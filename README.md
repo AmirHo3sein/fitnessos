@@ -30,6 +30,7 @@ packages/ui           shared React layer — primitives, patterns, DI factory
 packages/telemetry    observability seam — closed event vocabulary, no vendor (ADR-0032)
 packages/design-tokens  the colour system — generated, contrast-gated (see its README)
 packages/editor-engine  document · inverse-action history · spatial index · coordinate spaces
+packages/editor-react   React bindings — vanilla store, two channels, useSyncExternalStore
 tools/generators      plop generators
 tools/color           palette generator + WCAG gate + token-usage lint
 tools/stub-api        stands in for the backend in e2e and local dev
@@ -89,7 +90,7 @@ Phase 0 and the Phase 1 scaffold are complete.
 - [x] `apps/web` — route groups, middleware guard, RSC prefetch, per-group composition, **working sign-in** · 24 e2e
 - [x] CI stages 1–11
 
-**365 tests + 78 e2e. All CI stages live.**
+**377 tests + 78 e2e. All CI stages live.**
 
 ## Import convention
 

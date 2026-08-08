@@ -2,6 +2,21 @@ import '@testing-library/jest-dom/vitest'
 import { cleanup } from '@testing-library/react'
 import { afterEach } from 'vitest'
 
+/**
+ * Tell React it is in a test environment.
+ *
+ * Without this, `act()` warns and does not properly flush updates — so a test that asserts on
+ * post-update state can pass because the assertion happened to run after a microtask, and fail on
+ * a different machine. Testing Library sets it internally for its own helpers, but a direct
+ * `act()` call (which the editor store tests need, since they update the store outside React)
+ * relies on the global.
+ */
+declare global {
+  // eslint-disable-next-line no-var
+  var IS_REACT_ACT_ENVIRONMENT: boolean
+}
+globalThis.IS_REACT_ACT_ENVIRONMENT = true
+
 afterEach(() => {
   cleanup()
 })
