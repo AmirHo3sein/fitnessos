@@ -11,7 +11,9 @@
     "./athlete": "./src/athlete/index.ts",
     "./athlete/presentation": "./src/athlete/presentation/index.ts",
     "./auth": "./src/auth/index.ts",
-    "./auth/presentation": "./src/auth/presentation/index.ts"
+    "./auth/presentation": "./src/auth/presentation/index.ts",
+    "./goal": "./src/goal/index.ts",
+    "./goal/presentation": "./src/goal/presentation/index.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

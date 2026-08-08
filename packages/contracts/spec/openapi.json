@@ -202,6 +202,76 @@
           }
         }
       }
+    },
+    "/goals": {
+      "get": {
+        "operationId": "listMyGoals",
+        "tags": [
+          "goal"
+        ],
+        "summary": "The calling athlete's goals",
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Goal"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "operationId": "declareGoal",
+        "tags": [
+          "goal"
+        ],
+        "summary": "Declare a goal",
+        "description": "POST rather than PUT: declaring a goal creates a new one each time, and two goals with the same wording are legitimately different goals declared at different moments.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeclareGoalBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "declared",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Goal"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -399,6 +469,71 @@
           },
           "availability": {
             "$ref": "#/components/schemas/Availability"
+          }
+        }
+      },
+      "Goal": {
+        "type": "object",
+        "required": [
+          "id",
+          "athleteId",
+          "intent",
+          "declaredOn",
+          "cadenceDays"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "athleteId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "intent": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "The athlete's own words, verbatim. Never a normalised or translated form -- losing the phrasing is not recoverable."
+          },
+          "declaredOn": {
+            "type": "string",
+            "format": "date",
+            "description": "ISO date, no time. The declaration is a calendar fact in the athlete's zone."
+          },
+          "horizon": {
+            "type": "string",
+            "format": "date",
+            "description": "Absent means open-ended, which is a valid answer."
+          },
+          "cadenceDays": {
+            "type": "integer",
+            "minimum": 7,
+            "maximum": 365,
+            "description": "Evaluation cadence. NOT a status: staleness and expiry are derived from this plus a date (ADR-0006), never stored."
+          }
+        }
+      },
+      "DeclareGoalBody": {
+        "type": "object",
+        "required": [
+          "intent",
+          "cadenceDays"
+        ],
+        "properties": {
+          "intent": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "horizon": {
+            "type": "string",
+            "format": "date"
+          },
+          "cadenceDays": {
+            "type": "integer",
+            "minimum": 7,
+            "maximum": 365
           }
         }
       }

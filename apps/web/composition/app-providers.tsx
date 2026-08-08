@@ -1,9 +1,11 @@
 'use client'
 
 import { AthletePortsProvider } from '@fitnessos/core/athlete/presentation'
+import { GoalPortsProvider } from '@fitnessos/core/goal/presentation'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useRef, type ReactNode } from 'react'
 import { createAthletePorts } from './athlete'
+import { createGoalPorts } from './goal'
 import { createHttp } from './container'
 
 /**
@@ -47,23 +49,27 @@ export const AppProviders = ({ children }: { children: ReactNode }) => {
   // every port would re-render with it and `useMyAthlete` would see a new `queryFn`
   // each time, defeating the cache. The React Compiler makes no promise about this —
   // it is a correctness requirement, not a memoisation opportunity.
-  const ports = useMemo(
-    () =>
-      createAthletePorts(
-        createHttp({
-          mode: 'browser',
-          onSessionLost: () => {
-            // The refresh itself failed, so the session is genuinely gone. Send the
-            // user to sign-in rather than leaving them on a page that will keep
-            // 401ing every query it mounts.
-            routerRef.current.replace('/sign-in')
-          },
-        }),
-        // Browser requests carry cookies automatically, so no cookie to forward.
-        {},
-      ),
-    [],
-  )
+  const ports = useMemo(() => {
+    const http = createHttp({
+      mode: 'browser',
+      onSessionLost: () => {
+        // The refresh itself failed, so the session is genuinely gone. Send the user to
+        // sign-in rather than leaving them on a page that will keep 401ing every query
+        // it mounts.
+        routerRef.current.replace('/sign-in')
+      },
+    })
+    // One HTTP client, several contexts' ports. The client carries the refresh
+    // single-flight state, so sharing it is not an optimisation — two clients would each
+    // rotate the refresh token and revoke each other's session.
+    //
+    // Browser requests carry cookies automatically, so there is no cookie to forward.
+    return { athlete: createAthletePorts(http, {}), goal: createGoalPorts(http, {}) }
+  }, [])
 
-  return <AthletePortsProvider value={ports}>{children}</AthletePortsProvider>
+  return (
+    <AthletePortsProvider value={ports.athlete}>
+      <GoalPortsProvider value={ports.goal}>{children}</GoalPortsProvider>
+    </AthletePortsProvider>
+  )
 }

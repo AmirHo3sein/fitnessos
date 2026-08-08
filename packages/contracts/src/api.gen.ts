@@ -101,6 +101,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/goals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The calling athlete's goals */
+        get: operations["listMyGoals"];
+        put?: never;
+        /**
+         * Declare a goal
+         * @description POST rather than PUT: declaring a goal creates a new one each time, and two goals with the same wording are legitimately different goals declared at different moments.
+         */
+        post: operations["declareGoal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -155,6 +176,32 @@ export interface components {
         CompleteOnboardingBody: {
             trainingIdentity: components["schemas"]["TrainingIdentity"];
             availability: components["schemas"]["Availability"];
+        };
+        Goal: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            athleteId: string;
+            /** @description The athlete's own words, verbatim. Never a normalised or translated form -- losing the phrasing is not recoverable. */
+            intent: string;
+            /**
+             * Format: date
+             * @description ISO date, no time. The declaration is a calendar fact in the athlete's zone.
+             */
+            declaredOn: string;
+            /**
+             * Format: date
+             * @description Absent means open-ended, which is a valid answer.
+             */
+            horizon?: string;
+            /** @description Evaluation cadence. NOT a status: staleness and expiry are derived from this plus a date (ADR-0006), never stored. */
+            cadenceDays: number;
+        };
+        DeclareGoalBody: {
+            intent: string;
+            /** Format: date */
+            horizon?: string;
+            cadenceDays: number;
         };
     };
     responses: {
@@ -310,6 +357,61 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Athlete"];
+                };
+            };
+            /** @description invalid */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    listMyGoals: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ok */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Goal"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    declareGoal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeclareGoalBody"];
+            };
+        };
+        responses: {
+            /** @description declared */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Goal"];
                 };
             };
             /** @description invalid */

@@ -28,3 +28,4 @@ export type LocalizedText = Readonly<Record<Locale, string>>
 export const localized = (text: LocalizedText, locale: Locale): string => text[locale]
 
 export { normalizeDigits, isAllDigits } from './digits'
+export { countGraphemes, truncateGraphemes } from './graphemes'

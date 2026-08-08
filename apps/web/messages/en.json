@@ -81,5 +81,24 @@
       "noDisciplines": "Choose at least one kind of training.",
       "generic": "That did not save. Please try again."
     }
+  },
+  "goal": {
+    "declare": {
+      "intentLabel": "What do you want?",
+      "intentPlaceholder": "Run 10k without stopping",
+      "intentHint": "In your own words. It does not need to be precise or measurable.",
+      "horizonLabel": "By when?",
+      "horizonHint": "You can change this later.",
+      "horizonOpenEnded": "No deadline",
+      "submit": "Set goal",
+      "skip": "Later",
+      "errors": {
+        "empty": "Write your goal, or choose Later.",
+        "tooLong": "Keep it shorter — one sentence is enough.",
+        "horizonInPast": "That date has already passed.",
+        "horizonTooNear": "A deadline needs to be at least a week away so progress can be judged.",
+        "generic": "That did not save. Please try again."
+      }
+    }
   }
 }
