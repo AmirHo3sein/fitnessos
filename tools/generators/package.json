@@ -1,0 +1,13 @@
+{
+  "name": "@fitnessos/generators",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:unit": "node --test plopfile.test.mjs"
+  },
+  "devDependencies": {
+    "node-plop": "^0.32.0",
+    "plop": "^4.0.1"
+  }
+}
