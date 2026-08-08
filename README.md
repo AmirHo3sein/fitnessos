@@ -16,6 +16,14 @@ Deviating from the handbook requires an ADR, referenced by id in the lint rule
 that would otherwise block the change. Changes are accepted only when they solve
 a proven problem — a benchmark, a failing test, or a production incident.
 
+One document is authored here rather than there:
+
+- **`packages/contracts/BACKEND-CONTRACT.md`** — what the backend must do, in the
+  part an OpenAPI schema cannot express. Idempotency, conflict semantics, which
+  status codes carry a body, and which distinctions the client depends on being
+  real. Every item is something this codebase already assumes, with the failure
+  described — the symptom is almost never at the endpoint that caused it.
+
 ## Layout
 
 ```

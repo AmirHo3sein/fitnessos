@@ -5,6 +5,11 @@
  * Regenerate with `pnpm --filter @fitnessos/contracts contracts:generate`;
  * CI fails on any diff.
  *
+ * The schema is not the whole contract. `../BACKEND-CONTRACT.md` states the
+ * behaviour a schema cannot: which duplicate returns 409 and which returns 200,
+ * which conflicts must carry a body, and where `null` and absent mean different
+ * things. Changing an idempotency rule means changing that document too.
+ *
  * ADR-0011 / handbook §5: nothing outside `infra/mappers` may import this package.
  * Enforced by `no-contracts-escape`. If a contract type reaches presentation, a
  * backend field rename becomes a UI change — which is the whole failure mode the
