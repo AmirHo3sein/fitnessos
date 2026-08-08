@@ -15,4 +15,5 @@
  */
 export * from './domain/ScreeningVerdict'
 export * from './domain/PrescribedSession'
+export * from './domain/PerformedSession'
 export * from './application/index'

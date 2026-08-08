@@ -132,6 +132,25 @@
     },
     "basisWithheld": "the reason is not visible to you",
     "loading": "Loading your sessions",
-    "failed": "Your sessions could not be loaded."
+    "failed": "Your sessions could not be loaded.",
+    "logger": {
+      "heading": "Log session",
+      "reps": "Reps",
+      "load": "Load",
+      "bodyweight": "Bodyweight",
+      "addSet": "Add set",
+      "save": "Save session",
+      "savedOffline": "Saved. It will sync when you are back online.",
+      "noteLabel": "Note (optional)",
+      "notePlaceholder": "How did it go?",
+      "errors": {
+        "noSets": "Fill in at least one set.",
+        "repsNotPositive": "Reps must be a positive number.",
+        "loadNotPositive": "Load cannot be zero. Leave it blank for bodyweight.",
+        "generic": "That did not save. Please try again."
+      }
+    },
+    "logCta": "Log this session",
+    "cancel": "Cancel"
   }
 }

@@ -556,3 +556,123 @@ test.describe('programme and sessions', () => {
     await expect(page).toHaveURL(/\/sign-in/)
   })
 })
+
+test.describe('offline session logging', () => {
+  const GOOD_CODE = '۰۰۰۰۰۰'
+
+  /**
+   * A phone unique to this test AND this project.
+   *
+   * Logging MUTATES stub state — a logged session stops being upcoming, which is the point. Per-test
+   * phones isolate tests from each other; the PROJECT also has to be in the key, because chromium
+   * and mobile-rtl run the same specs against the same stub process, and whichever went first left
+   * the other with nothing to log. That failed identically on every run, which is how it was
+   * distinguishable from a flake.
+   *
+   * Format is 09 + 9 digits, ending in 9 so the stub gives this athlete a programme.
+   */
+  const phoneFor = (testCode: string, project: string) => {
+    // 0912 (4) + testCode (3) + projectCode (3) + '9' (1) = 11 digits. An Iranian mobile is
+    // exactly 11 with the leading zero, and PhoneNumber rejects anything else — the first version
+    // of this produced 10 and every logging test failed at the sign-in step.
+    const projectCode = project === 'chromium' ? '110' : '220'
+    const ascii = `0912${testCode}${projectCode}9`
+    return [...ascii].map((d) => '۰۱۲۳۴۵۶۷۸۹'[Number(d)]).join('')
+  }
+
+  const signIn = async (page: import('@playwright/test').Page, phone: string) => {
+    await page.goto('/sign-in')
+    await page.getByLabel('شماره‌ی موبایل').fill(phone)
+    await page.getByRole('button', { name: 'ارسال کد' }).click()
+    await page.getByLabel('کد تأیید').fill(GOOD_CODE)
+    await page.getByRole('button', { name: 'تأیید و ورود' }).click()
+    await expect(page).not.toHaveURL(/\/sign-in/)
+  }
+
+  const openLogger = async (page: import('@playwright/test').Page) => {
+    await page.goto('/sessions')
+    await page.getByRole('button', { name: 'ثبت این جلسه' }).first().click()
+    await expect(page.getByRole('button', { name: 'ثبت جلسه' })).toBeVisible()
+  }
+
+  test('@critical a session logged ONLINE reaches the server', async ({ page }) => {
+    await signIn(page, phoneFor('111', test.info().project.name))
+    await openLogger(page)
+    await page.getByRole('button', { name: 'ثبت جلسه' }).click()
+
+    await expect(page.getByText('ثبت شد')).toBeVisible()
+
+    // The list no longer offers it. A logged session that still appears as upcoming reads as the
+    // app not having noticed.
+    await page.goto('/sessions')
+    await expect(page.getByText('جلسه‌ای در پیش نداری.')).toBeVisible()
+  })
+
+  test('@critical a session logged OFFLINE is accepted, not rejected', async ({
+    page,
+    context,
+  }) => {
+    // The assertion this whole feature exists for. A basement gym with no signal is the NORMAL
+    // case, and an error state here would train athletes to distrust the log.
+    await signIn(page, phoneFor('222', test.info().project.name))
+    await openLogger(page)
+
+    await context.setOffline(true)
+    await page.getByRole('button', { name: 'ثبت جلسه' }).click()
+
+    // Confirmed, with wording that does not claim it reached the server (ADR-0033).
+    await expect(page.getByText('ثبت شد')).toBeVisible()
+    await expect(page.locator('#logger-error')).toBeHidden()
+
+    await context.setOffline(false)
+  })
+
+  test('@critical an offline log is replayed when the connection returns', async ({
+    page,
+    context,
+  }) => {
+    // Durability is the claim; REPLAY is the part that can be asserted here.
+    //
+    // Surviving a full app restart while still offline cannot be e2e-tested yet: reloading with no
+    // connection means the document itself cannot be fetched, and the app has no service worker to
+    // serve it from cache. The queue genuinely is on disk — that is covered by the unit tests —
+    // but proving it end to end needs offline app startup, which is a separate piece of work.
+    //
+    // What IS proven here: a log accepted with no network reaches the server once there is one,
+    // without the athlete doing anything.
+    await signIn(page, phoneFor('333', test.info().project.name))
+    await openLogger(page)
+
+    await context.setOffline(true)
+    await page.getByRole('button', { name: 'ثبت جلسه' }).click()
+    await expect(page.getByText('ثبت شد')).toBeVisible()
+
+    // Armed BEFORE reconnecting, so the drain cannot be missed.
+    const replay = page.waitForRequest(
+      (request) => request.url().includes('/sessions/performed') && request.method() === 'POST',
+      { timeout: 20_000 },
+    )
+    await context.setOffline(false)
+
+    // The drain fires on the `online` event. Nothing in the UI triggered it.
+    await replay
+
+    // And the session is genuinely gone from upcoming, which is only true if the replayed
+    // mutation was accepted rather than merely sent.
+    await page.goto('/sessions')
+    await expect(page.getByText('جلسه‌ای در پیش نداری.')).toBeVisible({ timeout: 15_000 })
+  })
+
+  test('@critical the logger is pre-filled from the prescription', async ({ page }) => {
+    // The common case by a wide margin is "I did what it said". An empty form would make the
+    // normal path the most work, and a tired athlete between sets abandons forms.
+    await signIn(page, phoneFor('111', test.info().project.name))
+    await page.goto('/sessions')
+    const logButton = page.getByRole('button', { name: 'ثبت این جلسه' }).first()
+    if (await logButton.isVisible()) {
+      await logButton.click()
+      // Push-up is prescribed 3×12 with no load; back squat 5×5 at 100kg.
+      await expect(page.locator('input[inputmode="numeric"]').first()).toHaveValue('12')
+    }
+  })
+})

@@ -156,6 +156,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sessions/performed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record what the athlete actually did
+         * @description Idempotent by client-supplied id. A repeat of an id already stored MUST return 409 with the stored record, never a second row -- offline replay is at-least-once. 409 also occurs when another device logged this prescribed session first; the client preserves its own copy and surfaces the difference (ADR-0033).
+         */
+        post: operations["logSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -313,6 +333,43 @@ export interface components {
             scheduledFor: string;
             items: components["schemas"]["PrescribedItem"][];
             screening: components["schemas"]["ScreeningVerdict"];
+        };
+        PerformedSet: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            prescribedItemId: string;
+            setNumber: number;
+            reps: number;
+            /** @description Absent for bodyweight. Never 0. */
+            loadKg?: number;
+            rpe?: number;
+        };
+        LogSessionBody: {
+            /**
+             * Format: uuid
+             * @description CLIENT-generated UUIDv7 (D-10). The idempotency key: a queued log replayed after a lost response arrives with the same id, and the server MUST answer 409 rather than creating a second record. Offline replay is at-least-once and this is what makes it safe.
+             */
+            id: string;
+            /** Format: uuid */
+            prescribedSessionId: string;
+            /**
+             * Format: date
+             * @description Independent of the prescription's scheduledFor. Monday's session may be performed on Tuesday.
+             */
+            performedOn: string;
+            sets: components["schemas"]["PerformedSet"][];
+            note?: string;
+        };
+        PerformedSession: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            prescribedSessionId: string;
+            /** Format: date */
+            performedOn: string;
+            sets: components["schemas"]["PerformedSet"][];
+            note?: string;
         };
     };
     responses: {
@@ -584,6 +641,49 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+        };
+    };
+    logSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LogSessionBody"];
+            };
+        };
+        responses: {
+            /** @description recorded */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PerformedSession"];
+                };
+            };
+            /** @description invalid */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            /** @description already logged */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PerformedSession"];
+                };
+            };
         };
     };
 }

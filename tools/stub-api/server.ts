@@ -31,6 +31,8 @@ import {
   CompleteOnboardingBodySchema,
   DeclareGoalBodySchema,
   GoalSchema,
+  LogSessionBodySchema,
+  PerformedSessionSchema,
   PrescribedSessionSchema,
   ProblemSchema,
   ProgramSchema,
@@ -94,6 +96,19 @@ interface StubGoal {
 
 /** Keyed by phone, for the same isolation reason as athletes. */
 const goals = new Map<string, StubGoal[]>()
+
+/**
+ * Performed sessions, keyed by phone then by the CLIENT-supplied id.
+ *
+ * Keying by the client's id is what implements the idempotency contract in ADR-0033: a replayed
+ * mutation arrives with an id already present and gets 409 with the stored record, rather than
+ * creating a second session. Offline replay is at-least-once, and this is the whole mechanism
+ * that makes that safe.
+ */
+const performed = new Map<string, Map<string, unknown>>()
+
+/** Which prescribed sessions already have a log, for the first-write-wins conflict rule. */
+const loggedPrescribed = new Map<string, Map<string, string>>()
 
 /**
  * A phone whose last digit is 9 gets a programme; everyone else gets none.
@@ -404,7 +419,12 @@ const handlers: Record<string, (req: IncomingMessage, res: ServerResponse) => Pr
       problem(res, 401, 'unauthenticated', 'no valid session')
       return
     }
-    const list = hasProgramme(phone) ? sessionsFor(phone) : []
+    const logged = loggedPrescribed.get(phone) ?? new Map<string, string>()
+    // A logged session is no longer upcoming. Without this the list still shows a session the
+    // athlete finished, which reads as the app not having noticed.
+    const list = hasProgramme(phone)
+      ? sessionsFor(phone).filter((session) => !logged.has(session.id))
+      : []
     for (const session of list) {
       const parsed = PrescribedSessionSchema.safeParse(session)
       if (!parsed.success) {
@@ -415,6 +435,69 @@ const handlers: Record<string, (req: IncomingMessage, res: ServerResponse) => Pr
     }
     res.writeHead(200, { 'content-type': 'application/json' })
     res.end(JSON.stringify(list))
+  },
+
+  /**
+   * Wipe all state. Called once before the e2e suite.
+   *
+   * Keying by phone isolates tests from each other WITHIN a run; it does nothing across runs,
+   * because Playwright reuses a running stub locally (`reuseExistingServer`). A session logged by
+   * yesterday's run is still logged today, so a test that expects an unlogged session finds none —
+   * which fails as "button not found", several steps from the cause.
+   *
+   * An explicit reset is better than per-run random phones: it keeps failures reproducible, and it
+   * makes the statefulness visible rather than something a future test has to rediscover.
+   */
+  'POST /__reset': async (_req, res) => {
+    athletes.clear()
+    goals.clear()
+    performed.clear()
+    loggedPrescribed.clear()
+    res.writeHead(204).end()
+    return Promise.resolve()
+  },
+
+  'POST /api/v1/sessions/performed': async (req, res) => {
+    const phone = phoneFromToken(cookiesOf(req)['access_token'])
+    if (phone === null) {
+      problem(res, 401, 'unauthenticated', 'no valid session')
+      return
+    }
+
+    const body = LogSessionBodySchema.safeParse(await readBody(req))
+    if (!body.success) {
+      problem(res, 400, 'invalid_request', 'a performed session requires id, prescribedSessionId, performedOn and at least one set')
+      return
+    }
+    const log = body.data as { id: string; prescribedSessionId: string }
+
+    const mine = performed.get(phone) ?? new Map<string, unknown>()
+    const byPrescribed = loggedPrescribed.get(phone) ?? new Map<string, string>()
+
+    // Same id replayed — the at-least-once case. Return the STORED record, not an error body: the
+    // client treats 409 as success and needs the canonical version.
+    const existingById = mine.get(log.id)
+    if (existingById !== undefined) {
+      res.writeHead(409, { 'content-type': 'application/json' })
+      res.end(JSON.stringify(existingById))
+      return
+    }
+
+    // Different id, same prescribed session — another device logged it first. First write wins;
+    // the client keeps its own copy and surfaces the difference (ADR-0033).
+    const winnerId = byPrescribed.get(log.prescribedSessionId)
+    if (winnerId !== undefined) {
+      res.writeHead(409, { 'content-type': 'application/json' })
+      res.end(JSON.stringify(mine.get(winnerId)))
+      return
+    }
+
+    mine.set(log.id, log)
+    byPrescribed.set(log.prescribedSessionId, log.id)
+    performed.set(phone, mine)
+    loggedPrescribed.set(phone, byPrescribed)
+
+    send(res, 201, PerformedSessionSchema, log)
   },
 
   'GET /api/v1/athletes/me': async (req, res) => {

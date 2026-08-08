@@ -32,6 +32,41 @@ export interface ExecutionReadPort {
   ) => Promise<readonly PrescribedSessionSnapshot[]>
 }
 
+export interface LoggedSetInput {
+  readonly id: string
+  readonly prescribedItemId: string
+  readonly setNumber: number
+  readonly reps: number
+  readonly loadKg: number | null
+  readonly rpe: number | null
+}
+
+export interface LogSessionInput {
+  readonly id: string
+  readonly prescribedSessionId: string
+  readonly performedOn: PlainDate
+  readonly sets: readonly LoggedSetInput[]
+  readonly note: string | null
+}
+
+export interface ExecutionWritePort {
+  /**
+   * Record a performed session.
+   *
+   * Resolves when the log is DURABLE, not when it reaches the server, and the boolean says which:
+   * `true` means it is queued for replay, `false` means it went straight through. The UI needs
+   * that distinction — "saved" and "saved, will sync" are different promises, and telling an
+   * athlete in a basement gym that their session is safely on the server would be a lie.
+   *
+   * Never rejects for a network reason. A gym with no signal is the NORMAL case here, not a
+   * failure, and an error state would train athletes to distrust the log.
+   */
+  readonly logSession: (input: LogSessionInput) => Promise<boolean>
+
+  /** Logs still waiting to reach the server. Drives the "n pending" indicator. */
+  readonly pendingLogCount: () => Promise<number>
+}
+
 export interface ExecutionPorts {
-  readonly execution: ExecutionReadPort
+  readonly execution: ExecutionReadPort & ExecutionWritePort
 }

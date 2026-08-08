@@ -17,7 +17,17 @@ import { defineConfig, devices } from '@playwright/test'
  */
 const STUB_API = process.env['STUB_API_URL'] ?? 'http://127.0.0.1:8791'
 
+/**
+ * Wipe the stub before the suite.
+ *
+ * The stub is stateful by design — logging a session has to actually change what is upcoming, or
+ * the write path cannot be asserted end to end. Locally Playwright reuses a running stub, so that
+ * state outlives the run and a later run finds sessions already logged.
+ */
+const globalSetup = new URL('./e2e/reset-stub.ts', import.meta.url).pathname
+
 export default defineConfig({
+  globalSetup,
   testDir: './e2e',
   fullyParallel: true,
   forbidOnly: !!process.env['CI'],

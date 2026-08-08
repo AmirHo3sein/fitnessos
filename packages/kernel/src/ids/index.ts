@@ -14,6 +14,16 @@ export type Branded<T, B extends string> = T & { readonly [brand]: B }
  */
 const make = <B extends string>(): Branded<string, B> => uuidv7() as Branded<string, B>
 
+/**
+ * A UUIDv7 with no brand, for entities that are identified but not first-class aggregates —
+ * a set within a session, a block within a programme version.
+ *
+ * Unbranded because there is nothing to confuse it with: these ids never cross a boundary on
+ * their own. Still a real UUIDv7 rather than a composed string, because the contract requires
+ * `format: uuid` and because time-ordering makes them sort correctly for free.
+ */
+export const newEntityId = (): string => uuidv7()
+
 /** Parse an id received from the wire. Does not validate UUID shape — the contract layer does. */
 const from = <B extends string>(raw: string): Branded<string, B> => raw as Branded<string, B>
 
