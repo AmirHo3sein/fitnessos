@@ -116,7 +116,26 @@
     "authoredByHuman": "Written by your coach",
     "authoredByAssistant": "Proposed by the assistant, approved by your coach",
     "loading": "Loading your programme",
-    "failed": "Your programme could not be loaded."
+    "failed": "Your programme could not be loaded.",
+    "edit": "Edit programme",
+    "cancel": "Done editing",
+    "saveFailed": "Your changes could not be saved. They are still here — try again.",
+    "conflictTitle": "This programme was changed elsewhere",
+    "conflictBody": "Someone else saved a new version while you were editing. Your changes are still here and nothing has been lost.",
+    "conflictKeep": "Keep my changes open",
+    "conflictDiscard": "Discard mine and reload",
+    "builder": {
+      "heading": "Blocks",
+      "addBlock": "Add block",
+      "removeBlock": "Remove",
+      "undo": "Undo",
+      "redo": "Redo",
+      "save": "Save",
+      "blockName": "Block name",
+      "rate": "per cycle",
+      "newBlockName": "New block",
+      "empty": "This programme has no blocks yet."
+    }
   },
   "sessions": {
     "heading": "Sessions",

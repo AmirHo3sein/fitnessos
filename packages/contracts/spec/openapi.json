@@ -71,7 +71,7 @@
           "auth"
         ],
         "summary": "Send a one-time code by SMS",
-        "description": "Rate limited per IP and per phone. Returns the same shape whether or not the phone is registered — a differing response would make this an account-enumeration oracle.",
+        "description": "Rate limited per IP and per phone. Returns the same shape whether or not the phone is registered \u2014 a differing response would make this an account-enumeration oracle.",
         "requestBody": {
           "required": true,
           "content": {
@@ -113,7 +113,7 @@
           "auth"
         ],
         "summary": "Exchange a one-time code for a session",
-        "description": "On success sets the access and refresh cookies (httpOnly, SameSite=Lax). No token is ever returned in the body — a token readable from JS is a token exfiltrable by XSS.",
+        "description": "On success sets the access and refresh cookies (httpOnly, SameSite=Lax). No token is ever returned in the body \u2014 a token readable from JS is a token exfiltrable by XSS.",
         "requestBody": {
           "required": true,
           "content": {
@@ -362,6 +362,82 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PerformedSession"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/programs/{programId}/versions": {
+      "post": {
+        "operationId": "reviseProgram",
+        "tags": [
+          "prescription"
+        ],
+        "summary": "Create the next version of a programme",
+        "description": "Idempotent by client-supplied version id; concurrency-checked by baseVersionId. A repeat of a stored id returns 200 with that version. A stale baseVersionId returns 409 with the CURRENT program, so the client can show the author what changed instead of silently discarding one of the two edits (ADR-0033).",
+        "parameters": [
+          {
+            "name": "programId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviseProgramBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "revised",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Program"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "this revision was already stored -- the same id replayed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Program"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "the base version is no longer current; body is the programme as it stands now",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Program"
                 }
               }
             }
@@ -1001,6 +1077,41 @@
             "type": "string"
           }
         }
+      },
+      "ReviseProgramBody": {
+        "type": "object",
+        "required": [
+          "id",
+          "baseVersionId",
+          "blocks",
+          "authoringDecision"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "CLIENT-generated id for the NEW version (D-10). The idempotency key: a revision replayed after a lost response arrives with the same id, and the server MUST return the stored version with 200 rather than creating a second one. Without it, a coach who loses the response and retries silently creates two versions and the athlete's programme jumps two numbers."
+          },
+          "baseVersionId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The version this revision was edited FROM. If it is no longer current, another author revised in the meantime and the server MUST answer 409 with the version that is current now -- overwriting would discard their work with no trace. Optimistic concurrency rather than locking, because a coach with a builder open for an hour must not hold a lock for an hour."
+          },
+          "blocks": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/components/schemas/Block"
+            }
+          },
+          "servesGoal": {
+            "$ref": "#/components/schemas/ServesGoal"
+          },
+          "authoringDecision": {
+            "$ref": "#/components/schemas/AuthoringDecision"
+          }
+        },
+        "description": "A revision creates a NEW version and leaves the old one untouched (ADR-0008): a structure an athlete has already followed cannot be edited without making every PerformedSession against it unreadable. versionNumber is assigned by the server, not sent -- it is derived from the lineage and a client that guessed it would race another author."
       }
     }
   }

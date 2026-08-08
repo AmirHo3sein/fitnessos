@@ -38,6 +38,7 @@ import {
   ProgramSchema,
   RequestCodeBodySchema,
   RequestCodeResultSchema,
+  ReviseProgramBodySchema,
   VerifyCodeBodySchema,
   VerifyCodeResultSchema,
 } from '../../packages/contracts/src/schemas.gen.ts'
@@ -111,6 +112,12 @@ const performed = new Map<string, Map<string, unknown>>()
 const loggedPrescribed = new Map<string, Map<string, string>>()
 
 /**
+ * Revisions, keyed by phone. `versions` is keyed by the CLIENT-supplied version id, which is what
+ * makes a replayed revision return the stored programme instead of creating a second one.
+ */
+const revisions = new Map<string, { current: unknown; versions: Map<string, unknown> }>()
+
+/**
  * A phone whose last digit is 9 gets a programme; everyone else gets none.
  *
  * Both paths need covering and neither is an error: "no programme yet" is the normal state for
@@ -118,6 +125,14 @@ const loggedPrescribed = new Map<string, Map<string, string>>()
  * choice deterministic and per-test, the same reason athlete state is keyed by phone.
  */
 const hasProgramme = (phone: string) => phone.endsWith('9')
+
+/** The programme as it now stands: the seed, unless a revision replaced it. */
+const currentProgrammeFor = (phone: string): Record<string, unknown> => {
+  const revised = revisions.get(phone)?.current
+  if (revised !== undefined) return revised as Record<string, unknown>
+  const { _athleteId: _unused, ...programme } = programmeFor(phone)
+  return programme
+}
 
 const programmeFor = (phone: string) => {
   const { personId, athleteId } = idsFor(phone)
@@ -409,8 +424,7 @@ const handlers: Record<string, (req: IncomingMessage, res: ServerResponse) => Pr
       res.writeHead(204).end()
       return
     }
-    const { _athleteId: _unused, ...programme } = programmeFor(phone)
-    send(res, 200, ProgramSchema, programme)
+    send(res, 200, ProgramSchema, currentProgrammeFor(phone))
   },
 
   'GET /api/v1/sessions/upcoming': async (req, res) => {
@@ -453,6 +467,7 @@ const handlers: Record<string, (req: IncomingMessage, res: ServerResponse) => Pr
     goals.clear()
     performed.clear()
     loggedPrescribed.clear()
+    revisions.clear()
     res.writeHead(204).end()
     return Promise.resolve()
   },
@@ -500,6 +515,58 @@ const handlers: Record<string, (req: IncomingMessage, res: ServerResponse) => Pr
     send(res, 201, PerformedSessionSchema, log)
   },
 
+  'POST /api/v1/programs/:programId/versions': async (req, res) => {
+    const phone = phoneFromToken(cookiesOf(req)['access_token'])
+    if (phone === null) {
+      problem(res, 401, 'unauthenticated', 'no valid session')
+      return
+    }
+
+    const body = ReviseProgramBodySchema.safeParse(await readBody(req))
+    if (!body.success) {
+      problem(res, 400, 'invalid_body', body.error.issues[0]?.message ?? 'invalid')
+      return
+    }
+
+    const state = revisions.get(phone) ?? { current: undefined, versions: new Map() }
+    const stored = state.versions.get(body.data.id)
+    if (stored !== undefined) {
+      // The same revision replayed after a lost response. 200 with what was stored, never a
+      // second version — this is the client-generated-id contract in ADR-0010, and the whole
+      // reason `id` is in the body at all.
+      send(res, 200, ProgramSchema, stored)
+      return
+    }
+
+    const current = currentProgrammeFor(phone) as {
+      currentVersion: { id: string; versionNumber: number }
+    }
+    if (body.data.baseVersionId !== current.currentVersion.id) {
+      // Someone else revised first. 409 with the programme AS IT NOW STANDS, so the client can
+      // show the author what they collided with rather than only that they collided.
+      send(res, 409, ProgramSchema, current)
+      return
+    }
+
+    const revised = {
+      ...current,
+      currentVersion: {
+        id: body.data.id,
+        programId: (current as unknown as { id: string }).id,
+        // Assigned HERE, by the lineage. A client that sent its own would race another author.
+        versionNumber: current.currentVersion.versionNumber + 1,
+        blocks: body.data.blocks,
+        ...(body.data.servesGoal === undefined ? {} : { servesGoal: body.data.servesGoal }),
+        authoringDecision: body.data.authoringDecision,
+      },
+    }
+
+    state.versions.set(body.data.id, revised)
+    state.current = revised
+    revisions.set(phone, state)
+    send(res, 201, ProgramSchema, revised)
+  },
+
   'GET /api/v1/athletes/me': async (req, res) => {
     // The check that makes the forged-cookie e2e meaningful. A cookie that is present
     // but not one this server issued is refused — which is what the real backend does
@@ -515,7 +582,15 @@ const handlers: Record<string, (req: IncomingMessage, res: ServerResponse) => Pr
 }
 
 createServer((req, res) => {
-  const path = (req.url ?? '').split('?')[0] ?? ''
+  const raw = (req.url ?? '').split('?')[0] ?? ''
+  // Handlers are keyed by exact path, which is enough for every route but one. Rather than
+  // introduce a router for a single parameterised path, the id is folded back into the literal
+  // key it was written with — the id itself is not needed, since programme state is keyed by
+  // phone like everything else here.
+  const path = raw.replace(
+    /^\/api\/v1\/programs\/[^/]+\/versions$/,
+    '/api/v1/programs/:programId/versions',
+  )
   const handler = handlers[`${req.method ?? 'GET'} ${path}`]
 
   if (!handler) {

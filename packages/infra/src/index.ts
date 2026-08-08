@@ -24,7 +24,10 @@ export { createAthleteReadAdapter } from './adapters/athleteReadAdapter'
 export { createAuthAdapter } from './adapters/authAdapter'
 export { createAthleteWriteAdapter } from './adapters/athleteWriteAdapter'
 export { createGoalAdapter } from './adapters/goalAdapter'
-export { createPrescriptionAdapter } from './adapters/prescriptionAdapter'
+export {
+  createPrescriptionAdapter,
+  createPrescriptionWriteAdapter,
+} from './adapters/prescriptionAdapter'
 export { createExecutionAdapter } from './adapters/executionAdapter'
 export {
   createExecutionWriteAdapter,

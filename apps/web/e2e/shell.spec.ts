@@ -676,3 +676,158 @@ test.describe('offline session logging', () => {
     }
   })
 })
+
+test.describe('the program builder', () => {
+  const GOOD_CODE = '۰۰۰۰۰۰'
+
+  /**
+   * Per-test AND per-project phones, for the same reason as offline logging: revising MUTATES
+   * stub state, and chromium and mobile-rtl run these specs against one stub process. Sharing a
+   * number would leave whichever ran second editing a programme the first had already revised —
+   * failing on a conflict assertion in a test that is not about conflicts.
+   *
+   * 0912 (4) + testCode (3) + projectCode (3) + '9' (1) = 11 digits, ending in 9 so the athlete
+   * has a programme to edit.
+   */
+  const phoneFor = (testCode: string, project: string) => {
+    const projectCode = project === 'chromium' ? '330' : '440'
+    const ascii = `0912${testCode}${projectCode}9`
+    return [...ascii].map((d) => '۰۱۲۳۴۵۶۷۸۹'[Number(d)]).join('')
+  }
+
+  const signIn = async (page: import('@playwright/test').Page, phone: string) => {
+    await page.goto('/sign-in')
+    await page.getByLabel('شماره‌ی موبایل').fill(phone)
+    await page.getByRole('button', { name: 'ارسال کد' }).click()
+    await page.getByLabel('کد تأیید').fill(GOOD_CODE)
+    await page.getByRole('button', { name: 'تأیید و ورود' }).click()
+    await expect(page).not.toHaveURL(/\/sign-in/)
+  }
+
+  const openBuilder = async (page: import('@playwright/test').Page) => {
+    await page.goto('/programme')
+    await page.getByRole('button', { name: 'ویرایش برنامه' }).click()
+    await expect(page.getByRole('button', { name: 'ذخیره' })).toBeVisible()
+  }
+
+  test('@critical a renamed block survives a save and a reload', async ({ page }) => {
+    /*
+     * The whole vertical, exercised once: editor document → commit → domain validation →
+     * outbound mapper → HTTP → stub → read path → mapper → view. Each layer has its own test;
+     * this is the one that fails if two of them agree with each other and not with reality.
+     */
+    await signIn(page, phoneFor('111', test.info().project.name))
+    await openBuilder(page)
+
+    const first = page.getByLabel('نام بلوک').first()
+    await first.fill('Base phase')
+    await page.getByRole('button', { name: 'ذخیره' }).click()
+    await page.getByRole('button', { name: 'پایان ویرایش' }).click()
+
+    await expect(page.locator('ol li').first()).toContainText('Base phase')
+
+    // Reloaded, so the assertion is about what the SERVER holds rather than what the local cache
+    // was set to after the mutation.
+    await page.reload()
+    await expect(page.locator('ol li').first()).toContainText('Base phase')
+  })
+
+  test('@critical saving bumps the version number', async ({ page }) => {
+    // Assigned by the lineage, not the client. If the client ever started sending its own, this
+    // is what would notice.
+    await signIn(page, phoneFor('222', test.info().project.name))
+    await page.goto('/programme')
+    await expect(page.getByText('نسخه')).toContainText('۲')
+
+    await openBuilder(page)
+    await page.getByLabel('نام بلوک').first().fill('Renamed')
+    await page.getByRole('button', { name: 'ذخیره' }).click()
+    await page.getByRole('button', { name: 'پایان ویرایش' }).click()
+
+    await expect(page.getByText('نسخه')).toContainText('۳')
+  })
+
+  test('@critical an added block is persisted with a contiguous order', async ({ page }) => {
+    await signIn(page, phoneFor('333', test.info().project.name))
+    await openBuilder(page)
+
+    await page.getByRole('button', { name: 'افزودن بلوک' }).click()
+    await page.getByRole('button', { name: 'ذخیره' }).click()
+    await page.getByRole('button', { name: 'پایان ویرایش' }).click()
+    await page.reload()
+
+    await expect(page.locator('ol li')).toHaveCount(3)
+    await expect(page.locator('ol li').nth(2)).toContainText('بلوک تازه')
+  })
+
+  test('@critical undo reverses a deletion before it is ever sent', async ({ page }) => {
+    await signIn(page, phoneFor('444', test.info().project.name))
+    await openBuilder(page)
+
+    await page.getByRole('button', { name: /^حذف/ }).first().click()
+    await expect(page.getByLabel('نام بلوک')).toHaveCount(1)
+
+    await page.getByRole('button', { name: 'واگرد' }).click()
+    await expect(page.getByLabel('نام بلوک')).toHaveCount(2)
+
+    await page.getByRole('button', { name: 'ذخیره' }).click()
+    await page.getByRole('button', { name: 'پایان ویرایش' }).click()
+    await page.reload()
+    await expect(page.locator('ol li')).toHaveCount(2)
+  })
+
+  test('@critical a stale save reports a conflict and keeps the local edits', async ({
+    page,
+    request,
+  }) => {
+    /*
+     * The case ADR-0033 exists for. Another author revises while the builder is open; the save
+     * must be refused, the coach must be told, and their work must still be on screen.
+     *
+     * The second author is a direct API call rather than a second browser, because the point
+     * being tested is the server's baseVersionId check and the client's handling of the 409 —
+     * not two browsers.
+     */
+    const phone = phoneFor('555', test.info().project.name)
+    await signIn(page, phone)
+    await openBuilder(page)
+
+    // Revise from underneath, using the session cookie this browser already holds.
+    const cookies = await page.context().cookies()
+    const cookieHeader = cookies.map((c) => `${c.name}=${c.value}`).join('; ')
+    const current = await (
+      await request.get('http://127.0.0.1:8791/api/v1/programs/current', {
+        headers: { cookie: cookieHeader },
+      })
+    ).json()
+
+    const elsewhere = await request.post(
+      `http://127.0.0.1:8791/api/v1/programs/${current.id as string}/versions`,
+      {
+        headers: { cookie: cookieHeader },
+        data: {
+          id: '018f2c8a-0004-7000-8000-0000000000ff',
+          baseVersionId: current.currentVersion.id as string,
+          blocks: [
+            {
+              id: '018f2c8a-0005-7000-8000-000000000001',
+              name: 'Written by someone else',
+              order: 0,
+              progressionIntent: { kind: 'fixed' },
+            },
+          ],
+          authoringDecision: { decidedBy: 'coach-2', proposedBy: 'human' },
+        },
+      },
+    )
+    expect(elsewhere.status()).toBe(201)
+
+    await page.getByLabel('نام بلوک').first().fill('My local edit')
+    await page.getByRole('button', { name: 'ذخیره' }).click()
+
+    await expect(page.getByText('این برنامه جای دیگری تغییر کرده است')).toBeVisible()
+    // The coach's work is still there. A conflict that discarded it would be strictly worse than
+    // no conflict detection at all.
+    await expect(page.getByLabel('نام بلوک').first()).toHaveValue('My local edit')
+  })
+})
