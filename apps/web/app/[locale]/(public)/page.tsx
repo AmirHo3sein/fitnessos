@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import { getTranslations } from 'next-intl/server'
 import { Link } from '../../../src/i18n/navigation'
 import { enableStaticRendering } from '../../../src/i18n/static'
@@ -17,6 +18,22 @@ import { enableStaticRendering } from '../../../src/i18n/static'
  * the middleware sets at runtime.
  */
 export const dynamic = 'force-dynamic'
+
+/**
+ * Fills the `%s` in the root layout's title template.
+ *
+ * Localised through the same catalogue as the page's own heading, so the tab and the h1 cannot
+ * drift apart into two different names for one screen.
+ */
+export const generateMetadata = async ({
+  params,
+}: {
+  params: Promise<{ locale: string }>
+}): Promise<Metadata> => {
+  const { locale } = await params
+  const t = await getTranslations({ locale, namespace: 'public' })
+  return { title: t('headline') }
+}
 
 export default async function LandingPage({
   params,

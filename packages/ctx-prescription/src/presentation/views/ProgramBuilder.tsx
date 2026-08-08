@@ -239,7 +239,7 @@ const BlockRow = ({
             onBlur={() => {
               setNameDraft(null)
             }}
-            className="border-default bg-surface-elevated text-primary focus:border-brand-border h-10 w-full rounded-md border px-3 outline-none"
+            className="border-default bg-surface-elevated text-primary focus:border-brand-border h-10 w-full rounded-md border px-3"
           />
 
           <Button

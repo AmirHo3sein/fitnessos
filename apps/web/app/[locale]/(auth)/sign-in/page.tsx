@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import { getTranslations } from 'next-intl/server'
 import { Suspense } from 'react'
 import { Card, CardDescription, CardTitle, Skeleton } from '@fitnessos/ui'
@@ -38,6 +39,22 @@ import { SignInClient } from './sign-in-client'
  * search-param read from suspending the whole page.
  */
 export const dynamic = 'force-dynamic'
+
+/**
+ * Fills the `%s` in the root layout's title template.
+ *
+ * Localised through the same catalogue as the page's own heading, so the tab and the h1 cannot
+ * drift apart into two different names for one screen.
+ */
+export const generateMetadata = async ({
+  params,
+}: {
+  params: Promise<{ locale: string }>
+}): Promise<Metadata> => {
+  const { locale } = await params
+  const t = await getTranslations({ locale, namespace: 'auth' })
+  return { title: t('signIn.title') }
+}
 
 export default async function SignInPage({
   params,

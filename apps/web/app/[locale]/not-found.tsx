@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import { getTranslations } from 'next-intl/server'
 import { Card, CardDescription, CardTitle } from '@fitnessos/ui'
 
@@ -14,6 +15,14 @@ import { Card, CardDescription, CardTitle } from '@fitnessos/ui'
  * never was.
  */
 export const dynamic = 'force-dynamic'
+
+/**
+ * Fills the `%s` in the root layout's title template.
+ *
+ * A 404 whose tab still reads "FitnessOS" is the case a title is most useful for: someone with
+ * twenty tabs open needs to see which one went nowhere.
+ */
+export const metadata: Metadata = { title: 'FitnessOS' }
 
 export default async function NotFound() {
   const t = await getTranslations('notFound')

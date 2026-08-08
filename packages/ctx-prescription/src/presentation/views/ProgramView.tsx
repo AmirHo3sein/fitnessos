@@ -77,7 +77,7 @@ export const ProgramView = ({ locale, labels }: ProgramViewProps) => {
       <Card>
         <CardTitle>{labels.title}</CardTitle>
         <CardDescription>{labels.noProgram}</CardDescription>
-        <p className="text-disabled mt-2 text-sm">{labels.noProgramHint}</p>
+        <p className="text-muted mt-2 text-sm">{labels.noProgramHint}</p>
       </Card>
     )
   }
@@ -113,7 +113,7 @@ export const ProgramView = ({ locale, labels }: ProgramViewProps) => {
               </span>
             </div>
             {block.progression.ratePercent !== null && (
-              <p className="text-disabled mt-1 text-xs">
+              <p className="text-muted mt-1 text-xs">
                 <span className="nums">{nf.format(block.progression.ratePercent)}%</span>{' '}
                 {labels.ratePerCycle}
               </p>

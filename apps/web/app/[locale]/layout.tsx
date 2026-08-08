@@ -1,5 +1,7 @@
 import { NextIntlClientProvider } from 'next-intl'
 import { hasLocale } from 'next-intl'
+import { getTranslations } from 'next-intl/server'
+import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { Vazirmatn } from 'next/font/google'
 import type { ReactNode } from 'react'
@@ -30,6 +32,30 @@ const vazirmatn = Vazirmatn({
  * adding one export to it; forgetting costs a dynamic render, which is the safe
  * direction to fail in.
  */
+
+/**
+ * The document title, and a template every page fills in.
+ *
+ * There was none at all until an axe audit reported `document-title` on every page — a serious
+ * WCAG 2.4.2 failure, and one that is completely invisible while developing, because a browser
+ * tab showing a URL looks unremarkable to someone who already knows where they are. It is not
+ * unremarkable to a screen-reader user, for whom the title is the first thing announced on every
+ * navigation, nor to anyone with twenty tabs open.
+ *
+ * A template rather than a title per page repeating the product name: `%s · FitnessOS` keeps the
+ * distinguishing part first, which is the part that survives a truncated tab.
+ */
+export const generateMetadata = async ({
+  params,
+}: {
+  params: Promise<{ locale: string }>
+}): Promise<Metadata> => {
+  const { locale } = await params
+  const t = await getTranslations({ locale, namespace: 'app' })
+  return {
+    title: { template: `%s · ${t('name')}`, default: t('name') },
+  }
+}
 
 /**
  * The root layout. A SERVER component — note the absence of `'use client'`.

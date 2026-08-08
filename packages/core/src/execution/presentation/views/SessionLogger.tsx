@@ -126,7 +126,7 @@ export const SessionLogger = ({ session, locale, labels, onLogged }: SessionLogg
                       update(draft.id, { reps: e.target.value })
                     }}
                     placeholder={labels.reps}
-                    className="border-default bg-surface-elevated text-primary focus:border-brand-border nums h-11 w-full rounded-md border px-3 outline-none"
+                    className="border-default bg-surface-elevated text-primary focus:border-brand-border nums h-11 w-full rounded-md border px-3"
                   />
                   <label className="sr-only" htmlFor={`${draft.id}-load`}>
                     {labels.load}
@@ -140,7 +140,7 @@ export const SessionLogger = ({ session, locale, labels, onLogged }: SessionLogg
                       update(draft.id, { load: e.target.value })
                     }}
                     placeholder={labels.bodyweight}
-                    className="border-default bg-surface-elevated text-primary focus:border-brand-border nums h-11 w-full rounded-md border px-3 outline-none"
+                    className="border-default bg-surface-elevated text-primary focus:border-brand-border nums h-11 w-full rounded-md border px-3"
                   />
                 </li>
               ))}
@@ -160,7 +160,7 @@ export const SessionLogger = ({ session, locale, labels, onLogged }: SessionLogg
             setNote(e.target.value)
           }}
           placeholder={labels.notePlaceholder}
-          className="border-default bg-surface-elevated text-primary focus:border-brand-border w-full resize-none rounded-md border px-3 py-2 outline-none"
+          className="border-default bg-surface-elevated text-primary focus:border-brand-border w-full resize-none rounded-md border px-3 py-2"
         />
       </div>
 

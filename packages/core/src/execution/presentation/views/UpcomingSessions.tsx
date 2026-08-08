@@ -47,7 +47,7 @@ export const UpcomingSessions = ({ locale, labels }: UpcomingSessionsProps) => {
       <Card>
         <CardTitle>{labels.title}</CardTitle>
         <CardDescription>{labels.none}</CardDescription>
-        <p className="text-disabled mt-2 text-sm">{labels.noneHint}</p>
+        <p className="text-muted mt-2 text-sm">{labels.noneHint}</p>
       </Card>
     )
   }
@@ -92,7 +92,7 @@ export const UpcomingSessions = ({ locale, labels }: UpcomingSessionsProps) => {
                 when in fact it is explained and the viewer is not entitled to the explanation.
               */}
               {session.screening.basis === null && session.screening.basisWithheld && (
-                <span className="text-disabled"> — {labels.basisWithheld}</span>
+                <span className="text-muted"> — {labels.basisWithheld}</span>
               )}
             </CardDescription>
           )}

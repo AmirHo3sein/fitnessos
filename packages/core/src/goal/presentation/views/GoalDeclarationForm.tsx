@@ -102,9 +102,9 @@ export const GoalDeclarationForm = ({
           {...(error === null
             ? {}
             : { 'aria-invalid': true, 'aria-errormessage': 'goal-error' })}
-          className="border-default bg-surface-elevated text-primary focus:border-brand-border w-full resize-none rounded-md border px-4 py-3 outline-none"
+          className="border-default bg-surface-elevated text-primary focus:border-brand-border w-full resize-none rounded-md border px-4 py-3"
         />
-        <p id="intent-hint" className="text-disabled mt-1.5 flex justify-between gap-4 text-xs">
+        <p id="intent-hint" className="text-muted mt-1.5 flex justify-between gap-4 text-xs">
           <span>{labels.intentHint}</span>
           <span className="nums shrink-0">
             {used}/{MAX_INTENT_LENGTH}
@@ -141,7 +141,7 @@ export const GoalDeclarationForm = ({
             {labels.horizonOpenEnded}
           </Button>
         </div>
-        <p className="text-disabled mt-1.5 text-xs">{labels.horizonHint}</p>
+        <p className="text-muted mt-1.5 text-xs">{labels.horizonHint}</p>
       </fieldset>
 
       {error !== null && (

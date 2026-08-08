@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import { getTranslations } from 'next-intl/server'
 import { hasLocale } from 'next-intl'
 import { routing } from '../../../../src/i18n/routing'
@@ -12,6 +13,22 @@ import { ProgrammeClient } from './programme-client'
  * needed by this route alone. Prefetching it in the layout would make every dashboard visit
  * pay for a query it does not use.
  */
+/**
+ * Fills the `%s` in the root layout's title template.
+ *
+ * Localised through the same catalogue as the page's own heading, so the tab and the h1 cannot
+ * drift apart into two different names for one screen.
+ */
+export const generateMetadata = async ({
+  params,
+}: {
+  params: Promise<{ locale: string }>
+}): Promise<Metadata> => {
+  const { locale } = await params
+  const t = await getTranslations({ locale, namespace: 'programme' })
+  return { title: t('heading') }
+}
+
 export default async function ProgrammePage({
   params,
 }: {

@@ -146,7 +146,7 @@ export const OnboardingForm = ({
           onChange={(event) => {
             setDays(event.target.value)
           }}
-          className="border-default bg-surface-elevated text-primary focus:border-brand-border nums h-12 w-full rounded-md border px-4 outline-none"
+          className="border-default bg-surface-elevated text-primary focus:border-brand-border nums h-12 w-full rounded-md border px-4"
         />
       </div>
 
@@ -165,9 +165,9 @@ export const OnboardingForm = ({
             setCeilingMinutes(event.target.value)
           }}
           aria-describedby="ceiling-hint"
-          className="border-default bg-surface-elevated text-primary focus:border-brand-border nums h-12 w-full rounded-md border px-4 outline-none"
+          className="border-default bg-surface-elevated text-primary focus:border-brand-border nums h-12 w-full rounded-md border px-4"
         />
-        <p id="ceiling-hint" className="text-disabled mt-1.5 text-xs">
+        <p id="ceiling-hint" className="text-muted mt-1.5 text-xs">
           {labels.ceilingHint}
         </p>
       </div>
