@@ -26,6 +26,22 @@ export { createAthleteWriteAdapter } from './adapters/athleteWriteAdapter'
 export { createGoalAdapter } from './adapters/goalAdapter'
 export { createPrescriptionAdapter } from './adapters/prescriptionAdapter'
 export { createExecutionAdapter } from './adapters/executionAdapter'
+export {
+  createExecutionWriteAdapter,
+  createMutationSender,
+} from './adapters/executionWriteAdapter'
+
+export { createSyncEngine, QUEUE_SCHEMA_VERSION } from './sync/queue'
+export type {
+  DrainOutcome,
+  MutationKind,
+  MutationStore,
+  QueuedMutation,
+  SyncConfig,
+  SyncEngine,
+} from './sync/queue'
+export { createMemoryStore } from './sync/memoryStore'
+export { createIndexedDbStore } from './sync/indexedDbStore'
 
 // Only the mapping FUNCTION is exported, never a type. The types it produces are
 // declared by the application layer and re-exported from there; a type family
@@ -36,4 +52,5 @@ export { codeRequestedFrom, sessionEstablishedFrom } from './mappers/auth'
 export { declareGoalBodyFrom, goalFrom, goalsFrom } from './mappers/goal'
 export { programFrom } from './mappers/program'
 export { sessionFrom, sessionsFrom } from './mappers/session'
+export { logSessionBodyFrom } from './mappers/performed'
 export { parseContract } from './mappers/parse'

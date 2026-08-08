@@ -326,6 +326,61 @@
           }
         }
       }
+    },
+    "/sessions/performed": {
+      "post": {
+        "operationId": "logSession",
+        "tags": [
+          "execution"
+        ],
+        "summary": "Record what the athlete actually did",
+        "description": "Idempotent by client-supplied id. A repeat of an id already stored MUST return 409 with the stored record, never a second row -- offline replay is at-least-once. 409 also occurs when another device logged this prescribed session first; the client preserves its own copy and surfaces the difference (ADR-0033).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LogSessionBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "recorded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PerformedSession"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "already logged",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PerformedSession"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -839,6 +894,113 @@
           }
         },
         "description": "Required screening is ADR-0021: a PrescribedSession cannot exist without a verdict covering its final RESOLVED dose. Screening an intent is worthless -- an intent has no numbers to screen."
+      },
+      "PerformedSet": {
+        "type": "object",
+        "required": [
+          "id",
+          "prescribedItemId",
+          "setNumber",
+          "reps"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "prescribedItemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "setNumber": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "reps": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "loadKg": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "Absent for bodyweight. Never 0."
+          },
+          "rpe": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 10,
+            "multipleOf": 0.5
+          }
+        }
+      },
+      "LogSessionBody": {
+        "type": "object",
+        "required": [
+          "id",
+          "prescribedSessionId",
+          "performedOn",
+          "sets"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "CLIENT-generated UUIDv7 (D-10). The idempotency key: a queued log replayed after a lost response arrives with the same id, and the server MUST answer 409 rather than creating a second record. Offline replay is at-least-once and this is what makes it safe."
+          },
+          "prescribedSessionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "performedOn": {
+            "type": "string",
+            "format": "date",
+            "description": "Independent of the prescription's scheduledFor. Monday's session may be performed on Tuesday."
+          },
+          "sets": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/components/schemas/PerformedSet"
+            }
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 500
+          }
+        }
+      },
+      "PerformedSession": {
+        "type": "object",
+        "required": [
+          "id",
+          "prescribedSessionId",
+          "performedOn",
+          "sets"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "prescribedSessionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "performedOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "sets": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/components/schemas/PerformedSet"
+            }
+          },
+          "note": {
+            "type": "string"
+          }
+        }
       }
     }
   }

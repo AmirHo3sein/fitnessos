@@ -1,4 +1,19 @@
 {
   "extends": "@fitnessos/config/tsconfig.package.json",
+  "compilerOptions": {
+    /*
+     * DOM lib, scoped to THIS package.
+     *
+     * `infra` is the platform-aware layer by definition — it already uses `fetch`, `Response` and
+     * `AbortSignal`, and the offline queue needs IndexedDB. Those types have to come from
+     * somewhere.
+     *
+     * Deliberately NOT added to the shared `tsconfig.package.json`: that would hand `document` and
+     * `window` to `kernel`, `domain` and `application`, which must stay renderer-free. The
+     * dependency-cruiser rules still forbid React here; this only supplies the web platform's
+     * type definitions to the one layer whose job is to talk to it.
+     */
+    "lib": ["ES2022", "DOM", "DOM.Iterable"]
+  },
   "include": ["src/**/*.ts"]
 }

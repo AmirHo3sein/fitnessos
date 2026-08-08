@@ -88,7 +88,7 @@ Phase 0 and the Phase 1 scaffold are complete.
 - [x] `apps/web` — route groups, middleware guard, RSC prefetch, per-group composition, **working sign-in** · 24 e2e
 - [x] CI stages 1–11
 
-**293 tests + 70 e2e. All CI stages live.**
+**327 tests + 78 e2e. All CI stages live.**
 
 ## Import convention
 
@@ -543,10 +543,7 @@ inverse-action history with checkpoints, a spatial index, branded coordinate spa
 a phase of work, not a file, and half of it is worse than none — an editor that can open a
 coach's programme and cannot reliably undo is a way to lose their work.
 
-**No session logging.** It is a write path against a live session with offline requirements
-(`infra/sync`, storage adapters, `serialization/migrate`), none of which exists. A logger
-that silently drops a set an athlete completed in a basement gym with no signal is worse
-than no logger — and that is the normal case here, not the edge case.
+**Session logging is offline-first** (ADR-0033). See below.
 
 What is proven out is the read path an editor and a logger will sit on: the aggregates, the
 invariants, the contract, the mappers, and the ordering guarantees.
@@ -622,3 +619,47 @@ are the same day, and showing a Gregorian date to an Iranian athlete is showing 
 they have to convert in their head. Formatted from the `PlainDate` components in **UTC**,
 because the value is a calendar fact with no time and no zone — letting the runtime interpret
 it locally is how the 10th becomes the 9th for anyone west of Greenwich.
+
+## Offline logging (ADR-0033)
+
+An athlete logs sets in a basement gym with no signal, on a phone that may be locked between
+sets. **This is the normal case for this feature, not an edge case** — which is why the logger
+was not built until `infra/sync` existed.
+
+`logSession` resolves when the log is **durable on the device**, not when it reaches the server.
+It never awaits the network and never rejects for a network reason. The confirmation says
+*"saved, will sync"* rather than *"saved"*, because telling someone in a basement that their
+session is on the server is a lie they would discover at the worst moment.
+
+### The three failure modes
+
+| Failure | Behaviour | Why |
+|---|---|---|
+| Transient — network, 5xx, **408, 429** | Stop the drain, retry later | The next mutation fails identically; each attempt costs a timeout and battery |
+| Permanent — 4xx except 408/429 | Quarantine **and continue** | One poison record would otherwise block every later log forever |
+| **409** | Treat as success | Already applied. Without this, a lost response poisons the queue permanently |
+
+Replay is at-least-once, made safe by a **client-generated UUIDv7** (D-10) that the server
+answers 409 to on a duplicate. Quarantine preserves the record — a mutation that cannot be sent
+is still evidence of work someone did.
+
+### Conflict policy: first write wins, loser preserved
+
+Last-write-wins was considered and rejected, because neither available clock can decide which
+write is "last": arrival order penalises the device that was offline longer, and client
+wall-clock drifts and can be set deliberately. So the server accepts the first log and answers
+409 to later ones; the client keeps its copy and surfaces the difference. **Neither side
+destroys data**, and the resolution goes to the athlete, who was there.
+
+### Three findings worth knowing
+
+- **TanStack Query's `networkMode: 'online'` default pauses mutations offline.** `mutationFn` is
+  never called, `isPending` stays true, and the UI hangs on a disabled button — silently. The
+  entire offline design was defeated by a library default that looks unrelated to it. Set
+  `networkMode: 'always'` on this mutation only; mutations that genuinely hit the server should
+  still pause.
+- **A success message inside a component the success handler unmounts renders for zero frames.**
+  Transient feedback about a completed action belongs to whatever survives the action.
+- **Offline app *startup* is not tested**, because it cannot work without a service worker — the
+  document itself cannot be fetched. Durability is covered by unit tests; the e2e proves replay
+  on reconnect. Stated rather than implied.

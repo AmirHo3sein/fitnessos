@@ -7,11 +7,10 @@ import { SessionsClient } from './sessions-client'
 /**
  * Upcoming prescribed sessions. Read-only.
  *
- * Logging what was actually performed is not here. It is a write path against a live session
- * with offline requirements — `infra/sync`, storage adapters, `serialization/migrate` — none
- * of which exists yet. A logger that silently loses a set an athlete completed in a basement
- * gym with no signal is worse than no logger, and that is the normal case rather than the
- * edge case.
+ * Logging is OFFLINE-FIRST (ADR-0033). A log resolves when it is durable on the device, not when
+ * it reaches the server — a basement gym with no signal is the normal case here, not a failure.
+ * The confirmation says "saved, will sync" rather than "saved", because telling an athlete their
+ * session is on the server when it is in a queue is a lie they would discover at the worst moment.
  */
 export default async function SessionsPage({
   params,
@@ -27,6 +26,27 @@ export default async function SessionsPage({
       <h1 className="text-display mb-6 text-2xl">{t('heading')}</h1>
       <SessionsClient
         locale={hasLocale(routing.locales, locale) ? locale : routing.defaultLocale}
+        logCta={t('logCta')}
+        savedOffline={t('logger.savedOffline')}
+        cancel={t('cancel')}
+        loggerLabels={{
+          heading: t('logger.heading'),
+          reps: t('logger.reps'),
+          load: t('logger.load'),
+          bodyweight: t('logger.bodyweight'),
+          addSet: t('logger.addSet'),
+          save: t('logger.save'),
+          noteLabel: t('logger.noteLabel'),
+          notePlaceholder: t('logger.notePlaceholder'),
+          errors: {
+            'no-sets': t('logger.errors.noSets'),
+            'reps-not-positive': t('logger.errors.repsNotPositive'),
+            'load-not-positive': t('logger.errors.loadNotPositive'),
+            'duplicate-set': t('logger.errors.generic'),
+            'rpe-out-of-range': t('logger.errors.generic'),
+            generic: t('logger.errors.generic'),
+          },
+        }}
         labels={{
           title: t('title'),
           none: t('none'),
