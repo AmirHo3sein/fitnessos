@@ -272,6 +272,60 @@
           }
         }
       }
+    },
+    "/programs/current": {
+      "get": {
+        "operationId": "getCurrentProgram",
+        "tags": [
+          "prescription"
+        ],
+        "summary": "The athlete's current programme and its current version",
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Program"
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "no programme yet"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/sessions/upcoming": {
+      "get": {
+        "operationId": "listUpcomingSessions",
+        "tags": [
+          "execution"
+        ],
+        "summary": "Prescribed sessions not yet performed",
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PrescribedSession"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -536,6 +590,255 @@
             "maximum": 365
           }
         }
+      },
+      "ProgressionIntent": {
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "fixed",
+              "linear",
+              "autoregulated"
+            ]
+          },
+          "ratePercent": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 20,
+            "description": "Percent per cycle. Present only for kind=linear. Percent rather than absolute because the same increment is trivial for one athlete and impossible for another."
+          }
+        }
+      },
+      "Block": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "order",
+          "progressionIntent"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "order": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Zero-based. Orders across a version must be exactly 0..n-1, each once."
+          },
+          "progressionIntent": {
+            "$ref": "#/components/schemas/ProgressionIntent"
+          }
+        }
+      },
+      "ServesGoal": {
+        "type": "object",
+        "required": [
+          "goalId"
+        ],
+        "properties": {
+          "goalId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "rationale": {
+            "type": "string"
+          }
+        },
+        "description": "States current purpose. NEVER an input to outcome evaluation (ADR-0008)."
+      },
+      "AuthoringDecision": {
+        "type": "object",
+        "required": [
+          "decidedBy",
+          "proposedBy"
+        ],
+        "properties": {
+          "decidedBy": {
+            "type": "string"
+          },
+          "proposedBy": {
+            "type": "string",
+            "enum": [
+              "human",
+              "assistant"
+            ],
+            "description": "Separate from decidedBy: an AI-proposed programme accepted by a coach was DECIDED by the coach. Collapsing them loses the fact that makes ADR-0003 auditable."
+          },
+          "rationale": {
+            "type": "string"
+          }
+        }
+      },
+      "ProgramVersion": {
+        "type": "object",
+        "required": [
+          "id",
+          "programId",
+          "versionNumber",
+          "blocks",
+          "authoringDecision"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "programId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "versionNumber": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "blocks": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/components/schemas/Block"
+            }
+          },
+          "servesGoal": {
+            "$ref": "#/components/schemas/ServesGoal"
+          },
+          "authoringDecision": {
+            "$ref": "#/components/schemas/AuthoringDecision"
+          }
+        }
+      },
+      "Program": {
+        "type": "object",
+        "required": [
+          "id",
+          "athleteId",
+          "title",
+          "currentVersion"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "athleteId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "currentVersion": {
+            "$ref": "#/components/schemas/ProgramVersion"
+          }
+        },
+        "description": "The LINEAGE plus its current structure. Program and ProgramVersion are separate aggregates (ADR-0008); this envelope is a read projection, not a merge."
+      },
+      "ScreeningVerdict": {
+        "type": "object",
+        "required": [
+          "level",
+          "basisWithheld"
+        ],
+        "properties": {
+          "level": {
+            "type": "string",
+            "enum": [
+              "clear",
+              "modified",
+              "blocked"
+            ]
+          },
+          "basis": {
+            "type": "string",
+            "description": "Why. Absent when consent-gated (ADR-0002/0014), which is NOT the same as absent because there is no reason -- see basisWithheld."
+          },
+          "basisWithheld": {
+            "type": "boolean",
+            "description": "True when a basis exists but this viewer may not see it. Distinguishes the two reasons basis can be absent."
+          }
+        }
+      },
+      "PrescribedItem": {
+        "type": "object",
+        "required": [
+          "id",
+          "movementName",
+          "order",
+          "sets",
+          "reps"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "movementName": {
+            "type": "string",
+            "minLength": 1
+          },
+          "order": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "sets": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "reps": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "loadKg": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "Resolved load in kilograms. ABSENT for bodyweight or time-based work -- never 0, which is what an unresolved progression writes."
+          }
+        }
+      },
+      "PrescribedSession": {
+        "type": "object",
+        "required": [
+          "id",
+          "programVersionId",
+          "scheduledFor",
+          "items",
+          "screening"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "programVersionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "scheduledFor": {
+            "type": "string",
+            "format": "date"
+          },
+          "items": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/components/schemas/PrescribedItem"
+            }
+          },
+          "screening": {
+            "$ref": "#/components/schemas/ScreeningVerdict"
+          }
+        },
+        "description": "Required screening is ADR-0021: a PrescribedSession cannot exist without a verdict covering its final RESOLVED dose. Screening an intent is worthless -- an intent has no numbers to screen."
       }
     }
   }

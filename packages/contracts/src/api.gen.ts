@@ -122,6 +122,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/programs/current": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The athlete's current programme and its current version */
+        get: operations["getCurrentProgram"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/upcoming": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Prescribed sessions not yet performed */
+        get: operations["listUpcomingSessions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -202,6 +236,83 @@ export interface components {
             /** Format: date */
             horizon?: string;
             cadenceDays: number;
+        };
+        ProgressionIntent: {
+            /** @enum {string} */
+            kind: "fixed" | "linear" | "autoregulated";
+            /** @description Percent per cycle. Present only for kind=linear. Percent rather than absolute because the same increment is trivial for one athlete and impossible for another. */
+            ratePercent?: number;
+        };
+        Block: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** @description Zero-based. Orders across a version must be exactly 0..n-1, each once. */
+            order: number;
+            progressionIntent: components["schemas"]["ProgressionIntent"];
+        };
+        /** @description States current purpose. NEVER an input to outcome evaluation (ADR-0008). */
+        ServesGoal: {
+            /** Format: uuid */
+            goalId: string;
+            rationale?: string;
+        };
+        AuthoringDecision: {
+            decidedBy: string;
+            /**
+             * @description Separate from decidedBy: an AI-proposed programme accepted by a coach was DECIDED by the coach. Collapsing them loses the fact that makes ADR-0003 auditable.
+             * @enum {string}
+             */
+            proposedBy: "human" | "assistant";
+            rationale?: string;
+        };
+        ProgramVersion: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            programId: string;
+            versionNumber: number;
+            blocks: components["schemas"]["Block"][];
+            servesGoal?: components["schemas"]["ServesGoal"];
+            authoringDecision: components["schemas"]["AuthoringDecision"];
+        };
+        /** @description The LINEAGE plus its current structure. Program and ProgramVersion are separate aggregates (ADR-0008); this envelope is a read projection, not a merge. */
+        Program: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            athleteId: string;
+            title: string;
+            currentVersion: components["schemas"]["ProgramVersion"];
+        };
+        ScreeningVerdict: {
+            /** @enum {string} */
+            level: "clear" | "modified" | "blocked";
+            /** @description Why. Absent when consent-gated (ADR-0002/0014), which is NOT the same as absent because there is no reason -- see basisWithheld. */
+            basis?: string;
+            /** @description True when a basis exists but this viewer may not see it. Distinguishes the two reasons basis can be absent. */
+            basisWithheld: boolean;
+        };
+        PrescribedItem: {
+            /** Format: uuid */
+            id: string;
+            movementName: string;
+            order: number;
+            sets: number;
+            reps: number;
+            /** @description Resolved load in kilograms. ABSENT for bodyweight or time-based work -- never 0, which is what an unresolved progression writes. */
+            loadKg?: number;
+        };
+        /** @description Required screening is ADR-0021: a PrescribedSession cannot exist without a verdict covering its final RESOLVED dose. Screening an intent is worthless -- an intent has no numbers to screen. */
+        PrescribedSession: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            programVersionId: string;
+            /** Format: date */
+            scheduledFor: string;
+            items: components["schemas"]["PrescribedItem"][];
+            screening: components["schemas"]["ScreeningVerdict"];
         };
     };
     responses: {
@@ -421,6 +532,55 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Problem"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    getCurrentProgram: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ok */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Program"];
+                };
+            };
+            /** @description no programme yet */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    listUpcomingSessions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ok */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrescribedSession"][];
                 };
             };
             401: components["responses"]["Unauthorized"];

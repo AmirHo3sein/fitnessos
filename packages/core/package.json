@@ -13,7 +13,11 @@
     "./auth": "./src/auth/index.ts",
     "./auth/presentation": "./src/auth/presentation/index.ts",
     "./goal": "./src/goal/index.ts",
-    "./goal/presentation": "./src/goal/presentation/index.ts"
+    "./goal/presentation": "./src/goal/presentation/index.ts",
+    "./prescription": "./src/prescription/index.ts",
+    "./prescription/presentation": "./src/prescription/presentation/index.ts",
+    "./execution": "./src/execution/index.ts",
+    "./execution/presentation": "./src/execution/presentation/index.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

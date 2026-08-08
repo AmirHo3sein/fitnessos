@@ -452,3 +452,107 @@ test.describe('goal declaration', () => {
     await expect(page.locator('#intent-hint')).toContainText('2/200')
   })
 })
+
+test.describe('programme and sessions', () => {
+  const GOOD_CODE = '۰۰۰۰۰۰'
+  /** Ends in 9, so the stub gives this athlete a programme. Does not write. */
+  const PHONE_WITH_PROGRAMME = '۰۹۱۲۳۴۵۶۷۸۹'
+  /** Ends in 0000, so no programme — the empty state, which is the normal first-run case. */
+  const PHONE_NO_PROGRAMME = '۰۹۱۲۸۸۸۰۰۰۰'
+
+  /**
+   * Waits until sign-in has actually completed before returning.
+   *
+   * Without the wait, a following `page.goto('/programme')` races the post-verify redirect:
+   * the session cookie may not be set when the navigation fires, so middleware bounces to
+   * sign-in and the test fails on an assertion about content, several lines from the cause.
+   *
+   * `not /sign-in` rather than a specific URL, because where the athlete lands depends on
+   * whether the stub considers them new — the dashboard for an existing person, onboarding for
+   * a new one.
+   */
+  const signIn = async (page: import('@playwright/test').Page, phone: string) => {
+    await page.goto('/sign-in')
+    await page.getByLabel('شماره‌ی موبایل').fill(phone)
+    await page.getByRole('button', { name: 'ارسال کد' }).click()
+    await page.getByLabel('کد تأیید').fill(GOOD_CODE)
+    await page.getByRole('button', { name: 'تأیید و ورود' }).click()
+    await expect(page).not.toHaveURL(/\/sign-in/)
+  }
+
+  test('@critical the programme renders its blocks in order', async ({ page }) => {
+    // The stub supplies blocks OUT of order deliberately — the contract promises no ordering,
+    // so this asserts the mapper sorts rather than rendering whatever arrived. Two clients
+    // showing the same programme in different orders is indistinguishable from a data bug.
+    await signIn(page, PHONE_WITH_PROGRAMME)
+    await expect(page).toHaveURL(/\/dashboard/)
+
+    await page.getByRole('link', { name: 'برنامه' }).click()
+    await expect(page).toHaveURL(/\/programme/)
+
+    const blocks = page.locator('ol li')
+    await expect(blocks.first()).toContainText('Preparation')
+    await expect(blocks.nth(1)).toContainText('Accumulation')
+  })
+
+  test('@critical a linear block shows its rate and a fixed block does not', async ({ page }) => {
+    await signIn(page, PHONE_WITH_PROGRAMME)
+    await page.goto('/programme')
+
+    await expect(page.getByText('افزایشی')).toBeVisible()
+    await expect(page.getByText('ثابت')).toBeVisible()
+    // 2.5% per cycle, rendered through Intl in Persian numerals.
+    await expect(page.getByText('۲٫۵%')).toBeVisible()
+  })
+
+  test('@critical no programme is an explained empty state, not a spinner', async ({ page }) => {
+    // A 204 maps to null, and null is DATA. If it were left as undefined the query would never
+    // settle and a newly-onboarded athlete would watch a spinner forever.
+    await signIn(page, PHONE_NO_PROGRAMME)
+    await page.goto('/programme')
+
+    await expect(page.getByText('هنوز برنامه‌ای نداری.')).toBeVisible()
+    await expect(page.getByRole('status')).toHaveCount(0)
+  })
+
+  test('@critical sessions show sets, reps, load, and bodyweight distinctly', async ({ page }) => {
+    await signIn(page, PHONE_WITH_PROGRAMME)
+    await page.goto('/sessions')
+
+    // Bodyweight work has NO load on the wire — absent, never 0. It must read as "bodyweight",
+    // not as "0 kg", which would look like a mistake to the athlete.
+    await expect(page.getByText('Push-up')).toBeVisible()
+    await expect(page.getByText('وزن بدن')).toBeVisible()
+    await expect(page.getByText('Back squat')).toBeVisible()
+    await expect(page.getByText('۱۰۰')).toBeVisible()
+  })
+
+  test('@critical a withheld screening basis says so rather than saying nothing', async ({
+    page,
+  }) => {
+    // ADR-0002 / ADR-0014. "Modified, and here is why" and "modified, and you are not entitled
+    // to the reason" are both `basis: null` on the wire and completely different statements to
+    // an athlete about to train. Saying nothing implies the modification is unexplained.
+    await signIn(page, PHONE_WITH_PROGRAMME)
+    await page.goto('/sessions')
+
+    await expect(page.getByText('با تغییر')).toBeVisible()
+    await expect(page.getByText('دلیلش برای تو قابل نمایش نیست')).toBeVisible()
+  })
+
+  test('@critical the session date renders in the Persian calendar', async ({ page }) => {
+    // 2026-08-10 is 1405/05/19 Jalali. Showing a Gregorian date to an Iranian athlete is
+    // showing them a date they have to convert in their head. Asserting on the Persian month
+    // name proves the calendar, not just the numerals.
+    await signIn(page, PHONE_WITH_PROGRAMME)
+    await page.goto('/sessions')
+    await expect(page.getByText('مرداد')).toBeVisible()
+  })
+
+  test('@critical both new routes require a session', async ({ page }) => {
+    await page.goto('/programme')
+    await expect(page).toHaveURL(/\/sign-in/)
+    await page.goto('/sessions')
+    await expect(page).toHaveURL(/\/sign-in/)
+  })
+})
