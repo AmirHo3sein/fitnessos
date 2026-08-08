@@ -29,3 +29,7 @@ export const VerifyCodeBodySchema = z.object({ "phone": z.string().regex(new Reg
 export const VerifyCodeResultSchema = z.object({ "personId": z.string().uuid(), "isNewPerson": z.boolean().describe("True when this verification created the person. The client routes to onboarding rather than the dashboard.") })
 
 export const CompleteOnboardingBodySchema = z.object({ "trainingIdentity": TrainingIdentitySchema, "availability": AvailabilitySchema })
+
+export const GoalSchema = z.object({ "id": z.string().uuid(), "athleteId": z.string().uuid(), "intent": z.string().min(1).max(200).describe("The athlete's own words, verbatim. Never a normalised or translated form -- losing the phrasing is not recoverable."), "declaredOn": z.string().date().describe("ISO date, no time. The declaration is a calendar fact in the athlete's zone."), "horizon": z.string().date().describe("Absent means open-ended, which is a valid answer.").optional(), "cadenceDays": z.number().int().gte(7).lte(365).describe("Evaluation cadence. NOT a status: staleness and expiry are derived from this plus a date (ADR-0006), never stored.") })
+
+export const DeclareGoalBodySchema = z.object({ "intent": z.string().min(1).max(200), "horizon": z.string().date().optional(), "cadenceDays": z.number().int().gte(7).lte(365) })

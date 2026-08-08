@@ -312,6 +312,11 @@ test.describe('onboarding', () => {
     await page.getByLabel('حداکثر مدت هر جلسه (دقیقه)').fill('۶۰')
     await page.getByRole('button', { name: 'ادامه' }).click()
 
+    // Step two: the goal. Skipped here — the athlete write path is what this test is
+    // about, and the goal has its own tests below.
+    await expect(page.getByLabel('چه چیزی می‌خواهی؟')).toBeVisible()
+    await page.getByRole('button', { name: 'بعداً' }).click()
+
     await expect(page).toHaveURL(/\/dashboard/)
 
     // What the athlete just entered, read back through the dashboard. This is the
@@ -359,9 +364,91 @@ test.describe('onboarding', () => {
     await signInAsNewPerson(page, PHONE_BACK_BUTTON)
     await page.getByRole('button', { name: 'قدرتی' }).click()
     await page.getByRole('button', { name: 'ادامه' }).click()
+    await page.getByRole('button', { name: 'بعداً' }).click()
     await expect(page).toHaveURL(/\/dashboard/)
 
     await page.goBack()
     await expect(page).not.toHaveURL(/\/onboarding/)
+  })
+})
+
+test.describe('goal declaration', () => {
+  const GOOD_CODE = '۰۰۰۰۰۰'
+  const PHONE_DECLARES = '۰۹۱۲۵۵۵۰۰۰۰'
+  const PHONE_EMPTY_GOAL = '۰۹۱۲۶۶۶۰۰۰۰'
+  const PHONE_SKIPS = '۰۹۱۲۷۷۷۰۰۰۰'
+
+  /** Through the athlete step to the goal step, which is where these tests start. */
+  const reachGoalStep = async (page: import('@playwright/test').Page, phone: string) => {
+    await page.goto('/sign-in')
+    await page.getByLabel('شماره‌ی موبایل').fill(phone)
+    await page.getByRole('button', { name: 'ارسال کد' }).click()
+    await page.getByLabel('کد تأیید').fill(GOOD_CODE)
+    await page.getByRole('button', { name: 'تأیید و ورود' }).click()
+    await expect(page).toHaveURL(/\/onboarding/)
+    await page.getByRole('button', { name: 'قدرتی' }).click()
+    await page.getByRole('button', { name: 'ادامه' }).click()
+    await expect(page.getByLabel('چه چیزی می‌خواهی؟')).toBeVisible()
+  }
+
+  test('@critical a Persian goal is declared verbatim, ZWNJ intact', async ({ page }) => {
+    // The assertion this whole context exists for. `می‌خواهم` carries a zero-width
+    // non-joiner, which is a letter-level joiner in Persian: strip it and the word
+    // becomes `میخواهم`, which reads to a Persian speaker as a spelling error the product
+    // introduced. The phone-number code strips ZWNJ deliberately; prose must not.
+    const intent = 'می‌خواهم ۱۰ کیلومتر بدون توقف بدوم'
+    let sent: string | null = null
+    page.on('request', (request) => {
+      if (request.url().endsWith('/goals') && request.method() === 'POST') {
+        const body = request.postData()
+        if (body !== null) sent = JSON.parse(body).intent as string
+      }
+    })
+
+    await reachGoalStep(page, PHONE_DECLARES)
+    await page.getByLabel('چه چیزی می‌خواهی؟').fill(intent)
+    await page.getByRole('button', { name: 'ثبت هدف' }).click()
+
+    await expect(page).toHaveURL(/\/dashboard/)
+    expect(sent).toBe(intent)
+    expect(sent).toContain('\u200c')
+  })
+
+  test('@critical an empty goal is refused before any request', async ({ page }) => {
+    let requested = false
+    page.on('request', (request) => {
+      if (request.url().endsWith('/goals') && request.method() === 'POST') requested = true
+    })
+
+    await reachGoalStep(page, PHONE_EMPTY_GOAL)
+    await page.getByRole('button', { name: 'ثبت هدف' }).click()
+
+    await expect(page.locator('#goal-error')).toContainText('هدفت را بنویس')
+    expect(requested).toBe(false)
+  })
+
+  test('@critical skipping is a real outcome, not a dead end', async ({ page }) => {
+    // A goal declared to get past a form becomes the thing every future prescription and
+    // evaluation is judged against — worse than arriving without one. So skipping must
+    // reach the dashboard, and must not post anything.
+    let requested = false
+    page.on('request', (request) => {
+      if (request.url().endsWith('/goals') && request.method() === 'POST') requested = true
+    })
+
+    await reachGoalStep(page, PHONE_SKIPS)
+    await page.getByRole('button', { name: 'بعداً' }).click()
+
+    await expect(page).toHaveURL(/\/dashboard/)
+    expect(requested).toBe(false)
+  })
+
+  test('@critical the character counter counts code points, not UTF-16 units', async ({
+    page,
+  }) => {
+    // A goal ending in an emoji must not be reported as one character longer than it is.
+    await reachGoalStep(page, PHONE_DECLARES)
+    await page.getByLabel('چه چیزی می‌خواهی؟').fill('a🏃')
+    await expect(page.locator('#intent-hint')).toContainText('2/200')
   })
 })

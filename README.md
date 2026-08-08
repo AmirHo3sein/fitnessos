@@ -85,7 +85,7 @@ Phase 0 and the Phase 1 scaffold are complete.
 - [x] `apps/web` — route groups, middleware guard, RSC prefetch, per-group composition, **working sign-in** · 24 e2e
 - [x] CI stages 1–11
 
-**207 tests + 48 e2e. All CI stages live.**
+**261 tests + 56 e2e. All CI stages live.**
 
 ## Import convention
 
@@ -447,3 +447,84 @@ are wider than its response; that is what `athleteInvalidations` is for.
 
 **`PUT`, not `POST`.** Onboarding is a form a user will resubmit after a network hiccup,
 and an idempotent verb makes that safe without a client-generated request id.
+
+## The Goal context
+
+The psychological centre of the domain (ADR-0004). People do not wake up wanting to
+improve a capability — they wake up wanting to run 10k without stopping, or to carry
+their child upstairs. The athlete's phrasing is stored **verbatim** because losing it is
+not recoverable: a coach reading "get stronger" cannot reconstruct that the athlete said
+"stop feeling weak when I pick up my daughter".
+
+Two ADRs shape the whole context, and both are tempting to break.
+
+**ADR-0018 — a Goal references nothing.** No programme, session, observation or proposal
+id. The moment it holds one it becomes a coordination record and every context touching
+programmes has to know about goals. The link runs the other way: `ProgramVersion` carries
+`ServesGoal` (ADR-0008), which states current purpose and is never an input to outcome
+evaluation. A test asserts the absence.
+
+**ADR-0006 — staleness, horizon expiry and closure are derived, not stored.** There is no
+`status`, no `isExpired`, no `isOverdue`, and no `lastEvaluatedAt`. A stored flag is wrong
+the instant time passes, which means something has to write it: a scheduled job, or a
+state machine spanning this context and Learning. Both are rejected. `isPastHorizon`,
+`isDueForEvaluation` and `daysOverdueForEvaluation` are functions taking the current date.
+
+`lastEvaluatedOn` is a **parameter**, not a field. The record of having evaluated
+something is a `DecisionOutcome` in the Learning context, which may neither read nor write
+another context's model (ADR-0019) — so Goal cannot know it, must not cache a copy, and
+receives it from whatever composed the two at the query layer. Two tests cover the absent
+fields, including one that says: *if this fails, delete the field, not the test.*
+
+### Text handling is not the same rule twice
+
+The two text value objects in this codebase normalise in **opposite** directions, and both
+are correct:
+
+| | `PhoneNumber` | `GoalIntent` |
+|---|---|---|
+| Persian digits `۰۹۱۲` | converted to ASCII | left alone — `۱۰ کیلومتر` is how it is written |
+| ZWNJ `U+200C` | **stripped** — incidental keyboard punctuation | **preserved** — a letter-level joiner |
+| whitespace | removed | collapsed to single spaces |
+
+The ZWNJ row is the one that matters. In a phone number it is noise a Persian keyboard
+inserted. In prose it changes words: می‌روم ("I go") is not میروم, and stripping it makes
+the product look like it introduced a spelling error into the athlete's own sentence.
+`\s` does not match `U+200C` in JavaScript, so prose survives by default — the comment in
+`GoalIntent` exists because the next person to touch it will have just read the
+phone-number code, where the rule is reversed.
+
+### Counting characters
+
+`countGraphemes` in the kernel, not `.length` and not code points. Three units get
+confused and only the third is what a user means:
+
+- `str.length` — UTF-16 units. `'🏃'` is 2.
+- code points — `'🏃'` is 1, but `'👨‍👩‍👧'` is 5, and a Persian letter with a diacritic
+  (بَ) is 2.
+- graphemes — what is rendered as one thing.
+
+The middle one is a trap because it looks like the fix. It solves the obvious emoji case
+and still miscounts vocalised Persian, so an athlete would be told they had used more of
+the limit than they had with nothing on screen explaining why. The domain rule and the
+on-screen counter call the same function, so they cannot disagree.
+
+### Dates never touch `Date`
+
+The contract carries ISO `date` strings; the application carries `PlainDate`.
+`new Date("2026-08-08")` parses as UTC midnight, so in a negative-offset zone it renders
+as the 7th — a goal declared on the 8th would display as the day before, and a horizon
+would shift by a day for some users and not others. The mapper decomposes the string
+arithmetically instead. Outbound, components are zero-padded: `"2027-1-5"` fails the
+contract's `format: date`.
+
+Use cases take a `Clock` and a timezone rather than reading the current date. A horizon
+rule tested against the real clock passes in March and fails in December — and "today" in
+Tehran is not "today" in UTC for several hours a day, which is exactly when someone
+declaring a goal late at night would have a horizon rejected for being one day too near.
+
+### Declaring is skippable
+
+A goal declared to get past a form becomes the thing every future prescription and
+evaluation is judged against. Arriving without one is better, so onboarding's second step
+has a first-class "later" that posts nothing, and an e2e test asserts it posts nothing.

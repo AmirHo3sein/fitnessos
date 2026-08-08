@@ -35,6 +35,7 @@ export default async function OnboardingPage({
   const { locale } = await params
   enableStaticRendering(locale)
   const t = await getTranslations('onboarding')
+  const g = await getTranslations('goal.declare')
 
   return (
     <main className="mx-auto max-w-md">
@@ -44,7 +45,27 @@ export default async function OnboardingPage({
         <div className="mt-6">
           <OnboardingClient
             disciplineOptions={DISCIPLINES}
-            labels={{
+            goalLabels={{
+              intentLabel: g('intentLabel'),
+              intentPlaceholder: g('intentPlaceholder'),
+              intentHint: g('intentHint'),
+              horizonLabel: g('horizonLabel'),
+              horizonHint: g('horizonHint'),
+              horizonOpenEnded: g('horizonOpenEnded'),
+              submit: g('submit'),
+              skip: g('skip'),
+              errors: {
+                empty: g('errors.empty'),
+                'too-long': g('errors.tooLong'),
+                'horizon-in-past': g('errors.horizonInPast'),
+                'horizon-too-near': g('errors.horizonTooNear'),
+                'cadence-too-short': g('errors.generic'),
+                'cadence-too-long': g('errors.generic'),
+                'cadence-not-whole': g('errors.generic'),
+                generic: g('errors.generic'),
+              },
+            }}
+            athleteLabels={{
               experienceLabel: t('experienceLabel'),
               experience: {
                 beginner: t('experience.beginner'),

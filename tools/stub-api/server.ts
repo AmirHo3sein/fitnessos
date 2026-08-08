@@ -29,6 +29,8 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import {
   AthleteSchema,
   CompleteOnboardingBodySchema,
+  DeclareGoalBodySchema,
+  GoalSchema,
   ProblemSchema,
   RequestCodeBodySchema,
   RequestCodeResultSchema,
@@ -78,6 +80,18 @@ interface StubAthlete {
 }
 
 const athletes = new Map<string, StubAthlete>()
+
+interface StubGoal {
+  id: string
+  athleteId: string
+  intent: string
+  declaredOn: string
+  horizon?: string
+  cadenceDays: number
+}
+
+/** Keyed by phone, for the same isolation reason as athletes. */
+const goals = new Map<string, StubGoal[]>()
 
 const athleteFor = (phone: string): StubAthlete => {
   const existing = athletes.get(phone)
@@ -253,6 +267,62 @@ const handlers: Record<string, (req: IncomingMessage, res: ServerResponse) => Pr
     const updated: StubAthlete = { ...athleteFor(phone), trainingIdentity, availability }
     athletes.set(phone, updated)
     send(res, 200, AthleteSchema, updated)
+  },
+
+  'GET /api/v1/goals': async (req, res) => {
+    const phone = phoneFromToken(cookiesOf(req)['access_token'])
+    if (phone === null) {
+      problem(res, 401, 'unauthenticated', 'no valid session')
+      return
+    }
+    // Validated per element, same as the client does, so a bad fixture fails here.
+    const list = goals.get(phone) ?? []
+    for (const g of list) {
+      const parsed = GoalSchema.safeParse(g)
+      if (!parsed.success) {
+        console.error('stub produced an invalid Goal', parsed.error)
+        res.writeHead(500).end()
+        return
+      }
+    }
+    res.writeHead(200, { 'content-type': 'application/json' })
+    res.end(JSON.stringify(list))
+  },
+
+  'POST /api/v1/goals': async (req, res) => {
+    const phone = phoneFromToken(cookiesOf(req)['access_token'])
+    if (phone === null) {
+      problem(res, 401, 'unauthenticated', 'no valid session')
+      return
+    }
+
+    const body = DeclareGoalBodySchema.safeParse(await readBody(req))
+    if (!body.success) {
+      problem(res, 400, 'invalid_request', 'intent and cadenceDays are required')
+      return
+    }
+    const { intent, horizon, cadenceDays } = body.data as {
+      intent: string
+      horizon?: string
+      cadenceDays: number
+    }
+
+    const athlete = athleteFor(phone)
+    const existing = goals.get(phone) ?? []
+    const declared: StubGoal = {
+      // Deterministic, so a failure is reproducible. The index is enough: goals are
+      // per-phone and each test uses its own number.
+      id: `018f2c8a-0002-7000-8000-${String(existing.length).padStart(12, '0')}`,
+      athleteId: athlete.personId,
+      // Verbatim. Normalising here would hide a client that failed to normalise.
+      intent,
+      // A calendar fact. Derived from the server's own date, never from the client's.
+      declaredOn: new Date().toISOString().slice(0, 10),
+      ...(horizon === undefined ? {} : { horizon }),
+      cadenceDays,
+    }
+    goals.set(phone, [...existing, declared])
+    send(res, 201, GoalSchema, declared)
   },
 
   'GET /api/v1/athletes/me': async (req, res) => {

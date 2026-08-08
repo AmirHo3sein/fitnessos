@@ -13,3 +13,6 @@
 // <<< contexts >>>
 export * from './athlete/index'
 export * from './auth/index'
+// Goal is reached through '@fitnessos/core/goal'. It is NOT re-exported here: its
+// vocabulary overlaps the Athlete context's (both have an 'Invalidator'), and a flat
+// re-export would silently pick one.

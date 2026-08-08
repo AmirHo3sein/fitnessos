@@ -23,6 +23,7 @@ export type { Refresher, RefreshConfig } from './http/refresh'
 export { createAthleteReadAdapter } from './adapters/athleteReadAdapter'
 export { createAuthAdapter } from './adapters/authAdapter'
 export { createAthleteWriteAdapter } from './adapters/athleteWriteAdapter'
+export { createGoalAdapter } from './adapters/goalAdapter'
 
 // Only the mapping FUNCTION is exported, never a type. The types it produces are
 // declared by the application layer and re-exported from there; a type family
@@ -30,4 +31,5 @@ export { createAthleteWriteAdapter } from './adapters/athleteWriteAdapter'
 // first without anything detecting it.
 export { athleteFrom, onboardingBodyFrom } from './mappers/athlete'
 export { codeRequestedFrom, sessionEstablishedFrom } from './mappers/auth'
+export { declareGoalBodyFrom, goalFrom, goalsFrom } from './mappers/goal'
 export { parseContract } from './mappers/parse'
