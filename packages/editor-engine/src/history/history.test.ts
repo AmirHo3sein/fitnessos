@@ -239,6 +239,15 @@ describe('the round-trip property', () => {
    * particular order of insert, move and remove that no one would think to write by hand. This is
    * what fast-check is for.
    */
+  /**
+   * Ids an insertion may use, disjoint from the starting document.
+   *
+   * Disjoint on purpose: `InsertNode` with an id already present overwrites rather than inserts,
+   * so a fuzzer that reused a name would be generating a case the action does not claim to
+   * support and would fail for a reason that is not a bug.
+   */
+  const fresh = ['x', 'y', 'z']
+
   const arbAction = (names: readonly string[]): fc.Arbitrary<EditorAction> =>
     fc.oneof(
       fc.record({
@@ -251,9 +260,28 @@ describe('the round-trip property', () => {
         type: fc.constant('RemoveNode' as const),
         nodeId: fc.constantFrom(...names).map(id),
       }),
+      /*
+       * Insertion, which this arbitrary did not generate until now.
+       *
+       * That was a real hole rather than an omission of convenience: `InsertNode` is one of the
+       * three actions a builder issues constantly, its inverse is `RemoveNode`, and the
+       * insert-then-undo path had only example coverage. A fuzzer that never inserts also never
+       * produces the interleavings that matter — insert, move the inserted node, remove its old
+       * sibling, undo all three.
+       */
+      fc.record({
+        type: fc.constant('InsertNode' as const),
+        node: fc.constantFrom(...fresh).map((n) => ({
+          id: id(n),
+          type: 'block',
+          props: {},
+        })),
+        parentId: fc.constant(null),
+        index: fc.integer({ min: 0, max: 3 }),
+      }),
       fc.record({
         type: fc.constant('MoveNodes' as const),
-        nodeIds: fc.constantFrom(...names).map((n) => [id(n)]),
+        nodeIds: fc.constantFrom(...names, ...fresh).map((n) => [id(n)]),
         toParentId: fc.constant(null),
         toIndex: fc.integer({ min: 0, max: 3 }),
       }),
@@ -273,7 +301,13 @@ describe('the round-trip property', () => {
           // `targetsOf` rather than a hand-rolled narrow: the union has six members and the
           // inline version only handled the three this arbitrary generates, so adding an action
           // would have silently stopped skipping.
-          if (targetsOf(action).some((t) => h.document.nodes[t] === undefined)) continue
+          //
+          // `InsertNode` is exempt, and has to be: its target is by definition absent, so the
+          // guard would skip every insertion and the fuzzer would silently be the old one again.
+          // An insert whose id IS present is skipped instead, since that overwrites.
+          if (action.type === 'InsertNode') {
+            if (h.document.nodes[action.node.id] !== undefined) continue
+          } else if (targetsOf(action).some((t) => h.document.nodes[t] === undefined)) continue
           h = push(h, action, opts('a', 1000 + i * 10_000))
         }
 
@@ -295,10 +329,12 @@ describe('the round-trip property', () => {
         let h = createHistory(withNodes(...names), { ...DEFAULT_HISTORY_CONFIG, coalesceWindowMs: 0 })
 
         for (const [i, action] of actions.entries()) {
-          // `targetsOf` rather than a hand-rolled narrow: the union has six members and the
-          // inline version only handled the three this arbitrary generates, so adding an action
-          // would have silently stopped skipping.
-          if (targetsOf(action).some((t) => h.document.nodes[t] === undefined)) continue
+          // Same exemption as above: an insertion's target is by definition absent, so the
+          // guard would skip every one of them and this test would still be fuzzing three
+          // action types while appearing to fuzz four.
+          if (action.type === 'InsertNode') {
+            if (h.document.nodes[action.node.id] !== undefined) continue
+          } else if (targetsOf(action).some((t) => h.document.nodes[t] === undefined)) continue
           h = push(h, action, opts('a', 1000 + i * 10_000))
         }
 

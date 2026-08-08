@@ -55,6 +55,18 @@ jobs:
 
       # Stage 5 — includes the generator tests (stage 11), which assert that
       # generated output renders cleanly and honours the boundary conventions.
+      #
+      # It also covers stage 13, the Phase 2 benchmark gate, and deliberately not as a
+      # timing. The handbook asks for "fail on >10% regression"; measured as wall clock
+      # against a stored baseline that gate does not survive a shared runner, which
+      # varies by more than 10% between two runs of identical code. So it either fires
+      # constantly and gets disabled, or is loosened until it catches nothing.
+      #
+      # The claims are not about milliseconds — O(1) memory per history entry, one node
+      # cloned per edit, O(1) spatial query — and each is testable exactly:
+      # `editor-engine/src/performance.test.ts` asserts reference identity, byte counts,
+      # and same-process ratios. That runs on every PR rather than only on main, cannot
+      # flake, and fails naming the claim it broke.
       - name: test:unit
         run: pnpm test:unit
 
