@@ -90,6 +90,17 @@ jobs:
   # worse than no test because it still reads as coverage.
   e2e:
     runs-on: ubuntu-latest
+    env:
+      # The stub API (tools/stub-api) stands in for the backend, which lives in another
+      # repository (ADR-0026). It is a separate process, never part of the app build.
+      #
+      # STUB_API_URL does two things: it enables the `/api/v1` rewrite in next.config,
+      # which stands in for the production reverse proxy (ADR-0025) so browser-side
+      # requests resolve; and it tells Playwright where to start and reach the stub.
+      # INTERNAL_API_URL is the server-side path the RSC prefetch uses. Both point at
+      # the same process, so the whole request path is exercised rather than half of it.
+      STUB_API_URL: http://127.0.0.1:8791
+      INTERNAL_API_URL: http://127.0.0.1:8791/api/v1
     steps:
       - uses: actions/checkout@v4
 
@@ -97,6 +108,8 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
+          # 22 minimum for `--experimental-strip-types`, which is how the stub runs its
+          # TypeScript with no build step and no transform dependency.
           node-version: 22
           cache: pnpm
 
@@ -108,13 +121,12 @@ jobs:
 
       - name: build
         run: pnpm --filter @fitnessos/web build
-        env:
-          INTERNAL_API_URL: http://127.0.0.1:8000/api/v1
 
+      # Playwright's webServer config starts both the stub and the app, so there is no
+      # separate step here — and no sleep-and-hope, since it waits on a real readiness
+      # URL for each.
       - name: e2e:critical
         run: pnpm --filter @fitnessos/web e2e:critical
-        env:
-          INTERNAL_API_URL: http://127.0.0.1:8000/api/v1
 
       - uses: actions/upload-artifact@v4
         if: failure()

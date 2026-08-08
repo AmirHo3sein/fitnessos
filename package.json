@@ -19,7 +19,8 @@
     "test:integration": "turbo run test:integration",
     "test:component": "turbo run test:component",
     "bundle:budget": "node tools/bundle-budget.mjs",
-    "e2e:critical": "pnpm --filter @fitnessos/web e2e:critical"
+    "e2e:critical": "pnpm --filter @fitnessos/web e2e:critical",
+    "dev:api": "pnpm --filter @fitnessos/stub-api start"
   },
   "devDependencies": {
     "@types/node": "^22.9.0",

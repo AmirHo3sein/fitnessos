@@ -41,6 +41,26 @@ const config: NextConfig = {
     reactCompiler: true,
   },
 
+  /**
+   * In production, `/api/v1` is served on the same origin by a reverse proxy
+   * (ADR-0025) and Next never sees those requests. There is no proxy in development
+   * or in e2e, so the browser's relative `/api/v1/...` calls would hit Next and 404.
+   *
+   * This rewrite stands in for the proxy, and only when `STUB_API_URL` is set — which
+   * it is not in any production deployment. That gate matters: a rewrite that always
+   * existed would let a misconfigured production environment silently route API
+   * traffic somewhere unintended rather than failing.
+   *
+   * A useful side effect is that development matches production topology. The client
+   * uses the same relative base URL in both, so a same-origin assumption cannot be
+   * accidentally broken in dev and discovered in production.
+   */
+  async rewrites() {
+    const stub = process.env['STUB_API_URL']
+    if (!stub) return []
+    return [{ source: '/api/v1/:path*', destination: `${stub}/api/v1/:path*` }]
+  },
+
   async headers() {
     return [
       {

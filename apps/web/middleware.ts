@@ -5,7 +5,7 @@ import { routing } from './src/i18n/routing'
 const intl = createIntlMiddleware(routing)
 
 /** Route segments under `(app)` require a session. */
-const PROTECTED = ['/dashboard', '/programme', '/sessions', '/settings']
+const PROTECTED = ['/dashboard', '/onboarding', '/programme', '/sessions', '/settings']
 
 const stripLocale = (pathname: string): string => {
   for (const locale of routing.locales) {

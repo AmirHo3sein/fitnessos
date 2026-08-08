@@ -28,6 +28,7 @@ packages/core         un-graduated bounded contexts; each exposes `./{ctx}` and 
 packages/ctx-*        graduated bounded contexts
 packages/ui           shared React layer — primitives, patterns, DI factory
 tools/generators      plop generators
+tools/stub-api        stands in for the backend in e2e and local dev
 tools/bundle-budget   CI stage 9
 ```
 
@@ -43,7 +44,8 @@ pnpm test:integration   # infra against MSW
 pnpm test:component     # jsdom
 pnpm build              # needs INTERNAL_API_URL
 pnpm bundle:budget      # reads the manifests build produced
-pnpm e2e:critical       # needs a build first
+pnpm e2e:critical       # starts the stub API and the app itself
+pnpm dev:api            # stub API alone, for `pnpm dev` against fake data
 ```
 
 ## The rules that matter
@@ -83,7 +85,7 @@ Phase 0 and the Phase 1 scaffold are complete.
 - [x] `apps/web` — route groups, middleware guard, RSC prefetch, per-group composition, **working sign-in** · 24 e2e
 - [x] CI stages 1–11
 
-**145 tests + 24 e2e. All CI stages live.**
+**145 tests + 38 e2e. All CI stages live.**
 
 ## Import convention
 
@@ -347,3 +349,41 @@ The flow is a discriminated union, not a set of booleans: `phase`, `isLoading`,
 meaningful. The normalised phone exists only in the `awaiting-code` state, so
 verification cannot be attempted against a re-parse of whatever is in the input —
 which is what happens when a user retypes their number while waiting for the SMS.
+
+## The stub API
+
+`tools/stub-api` stands in for the backend, which lives in another repository
+(ADR-0026). Before it existed the e2e suite could prove a phone number was normalised
+but not that a correct code establishes a session, and not that a forged cookie is
+refused — the two assertions that actually matter.
+
+```bash
+pnpm dev:api    # http://127.0.0.1:8791
+```
+
+| | |
+|---|---|
+| code that verifies | `000000` |
+| phone ending `0000` | treated as a new person, so onboarding is reachable |
+| any other code | 400 `code_invalid` |
+| unissued `access_token` | 401 `unauthenticated` |
+
+Three properties are deliberate:
+
+- **It is a separate process, never part of the app build.** A Route Handler inside
+  `apps/web` would have been less code and a much worse idea — an endpoint that returns
+  fabricated athlete data must not be *capable* of existing in a production bundle.
+- **Every response is validated against the same generated schema the client validates
+  it with.** A stub that drifts from the contract is worse than no stub: the suite goes
+  green against a shape the real backend will never produce. There is no unvalidated
+  `send`.
+- **Fixtures are fixed, never random.** `Math.random()` in a fixture is how a suite
+  becomes flaky without anyone changing a line of it.
+
+The browser reaches it through a `/api/v1` rewrite in `next.config.ts` that exists only
+when `STUB_API_URL` is set — standing in for the production reverse proxy (ADR-0025),
+which Next never sees. Development therefore matches production topology: the client
+uses the same relative base URL in both, so a same-origin assumption cannot be broken
+in dev and discovered in production. The gate matters as much as the rewrite: one that
+always existed would let a misconfigured production environment route API traffic
+somewhere unintended instead of failing.
