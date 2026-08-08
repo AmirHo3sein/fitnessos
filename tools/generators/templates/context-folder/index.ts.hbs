@@ -1,0 +1,14 @@
+/**
+ * {{pascal name}} — context barrel inside @fitnessos/core.
+ *
+ * This context lives as a folder rather than its own package because it has
+ * neither an editor nor an owning team yet (handbook §2.1 graduation rule).
+ *
+ * Caveat worth knowing: package-level `dependencies` cannot enforce isolation
+ * between contexts that share a package. Inside `core`, the `no-cross-context`
+ * boundary is held by path rules alone — weaker, and easier to erode. Graduate
+ * this context to `ctx-{{name}}` the moment it earns either trigger.
+ */
+
+export * as domain from './domain/index'
+export * as application from './application/index'

@@ -1,0 +1,118 @@
+@import 'tailwindcss';
+
+/* ============================================================================
+   FitnessOS — "Violet Navy" design tokens.
+   Carried forward from V1's design system, which was the one part of the V1
+   frontend that needed no rework.
+
+   Dual theme via [data-theme]. RTL-first: use logical properties (ps/pe,
+   start/end, border-s/e) everywhere. Physical properties are permitted only
+   when paired with an rtl:/ltr: variant.
+   ========================================================================= */
+
+@theme inline {
+  --font-sans: var(--font-vazirmatn), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-archivo), var(--font-vazirmatn), ui-sans-serif, sans-serif;
+
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-elevated: var(--elevated);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-contrast: var(--accent-contrast);
+  --color-success: var(--success);
+  --color-danger: var(--danger);
+
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1.125rem;
+  --radius-xl: 1.5rem;
+  --radius-2xl: 2rem;
+}
+
+:root,
+[data-theme='dim'] {
+  --bg: #0a0e1a;
+  --surface: #121829;
+  --elevated: #1b2238;
+  --fg: #eef1f8;
+  --muted: #9aa3bd;
+  /* Raised from V1's #646e8a, which measured ~3.7:1 and failed AA for the
+     body-sized text it was used on. */
+  --faint: #7c86a4;
+  --line: rgb(255 255 255 / 0.09);
+  --line-strong: rgb(255 255 255 / 0.17);
+
+  /* V1 used #8b5cf6 with white text at ~3.9:1 — below AA for normal text on
+     every primary button. Darkened to clear it. */
+  --accent: #7c3aed;
+  --accent-strong: #6d28d9;
+  --accent-contrast: #ffffff;
+  --success: #34d399;
+  --danger: #fb7185;
+  color-scheme: dark;
+}
+
+[data-theme='light'] {
+  --bg: #f5f6fb;
+  --surface: #ffffff;
+  --elevated: #ffffff;
+  --fg: #11162a;
+  --muted: #5b6480;
+  --faint: #6b7490;
+  --line: rgb(17 22 42 / 0.1);
+  --line-strong: rgb(17 22 42 / 0.18);
+
+  --accent: #6d28d9;
+  --accent-strong: #5b21b6;
+  --accent-contrast: #ffffff;
+  --success: #10b981;
+  --danger: #e11d48;
+  color-scheme: light;
+}
+
+@layer base {
+  * {
+    border-color: var(--line);
+  }
+  body {
+    background-color: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+}
+
+@layer utilities {
+  .text-display {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+    font-weight: 800;
+  }
+  /* Numerals read LTR even inside an RTL layout. Apply to every number. */
+  .nums {
+    direction: ltr;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum';
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

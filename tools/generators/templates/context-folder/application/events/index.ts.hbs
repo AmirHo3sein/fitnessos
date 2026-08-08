@@ -1,0 +1,22 @@
+/**
+ * {{pascal name}} — event vocabulary.
+ *
+ * PUBLISHED is what this context emits. SUBSCRIBED is what it reacts to.
+ * Declaring both in one place makes the context map auditable from the code.
+ *
+ * Handbook §3.2, ADR-0017: events carry identifiers and value objects, never
+ * entities. They are notification, never state transfer — state is always read
+ * through a query. Two rules follow:
+ *
+ *   server event → cache invalidation   goes straight through queryClient
+ *   server event → UI effect            goes through the typed emitter
+ *
+ * ADR-0019 also applies to Learning: it consumes published events only, never
+ * another context's model.
+ */
+
+export const PUBLISHED = [] as const satisfies readonly string[]
+export const SUBSCRIBED = [] as const satisfies readonly string[]
+
+export type PublishedEvent = (typeof PUBLISHED)[number]
+export type SubscribedEvent = (typeof SUBSCRIBED)[number]

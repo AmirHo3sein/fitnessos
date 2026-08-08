@@ -1,0 +1,42 @@
+{
+  "app": {
+    "name": "FitnessOS",
+    "nav": {
+      "dashboard": "Dashboard",
+      "programme": "Programme",
+      "sessions": "Sessions",
+      "settings": "Settings"
+    }
+  },
+  "public": {
+    "headline": "An operating system for physical development",
+    "subhead": "Prescribe, execute, observe, learn. One closed loop.",
+    "signIn": "Sign in"
+  },
+  "auth": {
+    "signIn": {
+      "title": "Sign in",
+      "subtitle": "Enter your mobile number",
+      "phone": "Mobile number",
+      "submit": "Send code"
+    }
+  },
+  "athlete": {
+    "summary": {
+      "title": "Training profile",
+      "daysPerWeek": "Days per week",
+      "ceiling": "Session ceiling (minutes)",
+      "noCeiling": "No ceiling",
+      "loading": "Loading training profile",
+      "failed": "Training profile could not be loaded.",
+      "experience": {
+        "beginner": "Beginner",
+        "intermediate": "Intermediate",
+        "advanced": "Advanced"
+      }
+    }
+  },
+  "dashboard": {
+    "title": "Dashboard"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "name": "@fitnessos/contracts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src",
+    "contracts:generate": "openapi-typescript spec/openapi.json -o src/api.gen.ts && node scripts/generate-schemas.mjs",
+    "contracts:check": "node scripts/check-drift.mjs"
+  },
+  "devDependencies": {
+    "@fitnessos/config": "workspace:*",
+    "openapi-typescript": "^7.4.2",
+    "typescript": "^5.6.3",
+    "json-schema-to-zod": "^2.4.1"
+  },
+  "dependencies": {
+    "zod": "^3.23.8"
+  }
+}

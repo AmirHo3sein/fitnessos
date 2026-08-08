@@ -1,0 +1,11 @@
+/**
+ * Development — application layer. Framework-free.
+ *
+ * Owns use cases, ports, query definitions, read models, client state and the
+ * context's event vocabulary. Must never import React, Next or
+ * @tanstack/react-query — enforced by `no-react-in-logic`.
+ */
+
+export * as ports from './ports/index'
+export * as queries from './queries/developmentKeys'
+export * as events from './events/index'

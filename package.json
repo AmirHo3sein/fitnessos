@@ -1,0 +1,33 @@
+{
+  "name": "fitnessos",
+  "private": true,
+  "packageManager": "pnpm@9.12.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "typecheck": "turbo run typecheck",
+    "lint": "turbo run lint && pnpm lint:boundaries",
+    "lint:boundaries": "depcruise --config packages/config/dependency-cruiser.cjs packages apps",
+    "test": "turbo run test",
+    "test:unit": "turbo run test:unit",
+    "build": "turbo run build",
+    "check": "pnpm typecheck && pnpm lint && pnpm test:unit && pnpm test:integration && pnpm test:component",
+    "contracts:generate": "turbo run contracts:generate",
+    "gen": "plop --plopfile tools/generators/plopfile.mjs",
+    "gen:context": "plop --plopfile tools/generators/plopfile.mjs context",
+    "test:integration": "turbo run test:integration",
+    "test:component": "turbo run test:component",
+    "bundle:budget": "node tools/bundle-budget.mjs",
+    "e2e:critical": "pnpm --filter @fitnessos/web e2e:critical"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "dependency-cruiser": "^16.5.0",
+    "eslint": "^9.14.0",
+    "plop": "^4.0.1",
+    "turbo": "^2.2.3",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.4"
+  }
+}

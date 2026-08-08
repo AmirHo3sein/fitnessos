@@ -1,0 +1,62 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "ui": "tui",
+  "tasks": {
+    "typecheck": {
+      "dependsOn": [
+        "^typecheck"
+      ],
+      "outputs": []
+    },
+    "lint": {
+      "outputs": []
+    },
+    "test:unit": {
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": [
+        "coverage/**"
+      ]
+    },
+    "test:integration": {
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": []
+    },
+    "test:component": {
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": []
+    },
+    "test": {
+      "dependsOn": [
+        "test:unit",
+        "test:integration",
+        "test:component"
+      ]
+    },
+    "build": {
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": [
+        "dist/**",
+        ".next/**",
+        "!.next/cache/**"
+      ],
+      "env": [
+        "INTERNAL_API_URL",
+        "NODE_ENV"
+      ]
+    },
+    "contracts:generate": {
+      "cache": false,
+      "outputs": [
+        "src/**/*.gen.ts"
+      ]
+    }
+  }
+}

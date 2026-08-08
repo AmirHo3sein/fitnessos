@@ -1,0 +1,103 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "FitnessOS API",
+    "version": "0.1.0",
+    "description": "STOPGAP per ADR-0026. This file is hand-authored and committed here until the backend publishes @fitnessos/api-spec as a versioned package. Spec-first: the specification is the contract; the Rust handlers conform to it."
+  },
+  "servers": [{ "url": "/api/v1", "description": "Same-origin per ADR-0025" }],
+  "tags": [
+    { "name": "athlete", "description": "Athlete ownership root" },
+    { "name": "auth", "description": "Session lifecycle" }
+  ],
+  "paths": {
+    "/athletes/me": {
+      "get": {
+        "operationId": "getMyAthlete",
+        "tags": ["athlete"],
+        "summary": "The calling person's athlete record",
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Athlete" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/auth/refresh": {
+      "post": {
+        "operationId": "refreshSession",
+        "tags": ["auth"],
+        "summary": "Rotate the refresh token and reissue the access cookie",
+        "description": "Strict rotation: the presented token is revoked. Concurrent callers MUST be serialised client-side or they will revoke each other's freshly issued session.",
+        "responses": {
+          "204": { "description": "cookies reissued" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    }
+  },
+  "components": {
+    "responses": {
+      "Unauthorized": {
+        "description": "no valid session",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Problem" }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "Problem": {
+        "type": "object",
+        "required": ["code", "detail"],
+        "properties": {
+          "code": { "type": "string", "description": "stable machine-readable code" },
+          "detail": { "type": "string" }
+        }
+      },
+      "Athlete": {
+        "type": "object",
+        "required": ["id", "personId", "status", "trainingIdentity", "availability"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "personId": { "type": "string", "format": "uuid" },
+          "status": { "type": "string", "enum": ["active", "dormant", "archived"] },
+          "trainingIdentity": { "$ref": "#/components/schemas/TrainingIdentity" },
+          "availability": { "$ref": "#/components/schemas/Availability" }
+        }
+      },
+      "TrainingIdentity": {
+        "type": "object",
+        "required": ["experienceLevel", "disciplines"],
+        "properties": {
+          "trainingAgeMonths": { "type": "integer", "minimum": 0 },
+          "experienceLevel": {
+            "type": "string",
+            "enum": ["beginner", "intermediate", "advanced"]
+          },
+          "disciplines": { "type": "array", "items": { "type": "string" } }
+        }
+      },
+      "Availability": {
+        "type": "object",
+        "required": ["daysPerWeek", "equipmentAccess"],
+        "properties": {
+          "daysPerWeek": { "type": "integer", "minimum": 1, "maximum": 7 },
+          "sessionCeilingSeconds": {
+            "type": "integer",
+            "minimum": 600,
+            "description": "Duration in seconds. Unit is explicit in the name because N11 forbids an ambiguous magnitude."
+          },
+          "equipmentAccess": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    }
+  }
+}

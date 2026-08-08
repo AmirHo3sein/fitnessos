@@ -1,0 +1,11 @@
+@import '@fitnessos/ui/theme.css';
+
+/*
+  Tailwind v4 discovers utilities by scanning source files. It cannot see into a
+  workspace dependency on its own, so @source points it at the UI package —
+  without this, every class used only inside @fitnessos/ui is absent from the
+  built stylesheet and the components render unstyled in production while looking
+  fine in dev.
+*/
+@source '../../../packages/ui/src/**/*.{ts,tsx}';
+@source '../../../packages/core/src/**/*.{ts,tsx}';
