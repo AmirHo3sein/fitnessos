@@ -5,7 +5,7 @@ import { enableStaticRendering } from '../../../../src/i18n/static'
 import { ProgrammeClient } from './programme-client'
 
 /**
- * The athlete's programme. Read-only — see the note in `ProgramView`.
+ * The athlete's programme: read by default, editable through the Program Builder.
  *
  * Dynamic via the `(app)` layout's `force-dynamic`. No prefetch here yet: the `(app)` layout
  * prefetches the athlete because every route in the group needs it, whereas the programme is
@@ -41,6 +41,32 @@ export default async function ProgrammePage({
           authoredByAssistant: t('authoredByAssistant'),
           loading: t('loading'),
           failed: t('failed'),
+          edit: t('edit'),
+          cancel: t('cancel'),
+          saveFailed: t('saveFailed'),
+          conflictTitle: t('conflictTitle'),
+          conflictBody: t('conflictBody'),
+          conflictKeep: t('conflictKeep'),
+          conflictDiscard: t('conflictDiscard'),
+          builder: {
+            heading: t('builder.heading'),
+            addBlock: t('builder.addBlock'),
+            removeBlock: t('builder.removeBlock'),
+            undo: t('builder.undo'),
+            redo: t('builder.redo'),
+            save: t('builder.save'),
+            blockName: t('builder.blockName'),
+            // Shared with the read view rather than duplicated: the same three words for the same
+            // three kinds, so a coach and an athlete never see a block described differently.
+            progression: {
+              fixed: t('progression.fixed'),
+              linear: t('progression.linear'),
+              autoregulated: t('progression.autoregulated'),
+            },
+            rate: t('builder.rate'),
+            newBlockName: t('builder.newBlockName'),
+            empty: t('builder.empty'),
+          },
         }}
       />
     </main>

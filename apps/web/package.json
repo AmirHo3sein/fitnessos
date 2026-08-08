@@ -14,15 +14,16 @@
   },
   "dependencies": {
     "@fitnessos/core": "workspace:*",
+    "@fitnessos/ctx-prescription": "workspace:*",
     "@fitnessos/infra": "workspace:*",
     "@fitnessos/kernel": "workspace:*",
+    "@fitnessos/telemetry": "workspace:*",
     "@fitnessos/ui": "workspace:*",
     "@tanstack/react-query": "^5.59.16",
     "next": "^15.5.0",
     "next-intl": "^4.0.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "@fitnessos/telemetry": "workspace:*"
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
     "@fitnessos/config": "workspace:*",

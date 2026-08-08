@@ -49,6 +49,39 @@ export interface PrescriptionReadPort {
   readonly currentProgram: (signal?: AbortSignal) => Promise<ProgramSnapshot | null>
 }
 
+/**
+ * A revision, as the client submits it.
+ *
+ * `id` is generated here rather than by the server, and `baseVersionId` says what was edited
+ * FROM. Together they make the request both replayable and collision-aware — see the contract
+ * notes on `ReviseProgramBody`.
+ *
+ * `versionNumber` is deliberately absent: it belongs to the lineage, and a client that guessed
+ * it would race whoever else has the same programme open.
+ */
+export interface ReviseProgramInput {
+  readonly programId: ProgramId
+  readonly id: ProgramVersionId
+  readonly baseVersionId: ProgramVersionId
+  readonly blocks: readonly BlockSnapshot[]
+  readonly servesGoal: { readonly goalId: GoalId; readonly rationale: string | null } | null
+  readonly authoredBy: { readonly decidedBy: string; readonly proposedBy: 'human' | 'assistant' }
+}
+
+export interface PrescriptionWritePort {
+  /**
+   * Create the next version.
+   *
+   * Resolves with the programme as the server now holds it — the response IS the new state, so
+   * the caller can set the cache rather than invalidate and refetch.
+   *
+   * Rejects with `ProgramConflictError` when `baseVersionId` is no longer current. That is a
+   * distinct outcome from a failure: nothing went wrong, someone else got there first, and the
+   * author needs to see both.
+   */
+  readonly revise: (input: ReviseProgramInput, signal?: AbortSignal) => Promise<ProgramSnapshot>
+}
+
 export interface PrescriptionPorts {
-  readonly prescription: PrescriptionReadPort
+  readonly prescription: PrescriptionReadPort & PrescriptionWritePort
 }

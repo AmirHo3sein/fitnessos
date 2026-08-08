@@ -18,6 +18,7 @@
   "dependencies": {
     "@fitnessos/contracts": "workspace:*",
     "@fitnessos/core": "workspace:*",
+    "@fitnessos/ctx-prescription": "workspace:*",
     "@fitnessos/kernel": "workspace:*",
     "zod": "^3.23.8"
   },

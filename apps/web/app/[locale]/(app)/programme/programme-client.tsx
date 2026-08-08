@@ -1,6 +1,6 @@
 'use client'
 
-import { ProgramView, type ProgramLabels } from '@fitnessos/core/prescription/presentation'
+import { ProgramWorkspace, type WorkspaceLabels } from '@fitnessos/ctx-prescription/presentation'
 import type { Locale } from '@fitnessos/kernel'
 
 export const ProgrammeClient = ({
@@ -8,5 +8,5 @@ export const ProgrammeClient = ({
   labels,
 }: {
   locale: Locale
-  labels: ProgramLabels
-}) => <ProgramView locale={locale} labels={labels} />
+  labels: WorkspaceLabels
+}) => <ProgramWorkspace locale={locale} labels={labels} />

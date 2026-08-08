@@ -176,6 +176,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/programs/{programId}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create the next version of a programme
+         * @description Idempotent by client-supplied version id; concurrency-checked by baseVersionId. A repeat of a stored id returns 200 with that version. A stale baseVersionId returns 409 with the CURRENT program, so the client can show the author what changed instead of silently discarding one of the two edits (ADR-0033).
+         */
+        post: operations["reviseProgram"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -370,6 +390,22 @@ export interface components {
             performedOn: string;
             sets: components["schemas"]["PerformedSet"][];
             note?: string;
+        };
+        /** @description A revision creates a NEW version and leaves the old one untouched (ADR-0008): a structure an athlete has already followed cannot be edited without making every PerformedSession against it unreadable. versionNumber is assigned by the server, not sent -- it is derived from the lineage and a client that guessed it would race another author. */
+        ReviseProgramBody: {
+            /**
+             * Format: uuid
+             * @description CLIENT-generated id for the NEW version (D-10). The idempotency key: a revision replayed after a lost response arrives with the same id, and the server MUST return the stored version with 200 rather than creating a second one. Without it, a coach who loses the response and retries silently creates two versions and the athlete's programme jumps two numbers.
+             */
+            id: string;
+            /**
+             * Format: uuid
+             * @description The version this revision was edited FROM. If it is no longer current, another author revised in the meantime and the server MUST answer 409 with the version that is current now -- overwriting would discard their work with no trace. Optimistic concurrency rather than locking, because a coach with a builder open for an hour must not hold a lock for an hour.
+             */
+            baseVersionId: string;
+            blocks: components["schemas"]["Block"][];
+            servesGoal?: components["schemas"]["ServesGoal"];
+            authoringDecision: components["schemas"]["AuthoringDecision"];
         };
     };
     responses: {
@@ -682,6 +718,60 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PerformedSession"];
+                };
+            };
+        };
+    };
+    reviseProgram: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                programId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviseProgramBody"];
+            };
+        };
+        responses: {
+            /** @description this revision was already stored -- the same id replayed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Program"];
+                };
+            };
+            /** @description revised */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Program"];
+                };
+            };
+            /** @description invalid */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            /** @description the base version is no longer current; body is the programme as it stands now */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Program"];
                 };
             };
         };

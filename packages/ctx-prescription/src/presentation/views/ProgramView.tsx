@@ -23,15 +23,12 @@ export interface ProgramViewProps {
 }
 
 /**
- * Read-only.
+ * Read-only. Editing lives in `ProgramBuilder`, behind the switch in `ProgramWorkspace`.
  *
- * The Program Builder is not here, and its absence is a decision rather than an omission: it
- * needs `packages/editor-engine` (handbook D-01–D-04) for inverse-action history, a spatial
- * index and branded coordinate spaces. An editor that can open a coach's programme and cannot
- * reliably undo is a way to lose their work, so half of it would be worse than none.
- *
- * What this does prove out is the read path an editor will sit on: the aggregates, the
- * contract, the mapper, and the block ordering invariant.
+ * Kept as a separate component rather than folded into the builder, because a programme is read
+ * far more often than it is written: an athlete never edits, and this is the whole of what they
+ * see. Rendering the editor's markup in a disabled state for them would ship the editor's weight
+ * to every reader for nothing.
  */
 export const ProgramView = ({ locale, labels }: ProgramViewProps) => {
   const { data, isPending, isError } = useCurrentProgram()

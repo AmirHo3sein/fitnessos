@@ -9,13 +9,13 @@
  * `ProgressionIntent`; resolving it consumes published derived indicators from Measurement
  * and stamps the resolved dose on an immutable `PrescribedSession`.
  *
- * NOT here yet, deliberately: the Program Builder editor. It needs `packages/editor-engine`
- * (handbook D-01 to D-04, D-11) — inverse-action history, a spatial index, branded
- * coordinate spaces — which is a phase of work, not a file. Half of it would be worse than
- * none: an editor that can open a programme and cannot reliably undo is a way to lose a
- * coach's work.
+ * This context has GRADUATED to its own package (handbook §2.1) because it acquired an editor.
+ * The Program Builder lives in `presentation/`, built on `@fitnessos/editor-engine` and its React
+ * bindings; the hydrate/commit pair and its D-09 round-trip tests live in `editor/`.
  */
 export * from './domain/ProgressionIntent'
 export * from './domain/ServesGoal'
 export * from './domain/ProgramVersion'
 export * from './application/index'
+
+export * from './editor/schema'

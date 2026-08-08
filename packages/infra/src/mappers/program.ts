@@ -1,5 +1,5 @@
-import type { ProgramSnapshot } from '@fitnessos/core/prescription'
-import { ProgramSchema, type components } from '@fitnessos/contracts'
+import type { ProgramSnapshot, ReviseProgramInput } from '@fitnessos/ctx-prescription'
+import { ProgramSchema, ReviseProgramBodySchema, type components } from '@fitnessos/contracts'
 import { idFrom } from '@fitnessos/kernel'
 import type { z } from 'zod'
 import { parseContract, type FieldsAgree } from './parse'
@@ -16,6 +16,8 @@ import { parseContract, type FieldsAgree } from './parse'
 
 type ContractProgram = components['schemas']['Program']
 type ValidatedProgram = z.infer<typeof ProgramSchema>
+type ContractReviseBody = components['schemas']['ReviseProgramBody']
+type ValidatedReviseBody = z.infer<typeof ReviseProgramBodySchema>
 
 export const programFrom = (raw: unknown): ProgramSnapshot => {
   const c = parseContract(ProgramSchema, raw, 'Program')
@@ -67,3 +69,62 @@ export const PROGRAM_COVERAGE: Record<keyof ContractProgram, true> = {
 
 const _programFieldsAgree: FieldsAgree<ContractProgram, ValidatedProgram> = true
 void _programFieldsAgree
+
+/**
+ * The outbound half. Validated on the way out, not only on the way in.
+ *
+ * Three shape differences from the application type, all of them the same kind of thing —
+ * `null` is the application's way of saying "absent", and the contract's is an absent key:
+ *
+ *   `ratePercent: null`  dropped, because the contract constrains it to `> 0` and a literal
+ *                        `null` would fail validation on every fixed block.
+ *   `servesGoal: null`   dropped for the same reason: the field is optional, not nullable.
+ *   `rationale: null`    dropped.
+ *
+ * Sending `null` for any of them is the bug this function exists to make impossible, and the
+ * `parseContract` call at the end is what catches it if the mapping ever drifts.
+ */
+export const reviseProgramBodyFrom = (input: ReviseProgramInput): ValidatedReviseBody => {
+  const body = {
+    id: input.id,
+    baseVersionId: input.baseVersionId,
+    blocks: input.blocks.map((block) => ({
+      id: block.id,
+      name: block.name,
+      order: block.order,
+      progressionIntent: {
+        kind: block.progression.kind,
+        ...(block.progression.ratePercent === null
+          ? {}
+          : { ratePercent: block.progression.ratePercent }),
+      },
+    })),
+    ...(input.servesGoal === null
+      ? {}
+      : {
+          servesGoal: {
+            goalId: input.servesGoal.goalId,
+            ...(input.servesGoal.rationale === null
+              ? {}
+              : { rationale: input.servesGoal.rationale }),
+          },
+        }),
+    authoringDecision: {
+      decidedBy: input.authoredBy.decidedBy,
+      proposedBy: input.authoredBy.proposedBy,
+    },
+  }
+
+  return parseContract(ReviseProgramBodySchema, body, 'ReviseProgramBody (request)')
+}
+
+export const REVISE_BODY_COVERAGE: Record<keyof ContractReviseBody, true> = {
+  id: true,
+  baseVersionId: true,
+  blocks: true,
+  servesGoal: true,
+  authoringDecision: true,
+}
+
+const _reviseFieldsAgree: FieldsAgree<ContractReviseBody, ValidatedReviseBody> = true
+void _reviseFieldsAgree

@@ -2,7 +2,7 @@
 
 import { AthletePortsProvider } from '@fitnessos/core/athlete/presentation'
 import { GoalPortsProvider } from '@fitnessos/core/goal/presentation'
-import { PrescriptionPortsProvider } from '@fitnessos/core/prescription/presentation'
+import { PrescriptionPortsProvider } from '@fitnessos/ctx-prescription/presentation'
 import { ExecutionPortsProvider } from '@fitnessos/core/execution/presentation'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useRef, type ReactNode } from 'react'
