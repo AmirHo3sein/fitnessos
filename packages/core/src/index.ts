@@ -12,3 +12,4 @@
 
 // <<< contexts >>>
 export * from './athlete/index'
+export * from './auth/index'

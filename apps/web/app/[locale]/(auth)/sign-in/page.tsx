@@ -1,15 +1,24 @@
 import { getTranslations } from 'next-intl/server'
-import { Card, CardDescription, CardTitle } from '@fitnessos/ui'
+import { Suspense } from 'react'
+import { Card, CardDescription, CardTitle, Skeleton } from '@fitnessos/ui'
 import { routing } from '../../../../src/i18n/routing'
 import { enableStaticRendering } from '../../../../src/i18n/static'
+import { SignInClient } from './sign-in-client'
 
 /**
- * Sign-in shell.
+ * Sign-in. A server component wrapping a client leaf.
  *
- * The OTP form itself is a client leaf and arrives with the auth context; this
- * page is the server-rendered frame around it. Placed in the `(auth)` group
- * rather than `(app)` because it must be reachable without a session — the
- * middleware guard covers `(app)` paths only.
+ * The `(auth)` group rather than `(app)`: this must be reachable without a session,
+ * and the middleware guard covers `(app)` paths only.
+ *
+ * `<Suspense>` around the client leaf is required, not decorative. `SignInClient`
+ * reads `useSearchParams()` for the post-sign-in redirect target, and a component
+ * that does so opts its whole route out of prerendering unless it sits inside a
+ * suspense boundary — this page would silently stop being static.
+ *
+ * Labels are resolved here, on the server, and passed down as plain strings. The Auth
+ * context therefore needs no dependency on the app's i18n runtime, and `SignInForm`
+ * can be rendered in a component test without standing that runtime up.
  */
 /** Public and cacheable — prerender both locales. See the note in `[locale]/layout.tsx`. */
 export const generateStaticParams = () => routing.locales.map((locale) => ({ locale }))
@@ -28,11 +37,28 @@ export default async function SignInPage({
       <Card>
         <CardTitle>{t('title')}</CardTitle>
         <CardDescription>{t('subtitle')}</CardDescription>
-        {/*
-          The phone/OTP form lands here with the Auth context. It is deliberately
-          absent rather than stubbed: a placeholder form that posts nowhere is
-          indistinguishable from a broken one during review.
-        */}
+        <div className="mt-6">
+          <Suspense fallback={<Skeleton className="h-40 w-full" label={t('loading')} />}>
+            <SignInClient
+              labels={{
+                phoneLabel: t('phone'),
+                phonePlaceholder: t('phonePlaceholder'),
+                phoneHint: t('phoneHint'),
+                sendCode: t('submit'),
+                codeLabel: t('code'),
+                codeSentTo: t('codeSentTo'),
+                verify: t('verify'),
+                changeNumber: t('changeNumber'),
+                errors: {
+                  emptyPhone: t('errors.emptyPhone'),
+                  badPhone: t('errors.badPhone'),
+                  badCode: t('errors.badCode'),
+                  generic: t('errors.generic'),
+                },
+              }}
+            />
+          </Suspense>
+        </div>
       </Card>
     </main>
   )

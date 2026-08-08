@@ -1,10 +1,10 @@
-import { myAthleteQuery } from '@fitnessos/core'
+import { myAthleteQuery } from '@fitnessos/core/athlete'
 import { HydrationBoundary, dehydrate } from '@tanstack/react-query'
 import { getTranslations } from 'next-intl/server'
 import type { ReactNode } from 'react'
 import { AppProviders } from '../../../composition/app-providers'
 import { createQueryClient } from '../../../composition/query-client'
-import { createServerContainer } from '../../../composition/server'
+import { createServerAthletePorts } from '../../../composition/server'
 import { Link } from '../../../src/i18n/navigation'
 import { enableStaticRendering } from '../../../src/i18n/static'
 
@@ -61,13 +61,13 @@ export default async function AppLayout({
   const { locale } = await params
   enableStaticRendering(locale)
 
-  const [t, container] = await Promise.all([
+  const [t, athletePorts] = await Promise.all([
     getTranslations('app'),
-    createServerContainer(),
+    createServerAthletePorts(),
   ])
 
   const queryClient = createQueryClient()
-  await queryClient.prefetchQuery(myAthleteQuery(container.athlete))
+  await queryClient.prefetchQuery(myAthleteQuery(athletePorts))
 
   const nav = [
     { href: '/dashboard', label: t('nav.dashboard') },

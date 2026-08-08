@@ -41,6 +41,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/request-code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send a one-time code by SMS
+         * @description Rate limited per IP and per phone. Returns the same shape whether or not the phone is registered — a differing response would make this an account-enumeration oracle.
+         */
+        post: operations["requestCode"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/verify-code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Exchange a one-time code for a session
+         * @description On success sets the access and refresh cookies (httpOnly, SameSite=Lax). No token is ever returned in the body — a token readable from JS is a token exfiltrable by XSS.
+         */
+        post: operations["verifyCode"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -71,6 +111,26 @@ export interface components {
             /** @description Duration in seconds. Unit is explicit in the name because N11 forbids an ambiguous magnitude. */
             sessionCeilingSeconds?: number;
             equipmentAccess: string[];
+        };
+        RequestCodeBody: {
+            /** @description E.164. The client normalises Persian/Arabic-Indic digits and local prefixes before sending; the server receives one canonical form only. */
+            phone: string;
+        };
+        RequestCodeResult: {
+            /** @description Seconds until another code may be requested. Unit is explicit in the name because N11 forbids an ambiguous magnitude. Server-authoritative: the client must not compute its own cooldown. */
+            retryAfterSeconds: number;
+            /** @description So the client does not hardcode a length the server can change. */
+            codeLength: number;
+        };
+        VerifyCodeBody: {
+            phone: string;
+            code: string;
+        };
+        VerifyCodeResult: {
+            /** Format: uuid */
+            personId: string;
+            /** @description True when this verification created the person. The client routes to onboarding rather than the dashboard. */
+            isNewPerson: boolean;
         };
     };
     responses: {
@@ -129,6 +189,81 @@ export interface operations {
                 content?: never;
             };
             401: components["responses"]["Unauthorized"];
+        };
+    };
+    requestCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RequestCodeBody"];
+            };
+        };
+        responses: {
+            /** @description code dispatched */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequestCodeResult"];
+                };
+            };
+            /** @description rate limited */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    verifyCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerifyCodeBody"];
+            };
+        };
+        responses: {
+            /** @description session established */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VerifyCodeResult"];
+                };
+            };
+            /** @description code incorrect or expired */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description too many attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
         };
     };
 }

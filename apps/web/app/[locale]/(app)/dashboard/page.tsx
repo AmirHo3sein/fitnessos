@@ -1,5 +1,5 @@
 import { getTranslations } from 'next-intl/server'
-import { AthleteSummary } from '@fitnessos/core/presentation'
+import { AthleteSummary } from '@fitnessos/core/athlete/presentation'
 import { hasLocale } from 'next-intl'
 import { routing } from '../../../../src/i18n/routing'
 import { enableStaticRendering } from '../../../../src/i18n/static'

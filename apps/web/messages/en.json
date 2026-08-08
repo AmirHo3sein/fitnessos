@@ -17,8 +17,21 @@
     "signIn": {
       "title": "Sign in",
       "subtitle": "Enter your mobile number",
+      "loading": "Loading the sign-in form",
       "phone": "Mobile number",
-      "submit": "Send code"
+      "phonePlaceholder": "0912 345 6789",
+      "phoneHint": "Persian or English digits, with or without the leading zero — all accepted.",
+      "submit": "Send code",
+      "code": "Verification code",
+      "codeSentTo": "Code sent to",
+      "verify": "Verify and sign in",
+      "changeNumber": "Change number",
+      "errors": {
+        "emptyPhone": "Enter your mobile number.",
+        "badPhone": "That does not look like an Iranian mobile number.",
+        "badCode": "The code must be digits only, at the expected length.",
+        "generic": "That did not work. Please try again."
+      }
     }
   },
   "athlete": {

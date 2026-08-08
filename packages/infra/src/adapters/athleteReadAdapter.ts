@@ -1,4 +1,4 @@
-import type { AthleteReadPort, AthleteSnapshot } from '@fitnessos/core'
+import type { AthleteReadPort, AthleteSnapshot } from '@fitnessos/core/athlete'
 import type { HttpClient, AuthContext } from '../http/client'
 import { athleteFrom } from '../mappers/athlete'
 

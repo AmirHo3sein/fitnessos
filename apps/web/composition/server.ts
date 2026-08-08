@@ -1,5 +1,7 @@
 import { cookies } from 'next/headers'
-import { createContainer, type Container } from './container'
+import type { AthletePorts } from '@fitnessos/core'
+import { createAthletePorts } from './athlete'
+import { createHttp } from './container'
 
 /**
  * The server-side container, built from the incoming request's cookies.
@@ -26,19 +28,18 @@ const internalApiUrl = (): string => {
   return url
 }
 
-export const createServerContainer = async (): Promise<Container> => {
+export const createServerAthletePorts = async (): Promise<AthletePorts> => {
   const jar = await cookies()
   const cookie = jar
     .getAll()
     .map((c) => `${c.name}=${c.value}`)
     .join('; ')
 
-  return createContainer({
-    mode: 'server',
-    baseUrl: internalApiUrl(),
-    // Omit rather than pass an empty string: `exactOptionalPropertyTypes` makes
-    // the distinction meaningful, and an empty Cookie header is not the same as
-    // no Cookie header to some proxies.
-    ...(cookie ? { auth: { cookie } } : {}),
-  })
+  return createAthletePorts(
+    createHttp({ mode: 'server', baseUrl: internalApiUrl() }),
+    // Omit the key rather than pass an empty string: `exactOptionalPropertyTypes`
+    // makes the distinction meaningful, and an empty Cookie header is not the same
+    // as no Cookie header to some proxies.
+    cookie ? { cookie } : {},
+  )
 }
