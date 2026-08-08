@@ -90,9 +90,9 @@ export const SignInForm = ({ labels, onSignedIn }: SignInFormProps) => {
             placeholder={labels.phonePlaceholder}
             aria-describedby="phone-hint"
             {...(error === null ? {} : { 'aria-invalid': true, 'aria-errormessage': 'phone-error' })}
-            className="border-default bg-surface-elevated text-primary focus:border-brand-border nums h-12 w-full rounded-md border px-4 outline-none"
+            className="border-default bg-surface-elevated text-primary focus:border-brand-border nums h-12 w-full rounded-md border px-4"
           />
-          <p id="phone-hint" className="text-disabled mt-1.5 text-xs">
+          <p id="phone-hint" className="text-muted mt-1.5 text-xs">
             {labels.phoneHint}
           </p>
           {error !== null && (
@@ -144,7 +144,7 @@ export const SignInForm = ({ labels, onSignedIn }: SignInFormProps) => {
             setCode(event.target.value)
           }}
           {...(error === null ? {} : { 'aria-invalid': true, 'aria-errormessage': 'code-error' })}
-          className="border-default bg-surface-elevated text-primary focus:border-brand-border nums h-12 w-full rounded-md border px-4 text-center tracking-[0.4em] outline-none"
+          className="border-default bg-surface-elevated text-primary focus:border-brand-border nums h-12 w-full rounded-md border px-4 text-center tracking-[0.4em]"
         />
         {error !== null && (
           <p id="code-error" role="alert" className="text-error-fg mt-1.5 text-sm">

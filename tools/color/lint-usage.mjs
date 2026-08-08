@@ -15,7 +15,13 @@ import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
-const ROOTS = ['packages/ui/src', 'packages/core/src', 'apps/web/app', 'apps/web/composition']
+const ROOTS = [
+  'packages/ui/src',
+  'packages/core/src',
+  'packages/ctx-prescription/src',
+  'apps/web/app',
+  'apps/web/composition',
+]
 
 const FAMILIES = 'teal|slate|green|amber|red|blue'
 const RULES = [
@@ -30,6 +36,25 @@ const RULES = [
     message: 'is a colour literal. Every colour must come from a semantic token.',
     // Generated files and the token pipeline itself are where hex legitimately lives.
     skipFile: (f) => f.includes('generated') || f.includes('design-tokens'),
+  },
+  {
+    /*
+     * `text-disabled` at 2.14:1 is exempt from WCAG 1.4.3 only because 1.4.3 exempts INACTIVE
+     * controls. On anything else it is simply text below the contrast threshold.
+     *
+     * Its own documentation said "never use this token for active text" and every one of the
+     * eight uses in this codebase was active text — form hints, empty-state copy, a
+     * withheld-basis note. Found by an axe audit, not by review, because a hint rendered in pale
+     * grey looks intentional.
+     *
+     * So the rule is mechanical now: components may not name it at all. A genuinely disabled
+     * control reaches the same colour through `action-disabled-fg`, which is what the Button
+     * primitive uses, and which carries the state that makes the exemption apply.
+     */
+    pattern: /\btext-disabled\b/g,
+    message:
+      'uses text-disabled (2.14:1) as active text. WCAG 1.4.3 exempts inactive CONTROLS only — use text-muted, or action-disabled-fg on a genuinely disabled control.',
+    skipFile: (f) => f.includes('theme.css'),
   },
 ]
 

@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import { getTranslations } from 'next-intl/server'
 import { Card, CardDescription, CardTitle } from '@fitnessos/ui'
 import { OnboardingClient } from './onboarding-client'
@@ -26,6 +27,22 @@ import { enableStaticRendering } from '../../../../src/i18n/static'
  * the label comes from the message catalogue, so adding a locale does not touch this.
  */
 const DISCIPLINES = ['strength', 'hypertrophy', 'running', 'cycling', 'mobility'] as const
+
+/**
+ * Fills the `%s` in the root layout's title template.
+ *
+ * Localised through the same catalogue as the page's own heading, so the tab and the h1 cannot
+ * drift apart into two different names for one screen.
+ */
+export const generateMetadata = async ({
+  params,
+}: {
+  params: Promise<{ locale: string }>
+}): Promise<Metadata> => {
+  const { locale } = await params
+  const t = await getTranslations({ locale, namespace: 'onboarding' })
+  return { title: t('title') }
+}
 
 export default async function OnboardingPage({
   params,
