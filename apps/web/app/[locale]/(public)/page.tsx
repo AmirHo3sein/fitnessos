@@ -1,6 +1,5 @@
 import { getTranslations } from 'next-intl/server'
 import { Link } from '../../../src/i18n/navigation'
-import { routing } from '../../../src/i18n/routing'
 import { enableStaticRendering } from '../../../src/i18n/static'
 
 /**
@@ -12,7 +11,12 @@ import { enableStaticRendering } from '../../../src/i18n/static'
  * does not.
  */
 /** Public and cacheable — prerender both locales. See the note in `[locale]/layout.tsx`. */
-export const generateStaticParams = () => routing.locales.map((locale) => ({ locale }))
+/*
+ * Per request rather than prerendered — see the full note in `(auth)/sign-in/page.tsx`. A
+ * prerendered page has no CSP nonce in its HTML, so its own scripts are refused by the policy
+ * the middleware sets at runtime.
+ */
+export const dynamic = 'force-dynamic'
 
 export default async function LandingPage({
   params,
