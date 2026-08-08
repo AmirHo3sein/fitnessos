@@ -41,6 +41,13 @@ export default async function ProgrammePage({
           authoredByAssistant: t('authoredByAssistant'),
           loading: t('loading'),
           failed: t('failed'),
+          servesGoal: t('servesGoal'),
+          refs: {
+            loading: t('refs.loading'),
+            deleted: t('refs.deleted'),
+            forbidden: t('refs.forbidden'),
+            unnamedGoal: t('refs.unnamedGoal'),
+          },
           edit: t('edit'),
           cancel: t('cancel'),
           saveFailed: t('saveFailed'),

@@ -68,10 +68,14 @@ export const AppProviders = ({ children }: { children: ReactNode }) => {
     // rotate the refresh token and revoke each other's session.
     //
     // Browser requests carry cookies automatically, so there is no cookie to forward.
+    // Built before Prescription, because Prescription resolves goal references through it. The
+    // dependency runs one way and lives entirely here: Development knows nothing of Prescription.
+    const goal = createGoalPorts(http, {})
+
     return {
       athlete: createAthletePorts(http, {}),
-      goal: createGoalPorts(http, {}),
-      prescription: createPrescriptionPorts(http, {}),
+      goal,
+      prescription: createPrescriptionPorts(http, {}, goal),
       execution: createExecutionPorts(http, {}),
     }
   }, [])

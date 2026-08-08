@@ -154,6 +154,17 @@ const programmeFor = (phone: string) => {
           progressionIntent: { kind: 'fixed' } },
       ],
       authoringDecision: { decidedBy: 'coach-1', proposedBy: 'human', rationale: 'base phase' },
+      /*
+       * Points at the id `POST /goals` assigns to an athlete's FIRST goal.
+       *
+       * One seed, both D-08 paths, no extra state: an athlete who has declared a goal gets a
+       * reference that resolves, and one who has not gets a reference that is broken. Which is
+       * also the truth about the product — a programme can outlive the goal it was written for.
+       */
+      servesGoal: {
+        goalId: '018f2c8a-0002-7000-8000-000000000000',
+        rationale: 'base phase before the build-up',
+      },
     },
     _athleteId: athleteId,
   }

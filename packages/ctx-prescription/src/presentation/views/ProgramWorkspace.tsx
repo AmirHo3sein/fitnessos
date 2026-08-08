@@ -1,13 +1,25 @@
 'use client'
 
-import { Button, Card, CardDescription, CardTitle } from '@fitnessos/ui'
+import { Button, Card, CardDescription, CardTitle, Skeleton } from '@fitnessos/ui'
 import type { Locale } from '@fitnessos/kernel'
-import { useState } from 'react'
+import { Suspense, lazy, useState } from 'react'
 import type { ProgramVersionSnapshot } from '../../application/index'
 import { useCurrentProgram } from '../hooks/useCurrentProgram'
 import { useReviseProgram } from '../hooks/useReviseProgram'
-import { ProgramBuilder, type BuilderLabels } from './ProgramBuilder'
+import type { BuilderLabels } from './ProgramBuilder'
 import { ProgramView, type ProgramLabels } from './ProgramView'
+
+/**
+ * The builder is loaded ONLY when someone edits.
+ *
+ * It pulls in the editor engine, its React bindings and the history machinery — weight that an
+ * athlete, who never edits, would otherwise pay for on every visit to their programme. Splitting
+ * it here rather than at the route is what makes the read path cheap while keeping the two views
+ * in one place.
+ */
+const ProgramBuilder = lazy(async () => ({
+  default: (await import('./ProgramBuilder')).ProgramBuilder,
+}))
 
 export interface WorkspaceLabels extends ProgramLabels {
   readonly edit: string
@@ -118,13 +130,15 @@ const EditingSession = ({
         </Card>
       )}
 
-      <ProgramBuilder
-        version={version}
-        locale={locale}
-        labels={labels.builder}
-        onSave={save}
-        isSaving={isSaving}
-      />
+      <Suspense fallback={<Skeleton className="h-64 w-full" label={labels.loading} />}>
+        <ProgramBuilder
+          version={version}
+          locale={locale}
+          labels={labels.builder}
+          onSave={save}
+          isSaving={isSaving}
+        />
+      </Suspense>
 
       <Button type="button" variant="ghost" onPress={onDone}>
         {labels.cancel}

@@ -1,6 +1,7 @@
 export { PrescriptionPortsProvider, usePrescriptionPorts } from './di'
 export { useCurrentProgram } from './hooks/useCurrentProgram'
 export { useReviseProgram, type UseReviseProgram } from './hooks/useReviseProgram'
+export { useResolvedRefs } from './hooks/useResolvedRefs'
 export { ProgramView, type ProgramLabels, type ProgramViewProps } from './views/ProgramView'
 export {
   ProgramWorkspace,
