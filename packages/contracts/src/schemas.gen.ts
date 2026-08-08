@@ -27,3 +27,5 @@ export const RequestCodeResultSchema = z.object({ "retryAfterSeconds": z.number(
 export const VerifyCodeBodySchema = z.object({ "phone": z.string().regex(new RegExp("^\\+989[0-9]{9}$")), "code": z.string().regex(new RegExp("^[0-9]{4,8}$")) })
 
 export const VerifyCodeResultSchema = z.object({ "personId": z.string().uuid(), "isNewPerson": z.boolean().describe("True when this verification created the person. The client routes to onboarding rather than the dashboard.") })
+
+export const CompleteOnboardingBodySchema = z.object({ "trainingIdentity": TrainingIdentitySchema, "availability": AvailabilitySchema })

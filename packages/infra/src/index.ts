@@ -22,11 +22,12 @@ export type { Refresher, RefreshConfig } from './http/refresh'
 
 export { createAthleteReadAdapter } from './adapters/athleteReadAdapter'
 export { createAuthAdapter } from './adapters/authAdapter'
+export { createAthleteWriteAdapter } from './adapters/athleteWriteAdapter'
 
 // Only the mapping FUNCTION is exported, never a type. The types it produces are
 // declared by the application layer and re-exported from there; a type family
 // exported from infra would become a second source of truth and drift from the
 // first without anything detecting it.
-export { athleteFrom } from './mappers/athlete'
+export { athleteFrom, onboardingBodyFrom } from './mappers/athlete'
 export { codeRequestedFrom, sessionEstablishedFrom } from './mappers/auth'
 export { parseContract } from './mappers/parse'

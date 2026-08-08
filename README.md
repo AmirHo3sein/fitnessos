@@ -85,7 +85,7 @@ Phase 0 and the Phase 1 scaffold are complete.
 - [x] `apps/web` — route groups, middleware guard, RSC prefetch, per-group composition, **working sign-in** · 24 e2e
 - [x] CI stages 1–11
 
-**145 tests + 38 e2e. All CI stages live.**
+**207 tests + 48 e2e. All CI stages live.**
 
 ## Import convention
 
@@ -364,6 +364,7 @@ pnpm dev:api    # http://127.0.0.1:8791
 | | |
 |---|---|
 | code that verifies | `000000` |
+| state | keyed by phone — each number is a distinct athlete |
 | phone ending `0000` | treated as a new person, so onboarding is reachable |
 | any other code | 400 `code_invalid` |
 | unissued `access_token` | 401 `unauthenticated` |
@@ -379,6 +380,12 @@ Three properties are deliberate:
   `send`.
 - **Fixtures are fixed, never random.** `Math.random()` in a fixture is how a suite
   becomes flaky without anyone changing a line of it.
+- **Athlete state is keyed by phone.** The first version held one mutable athlete for
+  the whole process, which is a flake generator under `fullyParallel` — the onboarding
+  spec writes `advanced`/5 days while the sign-in spec asserts `intermediate`, and
+  whichever ran first decided the result. Keying by phone means a test gets its own
+  athlete by using its own number: no reset endpoint, no serialisation, no shared
+  fixture to reason about.
 
 The browser reaches it through a `/api/v1` rewrite in `next.config.ts` that exists only
 when `STUB_API_URL` is set — standing in for the production reverse proxy (ADR-0025),
@@ -387,3 +394,56 @@ uses the same relative base URL in both, so a same-origin assumption cannot be b
 in dev and discovered in production. The gate matters as much as the rewrite: one that
 always existed would let a misconfigured production environment route API traffic
 somewhere unintended instead of failing.
+
+## The write path
+
+`Athlete` is the first context with both directions, and the two are deliberately
+asymmetric.
+
+**Reads produce snapshots; writes go through value objects.** `AvailabilitySnapshot`
+has no invariants and accepts whatever the backend holds, including data written before
+a rule existed. `Availability` — a value object — refuses anything the rules forbid.
+This is the same principle as the non-strict response schemas: **tolerant reader, strict
+writer.** One type doing both jobs would force a choice between rejecting historical
+data on read and accepting nonsense on write.
+
+The rules are not form validation. Availability is the primary input to prescription, so
+a nonsense value produces a nonsense programme, which the athlete experiences as the
+product not understanding them. Concretely:
+
+| Rule | Why |
+|---|---|
+| `daysPerWeek` is a whole number 1–7 | 3.5 days is meaningful to a person and impossible to schedule; rounding resolves the ambiguity by a rule nobody chose |
+| a zero ceiling is an error, not "no limit" | zero means *cannot train at all* — the opposite statement, and what a half-finished form submits |
+| ceiling ≥ 10 minutes | below that a session holds neither a warm-up nor a working set |
+| `trainingAgeMonths` ≤ 80 years | the field is months and people type years; `2024` sails past a `>= 0` check into every progression calculation |
+| disciplines non-empty | an athlete trains *something*; an empty list is a skipped form |
+| equipment and disciplines deduplicated and sorted | otherwise two athletes who chose the same things in a different order write different values |
+
+Note the disciplines rule is **stricter than the contract**, which permits an empty
+array. That asymmetry is the point, and a test asserts it: the read side accepts an
+athlete recorded before the rule, the write side will not create another.
+
+**Value objects are branded with a real symbol**, not `declare const brand: unique
+symbol`. The declared form is correct for a primitive, where the brand is a type-level
+fiction over a string. For an object it fails: the constructor cannot assign a property
+that exists only in the type system, so building one needs `as unknown as Availability`
+— a double cast that suppresses exactly the check the brand was added for. A real
+unexported symbol can be assigned, so no code outside the module can produce a
+conforming value. Unforgeable, no cast, and it never reaches the wire since
+`JSON.stringify` skips symbol keys.
+
+**Requests are validated on the way out**, closing ADR-0031's follow-up. Validating what
+we send turns a mapper bug into a field path at the boundary instead of a 400 whose
+diagnostic is a status code and a message written for an operator. The resource name
+carries the direction — `CompleteOnboardingBody (request)` — so telemetry can tell our
+defect from the server's.
+
+**The mutation sets the cache rather than invalidating it.** The endpoint returns the
+server's own view of the athlete, so invalidating would discard it and immediately
+refetch what we already hold — an extra round trip at the end of a form, on the slowest
+connection in the flow. Invalidation remains the right tool when a mutation's effects
+are wider than its response; that is what `athleteInvalidations` is for.
+
+**`PUT`, not `POST`.** Onboarding is a form a user will resubmit after a network hiccup,
+and an idempotent verb makes that safe without a client-generated request id.

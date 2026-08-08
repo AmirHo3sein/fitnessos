@@ -161,8 +161,10 @@ test.describe('sign-in form', () => {
 })
 
 test.describe('sign-in, end to end', () => {
+  // Does not end in 0000, so the stub reports an existing person and these tests land on
+  // the dashboard. Distinct from every onboarding phone, and none of these write.
   const PHONE_EXISTING = '۰۹۱۲۳۴۵۶۷۸۹'
-  const PHONE_NEW = '۰۹۱۲۳۴۵۰۰۰۰'
+  const PHONE_NEW = '۰۹۱۲۹۹۹۰۰۰۰'
   const GOOD_CODE = '۰۰۰۰۰۰'
 
   test('@critical a Persian-digit number and code sign the athlete in', async ({ page }) => {
@@ -269,5 +271,97 @@ test.describe('sign-in, end to end', () => {
     const readable = await page.evaluate(() => document.cookie)
     expect(readable).not.toContain('access_token')
     expect(readable).not.toContain('refresh_token')
+  })
+})
+
+test.describe('onboarding', () => {
+  const GOOD_CODE = '۰۰۰۰۰۰'
+
+  /**
+   * Each test that WRITES gets its own phone, because the stub keys athlete state by
+   * phone. Sharing one number across parallel writers is a flake generator: whichever
+   * test wrote last decides what the others read.
+   *
+   * All end in 0000 so the stub reports `isNewPerson`, routing them to onboarding.
+   */
+  const PHONE_COMPLETES = '۰۹۱۲۱۱۱۰۰۰۰'
+  const PHONE_NO_DISCIPLINE = '۰۹۱۲۲۲۲۰۰۰۰'
+  const PHONE_ZERO_CEILING = '۰۹۱۲۳۳۳۰۰۰۰'
+  const PHONE_BACK_BUTTON = '۰۹۱۲۴۴۴۰۰۰۰'
+
+  const signInAsNewPerson = async (page: import('@playwright/test').Page, phone: string) => {
+    await page.goto('/sign-in')
+    await page.getByLabel('شماره‌ی موبایل').fill(phone)
+    await page.getByRole('button', { name: 'ارسال کد' }).click()
+    await page.getByLabel('کد تأیید').fill(GOOD_CODE)
+    await page.getByRole('button', { name: 'تأیید و ورود' }).click()
+    await expect(page).toHaveURL(/\/onboarding/)
+  }
+
+  test('@critical a new athlete completes onboarding and lands on the dashboard', async ({
+    page,
+  }) => {
+    // The full write path: form → domain value objects → outbound validation → PUT →
+    // response validation → cache set → navigation. Nothing here is mocked at a module
+    // boundary; the only substitution is the API process itself.
+    await signInAsNewPerson(page, PHONE_COMPLETES)
+
+    await page.getByRole('button', { name: 'پیشرفته' }).click()
+    await page.getByRole('button', { name: 'قدرتی' }).click()
+    await page.getByLabel('چند روز در هفته؟').fill('۵')
+    await page.getByLabel('حداکثر مدت هر جلسه (دقیقه)').fill('۶۰')
+    await page.getByRole('button', { name: 'ادامه' }).click()
+
+    await expect(page).toHaveURL(/\/dashboard/)
+
+    // What the athlete just entered, read back through the dashboard. This is the
+    // assertion that proves the whole chain: the write landed, the response was mapped,
+    // and the cache the dashboard reads holds the new state rather than the old one.
+    await expect(page.getByText('پیشرفته')).toBeVisible()
+    // 5 days and a 60-minute ceiling, rendered as Persian numerals via Intl.
+    await expect(page.getByText('۵')).toBeVisible()
+    await expect(page.getByText('۶۰')).toBeVisible()
+  })
+
+  test('@critical the domain refuses an empty discipline list, before any request', async ({
+    page,
+  }) => {
+    await signInAsNewPerson(page, PHONE_NO_DISCIPLINE)
+    await page.getByRole('button', { name: 'ادامه' }).click()
+
+    await expect(page.locator('#onboarding-error')).toContainText('حداقل یک نوع تمرین')
+    // Still on the form. A rule the client already knows must not cost a round trip.
+    await expect(page).toHaveURL(/\/onboarding/)
+  })
+
+  test('@critical a zero ceiling is refused with a message naming the alternative', async ({
+    page,
+  }) => {
+    // Zero means "cannot train at all", which is a different statement from "no limit".
+    // The athlete has to be told which one they appear to have made.
+    await signInAsNewPerson(page, PHONE_ZERO_CEILING)
+    await page.getByRole('button', { name: 'قدرتی' }).click()
+    await page.getByLabel('حداکثر مدت هر جلسه (دقیقه)').fill('۰')
+    await page.getByRole('button', { name: 'ادامه' }).click()
+
+    await expect(page.locator('#onboarding-error')).toContainText('خالی بگذار')
+  })
+
+  test('@critical onboarding requires a session', async ({ page }) => {
+    await page.goto('/onboarding')
+    await expect(page).toHaveURL(/\/sign-in/)
+  })
+
+  test('@critical the back button does not return to a completed form', async ({ page }) => {
+    // `replace`, not `push`. Otherwise the athlete can go back and resubmit what they
+    // just recorded — harmless under PUT, but confusing, and it would show a form that
+    // no longer reflects their state.
+    await signInAsNewPerson(page, PHONE_BACK_BUTTON)
+    await page.getByRole('button', { name: 'قدرتی' }).click()
+    await page.getByRole('button', { name: 'ادامه' }).click()
+    await expect(page).toHaveURL(/\/dashboard/)
+
+    await page.goBack()
+    await expect(page).not.toHaveURL(/\/onboarding/)
   })
 })

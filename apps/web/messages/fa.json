@@ -54,6 +54,32 @@
   },
   "onboarding": {
     "title": "خوش آمدید",
-    "subtitle": "چند سؤال کوتاه تا برنامه‌ات را بسازیم."
+    "subtitle": "چند سؤال کوتاه تا برنامه‌ات را بسازیم.",
+    "experienceLabel": "چقدر تمرین کرده‌ای؟",
+    "experience": {
+      "beginner": "مبتدی",
+      "intermediate": "میان‌رده",
+      "advanced": "پیشرفته"
+    },
+    "disciplinesLabel": "چه نوع تمرینی؟",
+    "disciplines": {
+      "strength": "قدرتی",
+      "hypertrophy": "حجم",
+      "running": "دویدن",
+      "cycling": "دوچرخه",
+      "mobility": "تحرک"
+    },
+    "daysLabel": "چند روز در هفته؟",
+    "ceilingLabel": "حداکثر مدت هر جلسه (دقیقه)",
+    "ceilingHint": "اگر محدودیتی نداری خالی بگذار.",
+    "submit": "ادامه",
+    "errors": {
+      "daysOutOfRange": "تعداد روزها باید بین ۱ تا ۷ باشد.",
+      "daysNotWhole": "تعداد روزها باید عدد کامل باشد.",
+      "ceilingTooShort": "هر جلسه باید حداقل ۱۰ دقیقه باشد.",
+      "ceilingNotPositive": "مدت جلسه نمی‌تواند صفر باشد. اگر محدودیتی نداری خالی بگذار.",
+      "noDisciplines": "حداقل یک نوع تمرین انتخاب کن.",
+      "generic": "ثبت نشد. دوباره تلاش کن."
+    }
   }
 }

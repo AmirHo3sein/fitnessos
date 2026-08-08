@@ -28,6 +28,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import {
   AthleteSchema,
+  CompleteOnboardingBodySchema,
   ProblemSchema,
   RequestCodeBodySchema,
   RequestCodeResultSchema,
@@ -41,8 +42,26 @@ const PORT = Number(process.env['STUB_API_PORT'] ?? 8791)
  * Fixed fixtures. A stub with random data makes a failing test unreproducible, and
  * `Math.random()` in a fixture is how a suite becomes flaky without anyone changing it.
  */
-const PERSON_ID = '018f2c8a-0000-7000-8000-000000000002'
-const ATHLETE_ID = '018f2c8a-0000-7000-8000-000000000001'
+/**
+ * State is keyed by PHONE, so each phone is a distinct athlete.
+ *
+ * The first version held one mutable athlete for the whole process, which is a flake
+ * generator under `fullyParallel`: the onboarding spec writes `advanced`/5 days while
+ * the sign-in spec asserts `intermediate` on the dashboard, and whichever ran first
+ * decided the result. Keying by phone means a test gets its own athlete simply by using
+ * its own number — no reset endpoint, no serialisation, no shared fixture to reason
+ * about.
+ *
+ * Ids are derived from the phone rather than generated, so a failure is reproducible
+ * and a log line identifies which test wrote what.
+ */
+const idsFor = (phone: string) => {
+  const suffix = phone.replace(/\D/g, '').slice(-9).padStart(12, '0')
+  return {
+    personId: `018f2c8a-0000-7000-8000-${suffix}`,
+    athleteId: `018f2c8a-0001-7000-8000-${suffix}`,
+  }
+}
 
 /** The only code that verifies. Anything else is rejected, so both paths are testable. */
 const GOOD_CODE = '000000'
@@ -50,27 +69,56 @@ const GOOD_CODE = '000000'
 /** A phone ending in these digits is treated as new, so onboarding is reachable. */
 const NEW_PERSON_SUFFIX = '0000'
 
-const ATHLETE = {
-  id: ATHLETE_ID,
-  personId: PERSON_ID,
-  status: 'active',
-  trainingIdentity: {
-    experienceLevel: 'intermediate',
-    trainingAgeMonths: 18,
-    disciplines: ['strength'],
-  },
-  availability: {
-    daysPerWeek: 4,
-    sessionCeilingSeconds: 4200,
-    equipmentAccess: ['barbell', 'rack'],
-  },
+interface StubAthlete {
+  id: string
+  personId: string
+  status: string
+  trainingIdentity: { experienceLevel: string; trainingAgeMonths?: number; disciplines: string[] }
+  availability: { daysPerWeek: number; sessionCeilingSeconds?: number; equipmentAccess: string[] }
+}
+
+const athletes = new Map<string, StubAthlete>()
+
+const athleteFor = (phone: string): StubAthlete => {
+  const existing = athletes.get(phone)
+  if (existing) return existing
+
+  const { personId, athleteId } = idsFor(phone)
+  const fresh: StubAthlete = {
+    id: athleteId,
+    personId,
+    status: 'active',
+    trainingIdentity: {
+      experienceLevel: 'intermediate',
+      trainingAgeMonths: 18,
+      disciplines: ['strength'],
+    },
+    availability: {
+      daysPerWeek: 4,
+      sessionCeilingSeconds: 4200,
+      equipmentAccess: ['barbell', 'rack'],
+    },
+  }
+  athletes.set(phone, fresh)
+  return fresh
 }
 
 /**
- * The token the stub issues. Deliberately NOT a real JWT and obviously not one — a
- * stub that mints something JWT-shaped invites someone to point a real client at it.
+ * The token the stub issues. Deliberately NOT a real JWT and obviously not one — a stub
+ * that mints something JWT-shaped invites someone to point a real client at it.
+ *
+ * Carries the phone, which is how a request is resolved back to its athlete. A real
+ * backend would look the session up; this keeps the whole thing stateless apart from the
+ * athlete map.
  */
-const issuedToken = (personId: string) => `stub.${personId}`
+const issuedToken = (phone: string) => `stub.${phone.replace(/\D/g, '')}`
+
+/** The phone a presented access token belongs to, or null if it was not issued here. */
+const phoneFromToken = (token: string | undefined): string | null => {
+  if (token === undefined || !token.startsWith('stub.')) return null
+  const digits = token.slice('stub.'.length)
+  return /^[0-9]{12}$/.test(digits) ? `+${digits}` : null
+}
 
 const readBody = async (req: IncomingMessage): Promise<unknown> => {
   const chunks: Buffer[] = []
@@ -129,9 +177,9 @@ const problem = (res: ServerResponse, status: number, code: string, detail: stri
  * not be stored — the suite would then pass or fail for a reason unrelated to the code
  * under test.
  */
-const sessionCookies = (personId: string): string[] => [
-  `access_token=${issuedToken(personId)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=900`,
-  `refresh_token=refresh.${personId}; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000`,
+const sessionCookies = (phone: string): string[] => [
+  `access_token=${issuedToken(phone)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=900`,
+  `refresh_token=refresh.${phone.replace(/\D/g, '')}; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000`,
 ]
 
 const handlers: Record<string, (req: IncomingMessage, res: ServerResponse) => Promise<void>> = {
@@ -159,23 +207,52 @@ const handlers: Record<string, (req: IncomingMessage, res: ServerResponse) => Pr
       return
     }
 
+    const { personId } = idsFor(phone)
     send(
       res,
       200,
       VerifyCodeResultSchema,
-      { personId: PERSON_ID, isNewPerson: phone.endsWith(NEW_PERSON_SUFFIX) },
-      { 'set-cookie': sessionCookies(PERSON_ID) },
+      { personId, isNewPerson: phone.endsWith(NEW_PERSON_SUFFIX) },
+      { 'set-cookie': sessionCookies(phone) },
     )
   },
 
   'POST /api/v1/auth/refresh': async (req, res) => {
-    if (!cookiesOf(req)['refresh_token']) {
+    const refresh = cookiesOf(req)['refresh_token']
+    const digits = refresh?.startsWith('refresh.') ? refresh.slice('refresh.'.length) : ''
+    if (!/^[0-9]{12}$/.test(digits)) {
       res.writeHead(401).end()
       return
     }
     // Strict rotation: a new pair, and the old refresh token is conceptually revoked.
-    res.writeHead(204, { 'set-cookie': sessionCookies(PERSON_ID) })
+    res.writeHead(204, { 'set-cookie': sessionCookies(`+${digits}`) })
     res.end()
+  },
+
+  'PUT /api/v1/athletes/me/onboarding': async (req, res) => {
+    const phone = phoneFromToken(cookiesOf(req)['access_token'])
+    if (phone === null) {
+      problem(res, 401, 'unauthenticated', 'no valid session')
+      return
+    }
+
+    const body = CompleteOnboardingBodySchema.safeParse(await readBody(req))
+    if (!body.success) {
+      // The client validates outbound too, so a rejection here means the outbound
+      // mapper is wrong — which is exactly what should fail a test rather than be
+      // absorbed as a generic error.
+      problem(res, 400, 'invalid_request', 'trainingIdentity and availability required')
+      return
+    }
+
+    const { trainingIdentity, availability } = body.data as Pick<
+      StubAthlete,
+      'trainingIdentity' | 'availability'
+    >
+    // PUT is idempotent: the same body twice leaves the same state.
+    const updated: StubAthlete = { ...athleteFor(phone), trainingIdentity, availability }
+    athletes.set(phone, updated)
+    send(res, 200, AthleteSchema, updated)
   },
 
   'GET /api/v1/athletes/me': async (req, res) => {
@@ -183,11 +260,12 @@ const handlers: Record<string, (req: IncomingMessage, res: ServerResponse) => Pr
     // but not one this server issued is refused — which is what the real backend does
     // with a signature it cannot verify, and what the middleware deliberately does not
     // attempt to do itself.
-    if (cookiesOf(req)['access_token'] !== issuedToken(PERSON_ID)) {
+    const phone = phoneFromToken(cookiesOf(req)['access_token'])
+    if (phone === null) {
       problem(res, 401, 'unauthenticated', 'no valid session')
       return
     }
-    send(res, 200, AthleteSchema, ATHLETE)
+    send(res, 200, AthleteSchema, athleteFor(phone))
   },
 }
 
@@ -213,4 +291,5 @@ createServer((req, res) => {
   console.log(`stub api on http://127.0.0.1:${String(PORT)}`)
   console.log(`  code that verifies: ${GOOD_CODE}`)
   console.log(`  phone ending ${NEW_PERSON_SUFFIX} is treated as a new person`)
+  console.log('  state is keyed by phone — each number is a distinct athlete')
 })
