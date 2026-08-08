@@ -33,7 +33,11 @@ type ReviseFn = PrescriptionPorts['prescription']['revise']
  * assertion on a field the port does not have is a compile error, not a passing test.
  */
 const ports = (revise: Mock<ReviseFn> = vi.fn<ReviseFn>(() => Promise.resolve(program()))) => ({
-  ports: { prescription: { currentProgram: vi.fn(), revise } } satisfies PrescriptionPorts,
+  ports: {
+    prescription: { currentProgram: vi.fn(), revise },
+    // Unused here, and still required — `satisfies` will not let a fixture drift from the port.
+    references: { resolve: () => Promise.resolve(new Map()) },
+  } satisfies PrescriptionPorts,
   revise,
 })
 

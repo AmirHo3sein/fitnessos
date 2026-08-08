@@ -1,3 +1,4 @@
+import type { ReferenceResolver } from '@fitnessos/editor-engine'
 import type { AthleteId, GoalId, ProgramId, ProgramVersionId } from '@fitnessos/kernel'
 import type { ProgressionKind } from '../../domain/ProgressionIntent'
 
@@ -84,4 +85,12 @@ export interface PrescriptionWritePort {
 
 export interface PrescriptionPorts {
   readonly prescription: PrescriptionReadPort & PrescriptionWritePort
+  /**
+   * Resolves references this context holds but does not own (D-08).
+   *
+   * A programme version serves a GOAL, which belongs to Development. This port is why
+   * Prescription can render "serves: run 10k" without importing Development — it declares the
+   * need, and the composition root supplies something that can meet it.
+   */
+  readonly references: ReferenceResolver
 }

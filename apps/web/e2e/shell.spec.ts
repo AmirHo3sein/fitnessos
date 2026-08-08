@@ -831,3 +831,76 @@ test.describe('the program builder', () => {
     await expect(page.getByLabel('نام بلوک').first()).toHaveValue('My local edit')
   })
 })
+
+test.describe('cross-document references', () => {
+  const GOOD_CODE = '۰۰۰۰۰۰'
+
+  /** 0912 + testCode(3) + projectCode(3) + '9' — ends in 9, so the athlete has a programme. */
+  const phoneFor = (testCode: string, project: string) => {
+    const projectCode = project === 'chromium' ? '550' : '660'
+    const ascii = `0912${testCode}${projectCode}9`
+    return [...ascii].map((d) => '۰۱۲۳۴۵۶۷۸۹'[Number(d)]).join('')
+  }
+
+  const signIn = async (page: import('@playwright/test').Page, phone: string) => {
+    await page.goto('/sign-in')
+    await page.getByLabel('شماره‌ی موبایل').fill(phone)
+    await page.getByRole('button', { name: 'ارسال کد' }).click()
+    await page.getByLabel('کد تأیید').fill(GOOD_CODE)
+    await page.getByRole('button', { name: 'تأیید و ورود' }).click()
+    await expect(page).not.toHaveURL(/\/sign-in/)
+  }
+
+  test('@critical a goal the athlete has NOT declared renders broken, and the page still works', async ({
+    page,
+  }) => {
+    /*
+     * The guarantee D-08 exists for. The seeded programme serves a goal this athlete never
+     * declared — a programme outliving the goal it was written for, which is a normal thing for
+     * a programme to do. The page must render, and the chip must say WHICH reference broke.
+     */
+    await signIn(page, phoneFor('111', test.info().project.name))
+    await page.goto('/programme')
+
+    // The programme itself renders. A broken reference that took the page down would have lost
+    // a coach their programme to someone else's cleanup.
+    await expect(page.locator('ol li').first()).toContainText('Preparation')
+
+    await expect(page.getByText(/base phase before the build-up/)).toBeVisible()
+    await expect(page.getByText(/دیگر در دسترس نیست/)).toBeVisible()
+    // Nowhere to go, so it is not a link. A link to a deleted goal is a 404 the reader was
+    // invited into.
+    await expect(page.getByRole('link', { name: /base phase/ })).toHaveCount(0)
+  })
+
+  test('@critical a declared goal resolves to its own words and links to it', async ({ page }) => {
+    const phone = phoneFor('222', test.info().project.name)
+    await signIn(page, phone)
+
+    /*
+     * Declared through the API rather than the onboarding form, because the two requirements
+     * conflict: the stub gives a programme to a phone ending in 9 and treats a phone ending in
+     * 0000 as a new person, and only a new person sees the goal step. The declaration UI has its
+     * own tests; what is under test here is resolution.
+     */
+    const cookieHeader = (await page.context().cookies())
+      .map((c) => `${c.name}=${c.value}`)
+      .join('; ')
+    const declared = await page.request.post('http://127.0.0.1:8791/api/v1/goals', {
+      headers: { cookie: cookieHeader },
+      data: { intent: 'می‌خواهم ۱۰ کیلومتر بدون توقف بدوم', cadenceDays: 28 },
+    })
+    expect(declared.status()).toBe(201)
+
+    await page.goto('/programme')
+
+    // The GOAL's own words, not the programme's rationale — the live value wins when it exists.
+    const chip = page.getByRole('link', { name: /۱۰ کیلومتر/ })
+    await expect(chip).toBeVisible()
+    await expect(chip).toHaveAttribute(
+      'href',
+      '/goals/018f2c8a-0002-7000-8000-000000000000',
+    )
+    await expect(page.getByText(/base phase before the build-up/)).toHaveCount(0)
+  })
+})

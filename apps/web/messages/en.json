@@ -135,6 +135,13 @@
       "rate": "per cycle",
       "newBlockName": "New block",
       "empty": "This programme has no blocks yet."
+    },
+    "servesGoal": "Serves",
+    "refs": {
+      "loading": "Loading the goal",
+      "deleted": "no longer available",
+      "forbidden": "not visible to you",
+      "unnamedGoal": "a goal"
     }
   },
   "sessions": {

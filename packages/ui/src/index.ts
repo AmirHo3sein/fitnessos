@@ -28,3 +28,4 @@ export { Card, CardDescription, CardTitle, type CardProps } from './primitives/c
 export { Skeleton, type SkeletonProps } from './primitives/skeleton'
 
 export { SafeHtml, sanitizeHtml, type SafeHtmlProps } from './patterns/safe-html'
+export { RefChip, type RefChipProps, type RefChipState } from './patterns/ref-chip'
