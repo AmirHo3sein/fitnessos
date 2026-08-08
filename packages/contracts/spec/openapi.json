@@ -157,6 +157,51 @@
           }
         }
       }
+    },
+    "/athletes/me/onboarding": {
+      "put": {
+        "operationId": "completeOnboarding",
+        "tags": [
+          "athlete"
+        ],
+        "summary": "Record the athlete's training identity and availability",
+        "description": "PUT rather than POST: submitting the same body twice must leave the athlete in the same state. Onboarding is a form a user will resubmit after a network hiccup, and an idempotent verb is what makes that safe without a client-generated request id.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompleteOnboardingBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "recorded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Athlete"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -339,6 +384,21 @@
           "isNewPerson": {
             "type": "boolean",
             "description": "True when this verification created the person. The client routes to onboarding rather than the dashboard."
+          }
+        }
+      },
+      "CompleteOnboardingBody": {
+        "type": "object",
+        "required": [
+          "trainingIdentity",
+          "availability"
+        ],
+        "properties": {
+          "trainingIdentity": {
+            "$ref": "#/components/schemas/TrainingIdentity"
+          },
+          "availability": {
+            "$ref": "#/components/schemas/Availability"
           }
         }
       }

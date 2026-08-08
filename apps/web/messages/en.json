@@ -54,6 +54,32 @@
   },
   "onboarding": {
     "title": "Welcome",
-    "subtitle": "A few short questions so we can build your programme."
+    "subtitle": "A few short questions so we can build your programme.",
+    "experienceLabel": "How long have you been training?",
+    "experience": {
+      "beginner": "Beginner",
+      "intermediate": "Intermediate",
+      "advanced": "Advanced"
+    },
+    "disciplinesLabel": "What kind of training?",
+    "disciplines": {
+      "strength": "Strength",
+      "hypertrophy": "Hypertrophy",
+      "running": "Running",
+      "cycling": "Cycling",
+      "mobility": "Mobility"
+    },
+    "daysLabel": "How many days per week?",
+    "ceilingLabel": "Longest session (minutes)",
+    "ceilingHint": "Leave blank if you have no limit.",
+    "submit": "Continue",
+    "errors": {
+      "daysOutOfRange": "Days per week must be between 1 and 7.",
+      "daysNotWhole": "Days per week must be a whole number.",
+      "ceilingTooShort": "A session needs at least 10 minutes.",
+      "ceilingNotPositive": "A session cannot be zero minutes. Leave it blank if you have no limit.",
+      "noDisciplines": "Choose at least one kind of training.",
+      "generic": "That did not save. Please try again."
+    }
   }
 }

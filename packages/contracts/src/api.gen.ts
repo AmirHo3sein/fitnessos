@@ -81,6 +81,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/athletes/me/onboarding": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Record the athlete's training identity and availability
+         * @description PUT rather than POST: submitting the same body twice must leave the athlete in the same state. Onboarding is a form a user will resubmit after a network hiccup, and an idempotent verb is what makes that safe without a client-generated request id.
+         */
+        put: operations["completeOnboarding"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -131,6 +151,10 @@ export interface components {
             personId: string;
             /** @description True when this verification created the person. The client routes to onboarding rather than the dashboard. */
             isNewPerson: boolean;
+        };
+        CompleteOnboardingBody: {
+            trainingIdentity: components["schemas"]["TrainingIdentity"];
+            availability: components["schemas"]["Availability"];
         };
     };
     responses: {
@@ -264,6 +288,40 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
+        };
+    };
+    completeOnboarding: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompleteOnboardingBody"];
+            };
+        };
+        responses: {
+            /** @description recorded */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Athlete"];
+                };
+            };
+            /** @description invalid */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
         };
     };
 }

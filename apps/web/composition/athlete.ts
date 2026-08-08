@@ -1,5 +1,5 @@
 import type { AthletePorts } from '@fitnessos/core/athlete'
-import { createAthleteReadAdapter } from '@fitnessos/infra'
+import { createAthleteReadAdapter, createAthleteWriteAdapter } from '@fitnessos/infra'
 import type { AuthContext, HttpClient } from './container'
 
 /**
@@ -12,5 +12,11 @@ import type { AuthContext, HttpClient } from './container'
  * cookie serve another athlete's render.
  */
 export const createAthletePorts = (http: HttpClient, auth: AuthContext): AthletePorts => ({
-  athlete: createAthleteReadAdapter(http, auth),
+  // Read and write adapters are separate modules but one port object, because the DI
+  // context provides a whole context's ports to its subtree. Two contexts for one
+  // bounded context would be ceremony without a boundary.
+  athlete: {
+    ...createAthleteReadAdapter(http, auth),
+    ...createAthleteWriteAdapter(http, auth),
+  },
 })

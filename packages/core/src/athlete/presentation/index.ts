@@ -8,6 +8,15 @@
 export { AthletePortsProvider, useAthletePorts } from './di'
 export { useMyAthlete } from './hooks/useMyAthlete'
 export {
+  useCompleteOnboarding,
+  type UseCompleteOnboarding,
+} from './hooks/useCompleteOnboarding'
+export {
+  OnboardingForm,
+  type OnboardingFormProps,
+  type OnboardingLabels,
+} from './views/OnboardingForm'
+export {
   AthleteSummary,
   type AthleteSummaryLabels,
   type AthleteSummaryProps,

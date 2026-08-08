@@ -10,4 +10,7 @@
  * transitively, and `no-react-in-logic` would then fire on code that never
  * mentioned React. It is reached through the `./presentation` subpath export.
  */
+export * from './domain/vocabulary'
+export * from './domain/Availability'
+export * from './domain/TrainingIdentity'
 export * from './application/index'
