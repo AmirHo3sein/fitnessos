@@ -46,37 +46,41 @@ test.describe('authentication guard', () => {
     expect(new URL(page.url()).searchParams.get('next')).toBe('/dashboard')
   })
 
-  test('@critical a forged session cookie does not grant access to data', async ({
+  test('@critical a forged session cookie is refused and signed out', async ({
     page,
     context,
   }) => {
-    // The middleware checks cookie PRESENCE only — it cannot validate the token,
-    // because the signing key belongs to the backend. So a forged cookie is
-    // expected to get past the redirect and then be refused by the API.
+    // The middleware checks cookie PRESENCE only. It cannot validate the token — the
+    // signing key belongs to the backend — and it should not, because every protected
+    // response is already authorised by the API. So a forged cookie is EXPECTED to get
+    // past the redirect. What happens next is the point.
     //
-    // This test exists to keep that boundary honest. If it ever starts failing
-    // because the shell renders real data, the middleware has been mistaken for a
-    // security gate somewhere.
+    // An earlier version asserted "the shell renders, the data does not". That was
+    // written before a working refresh path existed, and it described a weaker outcome
+    // than the app actually delivers. It also raced: whether the assertion ran before
+    // or after the client-side recovery decided the result, so it passed on chromium
+    // and failed on mobile-rtl under parallel load.
+    //
+    // What actually happens, and what is asserted here:
+    //   1. middleware sees a cookie and lets the request through
+    //   2. the RSC prefetch 401s — server mode never refreshes, so it propagates
+    //   3. the client query 401s and attempts a refresh
+    //   4. the refresh 401s too, because there is no valid refresh token
+    //   5. onSessionLost fires and the user is returned to sign-in
+    //
+    // So a forged cookie cannot leave someone stranded on a shell that will 401 every
+    // query it mounts. The session ends properly.
     await context.addCookies([
       { name: 'access_token', value: 'forged.not.a.jwt', domain: '127.0.0.1', path: '/' },
     ])
 
     await page.goto('/dashboard')
 
-    // The security-relevant claim, and the only one assertable without a backend:
-    // the guard let the request through, so it is not acting as an authorisation
-    // boundary. The API is what refuses.
-    await expect(page).not.toHaveURL(/\/sign-in/)
-    await expect(page.locator('header')).toBeVisible()
+    await expect(page).toHaveURL(/\/sign-in/)
+    await expect(page.getByLabel('شماره‌ی موبایل')).toBeVisible()
 
-    // Deliberately NOT asserting on the athlete data here. Proving that the forged
-    // cookie yields no data requires an API that rejects it, and there is none in
-    // this suite. Asserting "the error message is visible" against a backend that
-    // is simply absent would pass for the wrong reason and keep passing after the
-    // guard was broken.
-    //
-    // TODO: assert the refusal once a stub API exists for E2E (see ADR-0026 —
-    // the same stub the contract pipeline will need).
+    // And no athlete data was rendered on the way through.
+    await expect(page.getByText('میان‌رده')).toBeHidden()
   })
 })
 
@@ -153,5 +157,117 @@ test.describe('sign-in form', () => {
     // stops appearing in the first response.
     const html = await (await request.get('/sign-in')).text()
     expect(html).toContain('شماره‌ی موبایل')
+  })
+})
+
+test.describe('sign-in, end to end', () => {
+  const PHONE_EXISTING = '۰۹۱۲۳۴۵۶۷۸۹'
+  const PHONE_NEW = '۰۹۱۲۳۴۵۰۰۰۰'
+  const GOOD_CODE = '۰۰۰۰۰۰'
+
+  test('@critical a Persian-digit number and code sign the athlete in', async ({ page }) => {
+    // The assertion the suite existed without for two rounds: not just that the form
+    // accepts the input, but that the session it establishes is real enough to load
+    // the dashboard's data on the next navigation.
+    await page.goto('/sign-in')
+    await page.getByLabel('شماره‌ی موبایل').fill(PHONE_EXISTING)
+    await page.getByRole('button', { name: 'ارسال کد' }).click()
+
+    await page.getByLabel('کد تأیید').fill(GOOD_CODE)
+    await page.getByRole('button', { name: 'تأیید و ورود' }).click()
+
+    await expect(page).toHaveURL(/\/dashboard/)
+    // Real data from the stub, which means the cookie survived, the RSC prefetch
+    // forwarded it, and the mapper produced a valid snapshot.
+    await expect(page.getByText('میان‌رده')).toBeVisible()
+  })
+
+  test('@critical a new person is routed to onboarding, not the dashboard', async ({ page }) => {
+    // `/onboarding` was a redirect target before it was a page: a genuinely new user
+    // reached a 404. Nothing in the type system covers "this string is a real route".
+    await page.goto('/sign-in')
+    await page.getByLabel('شماره‌ی موبایل').fill(PHONE_NEW)
+    await page.getByRole('button', { name: 'ارسال کد' }).click()
+    await page.getByLabel('کد تأیید').fill(GOOD_CODE)
+    await page.getByRole('button', { name: 'تأیید و ورود' }).click()
+
+    await expect(page).toHaveURL(/\/onboarding/)
+    await expect(page.getByRole('heading', { name: 'خوش آمدید' })).toBeVisible()
+  })
+
+  test('@critical a wrong code is rejected without leaking the server message', async ({
+    page,
+  }) => {
+    await page.goto('/sign-in')
+    await page.getByLabel('شماره‌ی موبایل').fill(PHONE_EXISTING)
+    await page.getByRole('button', { name: 'ارسال کد' }).click()
+    await page.getByLabel('کد تأیید').fill('۱۱۱۱۱۱')
+    await page.getByRole('button', { name: 'تأیید و ورود' }).click()
+
+    await expect(page.locator('#code-error')).toBeVisible()
+    // The stub's own wording must not reach the screen. On this page a server message
+    // can leak whether an account exists, which the endpoint is careful not to.
+    await expect(page.locator('#code-error')).not.toContainText('code_invalid')
+    await expect(page).not.toHaveURL(/\/dashboard/)
+  })
+
+  test('@critical the redirect target from the guard is honoured after signing in', async ({
+    page,
+  }) => {
+    // `/onboarding` rather than `/dashboard`: the dashboard is also the FALLBACK when
+    // `next` is absent or unsafe, so using it could not distinguish "honoured the
+    // target" from "ignored it and fell back". It also has to be a route that exists —
+    // a URL assertion cannot tell a real page from a 404.
+    await page.goto('/onboarding')
+    await expect(page).toHaveURL(/next=%2Fonboarding/)
+
+    await page.getByLabel('شماره‌ی موبایل').fill(PHONE_EXISTING)
+    await page.getByRole('button', { name: 'ارسال کد' }).click()
+    await page.getByLabel('کد تأیید').fill(GOOD_CODE)
+    await page.getByRole('button', { name: 'تأیید و ورود' }).click()
+
+    await expect(page).toHaveURL(/\/onboarding/)
+    await expect(page.getByRole('heading', { name: 'خوش آمدید' })).toBeVisible()
+  })
+
+  test('@critical an off-site `next` is ignored rather than followed', async ({ page }) => {
+    // `next` arrives from a redirect and is attacker-controllable: anyone can send a
+    // link carrying it. An open redirect on a sign-in page is a phishing primitive —
+    // the victim authenticates on the real site and is then handed to the attacker's.
+    await page.goto('/sign-in?next=https://evil.example/harvest')
+    await page.getByLabel('شماره‌ی موبایل').fill(PHONE_EXISTING)
+    await page.getByRole('button', { name: 'ارسال کد' }).click()
+    await page.getByLabel('کد تأیید').fill(GOOD_CODE)
+    await page.getByRole('button', { name: 'تأیید و ورود' }).click()
+
+    await expect(page).toHaveURL(/\/dashboard/)
+    expect(page.url()).not.toContain('evil.example')
+  })
+
+  test('@critical a protocol-relative `next` is ignored too', async ({ page }) => {
+    // `//evil.example` passes a naive startsWith('/') check and is still off-site.
+    await page.goto('/sign-in?next=//evil.example/harvest')
+    await page.getByLabel('شماره‌ی موبایل').fill(PHONE_EXISTING)
+    await page.getByRole('button', { name: 'ارسال کد' }).click()
+    await page.getByLabel('کد تأیید').fill(GOOD_CODE)
+    await page.getByRole('button', { name: 'تأیید و ورود' }).click()
+
+    await expect(page).toHaveURL(/\/dashboard/)
+    expect(page.url()).not.toContain('evil.example')
+  })
+
+  test('@critical no session token is readable from JavaScript', async ({ page }) => {
+    // The cookies are httpOnly, so document.cookie must not contain them. If this
+    // fails, an XSS payload anywhere in the app can exfiltrate a live session.
+    await page.goto('/sign-in')
+    await page.getByLabel('شماره‌ی موبایل').fill(PHONE_EXISTING)
+    await page.getByRole('button', { name: 'ارسال کد' }).click()
+    await page.getByLabel('کد تأیید').fill(GOOD_CODE)
+    await page.getByRole('button', { name: 'تأیید و ورود' }).click()
+    await expect(page).toHaveURL(/\/dashboard/)
+
+    const readable = await page.evaluate(() => document.cookie)
+    expect(readable).not.toContain('access_token')
+    expect(readable).not.toContain('refresh_token')
   })
 })

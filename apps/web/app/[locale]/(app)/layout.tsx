@@ -69,12 +69,13 @@ export default async function AppLayout({
   const queryClient = createQueryClient()
   await queryClient.prefetchQuery(myAthleteQuery(athletePorts))
 
-  const nav = [
-    { href: '/dashboard', label: t('nav.dashboard') },
-    { href: '/programme', label: t('nav.programme') },
-    { href: '/sessions', label: t('nav.sessions') },
-    { href: '/settings', label: t('nav.settings') },
-  ] as const
+  // Only routes that exist. A shell that links to unbuilt pages hands the user a 404
+  // for a link the product itself rendered — and it makes tests pass for the wrong
+  // reason, since a URL assertion cannot tell a real page from a not-found one.
+  //
+  // Arriving with their features: /programme, /sessions, /settings. The message
+  // catalogue already carries their labels, so adding one back is a single line here.
+  const nav = [{ href: '/dashboard', label: t('nav.dashboard') }] as const
 
   return (
     <div className="min-h-dvh">

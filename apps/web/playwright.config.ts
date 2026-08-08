@@ -15,6 +15,8 @@ import { defineConfig, devices } from '@playwright/test'
  * being run, and a test nobody runs is worse than no test, because it still looks
  * like coverage.
  */
+const STUB_API = process.env['STUB_API_URL'] ?? 'http://127.0.0.1:8791'
+
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
@@ -39,16 +41,34 @@ export default defineConfig({
     { name: 'mobile-rtl', use: { ...devices['Pixel 7'], locale: 'fa-IR' } },
   ],
 
-  webServer: {
-    command: 'pnpm start',
-    url: 'http://127.0.0.1:3000',
-    reuseExistingServer: !process.env['CI'],
-    timeout: 120_000,
-    env: {
-      // The app refuses to start without this (see composition/server.ts). E2E
-      // points it at a stub API rather than a real backend, so a failing backend
-      // cannot fail the frontend's own critical-path suite.
-      INTERNAL_API_URL: process.env['INTERNAL_API_URL'] ?? 'http://127.0.0.1:3000/api/v1',
+  /**
+   * Two servers: the stub API and the app.
+   *
+   * The stub is a separate process, never part of the app build — an endpoint that
+   * returns fabricated athlete data must not be capable of existing in a production
+   * bundle. Both the RSC prefetch (server-side, via INTERNAL_API_URL) and the browser
+   * (relative /api/v1, via the rewrite STUB_API_URL enables) reach the same process,
+   * so the whole request path is exercised rather than half of it.
+   */
+  webServer: [
+    {
+      command: 'pnpm --filter @fitnessos/stub-api start',
+      url: `${STUB_API}/api/v1/athletes/me`,
+      reuseExistingServer: !process.env['CI'],
+      timeout: 30_000,
+      // /athletes/me answers 401 without a session, which is a valid readiness signal.
+      ignoreHTTPSErrors: true,
     },
-  },
+    {
+      command: 'pnpm start',
+      url: 'http://127.0.0.1:3000',
+      reuseExistingServer: !process.env['CI'],
+      timeout: 120_000,
+      env: {
+        // The app refuses to start without this (see composition/server.ts).
+        INTERNAL_API_URL: `${STUB_API}/api/v1`,
+        STUB_API_URL: STUB_API,
+      },
+    },
+  ],
 })

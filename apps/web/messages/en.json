@@ -51,5 +51,9 @@
   },
   "dashboard": {
     "title": "Dashboard"
+  },
+  "onboarding": {
+    "title": "Welcome",
+    "subtitle": "A few short questions so we can build your programme."
   }
 }
