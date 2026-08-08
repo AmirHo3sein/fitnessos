@@ -5,39 +5,156 @@
     "version": "0.1.0",
     "description": "STOPGAP per ADR-0026. This file is hand-authored and committed here until the backend publishes @fitnessos/api-spec as a versioned package. Spec-first: the specification is the contract; the Rust handlers conform to it."
   },
-  "servers": [{ "url": "/api/v1", "description": "Same-origin per ADR-0025" }],
+  "servers": [
+    {
+      "url": "/api/v1",
+      "description": "Same-origin per ADR-0025"
+    }
+  ],
   "tags": [
-    { "name": "athlete", "description": "Athlete ownership root" },
-    { "name": "auth", "description": "Session lifecycle" }
+    {
+      "name": "athlete",
+      "description": "Athlete ownership root"
+    },
+    {
+      "name": "auth",
+      "description": "Session lifecycle"
+    }
   ],
   "paths": {
     "/athletes/me": {
       "get": {
         "operationId": "getMyAthlete",
-        "tags": ["athlete"],
+        "tags": [
+          "athlete"
+        ],
         "summary": "The calling person's athlete record",
         "responses": {
           "200": {
             "description": "ok",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Athlete" }
+                "schema": {
+                  "$ref": "#/components/schemas/Athlete"
+                }
               }
             }
           },
-          "401": { "$ref": "#/components/responses/Unauthorized" }
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
         }
       }
     },
     "/auth/refresh": {
       "post": {
         "operationId": "refreshSession",
-        "tags": ["auth"],
+        "tags": [
+          "auth"
+        ],
         "summary": "Rotate the refresh token and reissue the access cookie",
         "description": "Strict rotation: the presented token is revoked. Concurrent callers MUST be serialised client-side or they will revoke each other's freshly issued session.",
         "responses": {
-          "204": { "description": "cookies reissued" },
-          "401": { "$ref": "#/components/responses/Unauthorized" }
+          "204": {
+            "description": "cookies reissued"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/auth/request-code": {
+      "post": {
+        "operationId": "requestCode",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Send a one-time code by SMS",
+        "description": "Rate limited per IP and per phone. Returns the same shape whether or not the phone is registered — a differing response would make this an account-enumeration oracle.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestCodeBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "code dispatched",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestCodeResult"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/verify-code": {
+      "post": {
+        "operationId": "verifyCode",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Exchange a one-time code for a session",
+        "description": "On success sets the access and refresh cookies (httpOnly, SameSite=Lax). No token is ever returned in the body — a token readable from JS is a token exfiltrable by XSS.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyCodeBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "session established",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerifyCodeResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "code incorrect or expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "too many attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
         }
       }
     }
@@ -48,7 +165,9 @@
         "description": "no valid session",
         "content": {
           "application/json": {
-            "schema": { "$ref": "#/components/schemas/Problem" }
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
           }
         }
       }
@@ -56,46 +175,171 @@
     "schemas": {
       "Problem": {
         "type": "object",
-        "required": ["code", "detail"],
+        "required": [
+          "code",
+          "detail"
+        ],
         "properties": {
-          "code": { "type": "string", "description": "stable machine-readable code" },
-          "detail": { "type": "string" }
+          "code": {
+            "type": "string",
+            "description": "stable machine-readable code"
+          },
+          "detail": {
+            "type": "string"
+          }
         }
       },
       "Athlete": {
         "type": "object",
-        "required": ["id", "personId", "status", "trainingIdentity", "availability"],
+        "required": [
+          "id",
+          "personId",
+          "status",
+          "trainingIdentity",
+          "availability"
+        ],
         "properties": {
-          "id": { "type": "string", "format": "uuid" },
-          "personId": { "type": "string", "format": "uuid" },
-          "status": { "type": "string", "enum": ["active", "dormant", "archived"] },
-          "trainingIdentity": { "$ref": "#/components/schemas/TrainingIdentity" },
-          "availability": { "$ref": "#/components/schemas/Availability" }
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "personId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "dormant",
+              "archived"
+            ]
+          },
+          "trainingIdentity": {
+            "$ref": "#/components/schemas/TrainingIdentity"
+          },
+          "availability": {
+            "$ref": "#/components/schemas/Availability"
+          }
         }
       },
       "TrainingIdentity": {
         "type": "object",
-        "required": ["experienceLevel", "disciplines"],
+        "required": [
+          "experienceLevel",
+          "disciplines"
+        ],
         "properties": {
-          "trainingAgeMonths": { "type": "integer", "minimum": 0 },
+          "trainingAgeMonths": {
+            "type": "integer",
+            "minimum": 0
+          },
           "experienceLevel": {
             "type": "string",
-            "enum": ["beginner", "intermediate", "advanced"]
+            "enum": [
+              "beginner",
+              "intermediate",
+              "advanced"
+            ]
           },
-          "disciplines": { "type": "array", "items": { "type": "string" } }
+          "disciplines": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
         }
       },
       "Availability": {
         "type": "object",
-        "required": ["daysPerWeek", "equipmentAccess"],
+        "required": [
+          "daysPerWeek",
+          "equipmentAccess"
+        ],
         "properties": {
-          "daysPerWeek": { "type": "integer", "minimum": 1, "maximum": 7 },
+          "daysPerWeek": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 7
+          },
           "sessionCeilingSeconds": {
             "type": "integer",
             "minimum": 600,
             "description": "Duration in seconds. Unit is explicit in the name because N11 forbids an ambiguous magnitude."
           },
-          "equipmentAccess": { "type": "array", "items": { "type": "string" } }
+          "equipmentAccess": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "RequestCodeBody": {
+        "type": "object",
+        "required": [
+          "phone"
+        ],
+        "properties": {
+          "phone": {
+            "type": "string",
+            "pattern": "^\\+989[0-9]{9}$",
+            "description": "E.164. The client normalises Persian/Arabic-Indic digits and local prefixes before sending; the server receives one canonical form only."
+          }
+        }
+      },
+      "RequestCodeResult": {
+        "type": "object",
+        "required": [
+          "retryAfterSeconds",
+          "codeLength"
+        ],
+        "properties": {
+          "retryAfterSeconds": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Seconds until another code may be requested. Unit is explicit in the name because N11 forbids an ambiguous magnitude. Server-authoritative: the client must not compute its own cooldown."
+          },
+          "codeLength": {
+            "type": "integer",
+            "minimum": 4,
+            "maximum": 8,
+            "description": "So the client does not hardcode a length the server can change."
+          }
+        }
+      },
+      "VerifyCodeBody": {
+        "type": "object",
+        "required": [
+          "phone",
+          "code"
+        ],
+        "properties": {
+          "phone": {
+            "type": "string",
+            "pattern": "^\\+989[0-9]{9}$"
+          },
+          "code": {
+            "type": "string",
+            "pattern": "^[0-9]{4,8}$"
+          }
+        }
+      },
+      "VerifyCodeResult": {
+        "type": "object",
+        "required": [
+          "personId",
+          "isNewPerson"
+        ],
+        "properties": {
+          "personId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "isNewPerson": {
+            "type": "boolean",
+            "description": "True when this verification created the person. The client routes to onboarding rather than the dashboard."
+          }
         }
       }
     }

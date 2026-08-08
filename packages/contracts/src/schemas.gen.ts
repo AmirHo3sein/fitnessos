@@ -19,3 +19,11 @@ export const TrainingIdentitySchema = z.object({ "trainingAgeMonths": z.number()
 export const AvailabilitySchema = z.object({ "daysPerWeek": z.number().int().gte(1).lte(7), "sessionCeilingSeconds": z.number().int().gte(600).describe("Duration in seconds. Unit is explicit in the name because N11 forbids an ambiguous magnitude.").optional(), "equipmentAccess": z.array(z.string()) })
 
 export const AthleteSchema = z.object({ "id": z.string().uuid(), "personId": z.string().uuid(), "status": z.enum(["active","dormant","archived"]), "trainingIdentity": TrainingIdentitySchema, "availability": AvailabilitySchema })
+
+export const RequestCodeBodySchema = z.object({ "phone": z.string().regex(new RegExp("^\\+989[0-9]{9}$")).describe("E.164. The client normalises Persian/Arabic-Indic digits and local prefixes before sending; the server receives one canonical form only.") })
+
+export const RequestCodeResultSchema = z.object({ "retryAfterSeconds": z.number().int().gte(0).describe("Seconds until another code may be requested. Unit is explicit in the name because N11 forbids an ambiguous magnitude. Server-authoritative: the client must not compute its own cooldown."), "codeLength": z.number().int().gte(4).lte(8).describe("So the client does not hardcode a length the server can change.") })
+
+export const VerifyCodeBodySchema = z.object({ "phone": z.string().regex(new RegExp("^\\+989[0-9]{9}$")), "code": z.string().regex(new RegExp("^[0-9]{4,8}$")) })
+
+export const VerifyCodeResultSchema = z.object({ "personId": z.string().uuid(), "isNewPerson": z.boolean().describe("True when this verification created the person. The client routes to onboarding rather than the dashboard.") })

@@ -64,13 +64,38 @@ const MIDDLEWARE_BUDGET_KB = 50
  * providers into the route group that uses them; the budget is what surfaced it.
  */
 const ROUTE_BUDGETS_KB = [
-  // The authenticated shell: container, infra, generated validators, React Aria,
-  // next-intl's client runtime. Loaded once and navigated within. Measured 59.6 kB.
-  [/^\/\[locale\]\/\(app\)\/layout$/, 65],
-  // Everything a visitor sees before signing in. No infrastructure belongs here.
-  [/^\/\[locale\]\/\((public|auth)\)\//, 30],
-  // The root layout — QueryClient boundary only, no container. Measured 15.2 kB.
+  // The authenticated shell: athlete ports, mappers, validators, React Aria,
+  // next-intl's client runtime. Loaded once and navigated within. Measured 35.2 kB.
+  [/^\/\[locale\]\/\(app\)\/layout$/, 45],
+
+  // Marketing and other unauthenticated content. Measured 6.2 kB, and it should stay
+  // in that region — these pages are a link and some text. This is the tightest
+  // budget in the file precisely because it is the one where accidental weight is
+  // least likely to be noticed by anyone working on the app itself.
+  [/^\/\[locale\]\/\(public\)\//, 15],
+
+  // Sign-in is separate from (public) despite also being unauthenticated, because it
+  // has a genuinely different job: it is the first *interactive* screen, and it pays
+  // for the client stack that every subsequent interaction reuses — Zod for response
+  // validation (14.1 kB, ADR-0031), React Aria for accessible press handling
+  // (12.6 kB), and TanStack Query's mutation machinery. Measured 48.4 kB.
+  //
+  // Unlike the two failures above it, this number is CALIBRATION, not a discovered
+  // leak. Both earlier overruns were real problems the budget surfaced correctly:
+  // an aggregate `core/presentation` barrel that dragged every context's client
+  // components into any route importing one, and workspace packages missing
+  // `sideEffects: false`, without which webpack must assume every module is impure
+  // and cannot drop unused re-exports. Fixing those took the (app) layout from
+  // 61.9 kB to 35.2 and the dashboard from 37.3 to 19.1.
+  //
+  // What is left is the architecture's actual cost, and lowering it would mean giving
+  // something up: a second HTTP path that skips validation, or a plain <button> that
+  // diverges from the design system. Neither is worth it for one screen.
+  [/^\/\[locale\]\/\(auth\)\//, 55],
+
+  // The root layout — QueryClient boundary only, no ports. Measured 15 kB.
   [/^\/\[locale\]\/layout$/, 25],
+
   // Individual pages inside the authenticated area.
   [/./, 45],
 ]

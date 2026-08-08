@@ -1,9 +1,10 @@
 'use client'
 
-import { AthletePortsProvider } from '@fitnessos/core/presentation'
+import { AthletePortsProvider } from '@fitnessos/core/athlete/presentation'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useRef, type ReactNode } from 'react'
-import { createContainer } from './container'
+import { createAthletePorts } from './athlete'
+import { createHttp } from './container'
 
 /**
  * Port providers for the authenticated area. Mounted by the `(app)` layout, NOT by
@@ -46,19 +47,23 @@ export const AppProviders = ({ children }: { children: ReactNode }) => {
   // every port would re-render with it and `useMyAthlete` would see a new `queryFn`
   // each time, defeating the cache. The React Compiler makes no promise about this —
   // it is a correctness requirement, not a memoisation opportunity.
-  const container = useMemo(
+  const ports = useMemo(
     () =>
-      createContainer({
-        mode: 'browser',
-        onSessionLost: () => {
-          // The refresh itself failed, so the session is genuinely gone. Send the user
-          // to sign-in rather than leaving them on a page that will keep 401ing every
-          // query it mounts.
-          routerRef.current.replace('/sign-in')
-        },
-      }),
+      createAthletePorts(
+        createHttp({
+          mode: 'browser',
+          onSessionLost: () => {
+            // The refresh itself failed, so the session is genuinely gone. Send the
+            // user to sign-in rather than leaving them on a page that will keep
+            // 401ing every query it mounts.
+            routerRef.current.replace('/sign-in')
+          },
+        }),
+        // Browser requests carry cookies automatically, so no cookie to forward.
+        {},
+      ),
     [],
   )
 
-  return <AthletePortsProvider value={container.athlete}>{children}</AthletePortsProvider>
+  return <AthletePortsProvider value={ports}>{children}</AthletePortsProvider>
 }

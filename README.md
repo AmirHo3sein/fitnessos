@@ -24,7 +24,7 @@ packages/config       tsconfig · eslint · dependency-cruiser · vitest bases
 packages/kernel       shared kernel — ids · Result · Quantity · temporal · Money · Locale
 packages/contracts    OpenAPI spec → generated types + Zod validators (ADR-0026, 0029)
 packages/infra        adapters — http client, mappers, ports implementations
-packages/core         bounded contexts that have not graduated to their own package
+packages/core         un-graduated bounded contexts; each exposes `./{ctx}` and `./{ctx}/presentation`
 packages/ctx-*        graduated bounded contexts
 packages/ui           shared React layer — primitives, patterns, DI factory
 tools/generators      plop generators
@@ -76,14 +76,14 @@ Phase 0 and the Phase 1 scaffold are complete.
 - [x] ESLint base with exhaustiveness and no-`any`; React config with a11y and the XSS ban
 - [x] `@fitnessos/kernel` — ids, Result, Quantity, temporal, Money, Locale · 29 tests
 - [x] `tools/generators` — `gen:context`, 7 tests
-- [x] `packages/core` — host for un-graduated contexts, plus the Athlete context
+- [x] `packages/core` — host for un-graduated contexts: **Athlete** (read) and **Auth** (write)
 - [x] `packages/contracts` — committed-spec stopgap per ADR-0026, types **and** runtime Zod validators from one spec (ADR-0029), drift-checked
 - [x] `packages/infra` — http client with single-flight refresh, tiered mappers, adapters, **response validation** · 18 unit + 12 integration
 - [x] `packages/ui` — React Aria primitives, `<SafeHtml>`, DI factory · 21 tests
-- [x] `apps/web` — route groups, middleware guard, RSC prefetch, composition root · 16 e2e
+- [x] `apps/web` — route groups, middleware guard, RSC prefetch, per-group composition, **working sign-in** · 24 e2e
 - [x] CI stages 1–11
 
-**85 tests + 16 e2e. All CI stages live.**
+**145 tests + 24 e2e. All CI stages live.**
 
 ## Import convention
 
@@ -300,3 +300,50 @@ Three properties that are easy to get wrong, and were:
 Zod-inferred type describe the same field set. They come from one file in one run, so
 they should never differ — which is exactly why it is worth four lines to check: if they
 ever do, the type promises one shape while the validator enforces another.
+
+## Tree-shaking and barrels
+
+Every workspace package declares `sideEffects: false` (`ui` declares `["*.css"]`).
+Without it webpack must assume every module in a package is impure and cannot drop
+unused re-exports from a barrel — which is not a theoretical cost. Adding it took the
+`(app)` layout from 61.9 kB gz to 35.2 and the dashboard from 37.3 to 19.1, with no
+code change.
+
+`packages/core` exposes one barrel pair **per context** — `./auth` and
+`./auth/presentation` — rather than one aggregate `./presentation`. The aggregate was
+removed after the budget caught what it cost: a barrel over `'use client'` modules is
+not tree-shaken, because each client module is a bundler entry point, so importing
+`SignInForm` dragged in every other context's components. The per-context shape is
+also exactly what a graduated `ctx-*` package exposes, so graduation is a move plus a
+rename and no import changes shape.
+
+There is deliberately no `createContainer` that builds every port. A single factory
+means importing it constructs every adapter, mapper and validator — tree-shaking
+cannot help, because the factory genuinely uses them all. Each context has its own
+factory in `apps/web/composition/`, and a route group imports only what it mounts.
+
+## Sign-in
+
+The Auth context is the first write path, and the first to demonstrate that the
+per-route-group port rule generalises beyond the context it was derived from.
+
+Two things carry most of the weight, both specific to the market:
+
+**Digit normalisation.** A Persian keyboard produces `۰۹۱۲۳۴۵۶۷۸۹` and an Arabic one
+`٠٩١٢٣٤٥٦٧٨٩`. Neither is an ASCII digit — `Number()` returns `NaN` and `/^\d+$/`
+does not match. Without `normalizeDigits` (in the kernel, not a form helper) the user
+types the number printed on their own SIM and the form calls it invalid. The same
+applies to the OTP code.
+
+**One canonical phone.** `09123456789`, `+989123456789`, `0912 345 6789`,
+`00989123456789` and `9123456789` are the same person. A system that treats them as
+different creates duplicate accounts, and the duplicate is only discovered when
+someone cannot see their own history. `PhoneNumber` reduces every accepted form to
+E.164 — including a zero-width non-joiner, which Persian keyboards insert and which
+survives copy-paste.
+
+The flow is a discriminated union, not a set of booleans: `phase`, `isLoading`,
+`hasCode` and `error` as independent flags admit sixteen states, of which four are
+meaningful. The normalised phone exists only in the `awaiting-code` state, so
+verification cannot be attempted against a re-parse of whatever is in the input —
+which is what happens when a user retypes their number while waiting for the SMS.

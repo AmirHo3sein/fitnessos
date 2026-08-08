@@ -67,6 +67,25 @@ export interface HttpClient {
 
 const REFRESH_PATH = '/auth/refresh'
 
+/**
+ * Endpoints where a 401 is an ANSWER, not an expired session.
+ *
+ * These are the requests that establish a session, so by definition there is none to
+ * refresh. Attempting one anyway is not merely wasted — the refresh fails (no cookie
+ * to present), and its failure replaces the real error. The user typed a wrong code
+ * and is told the network is down.
+ *
+ * Found by an integration test: verifying a code against a 401 tried to refresh, and
+ * MSW failed the unhandled request to `/auth/refresh`. Without that test the symptom
+ * in production would have been an incorrect error message on the most sensitive
+ * screen in the product.
+ */
+const NEVER_REFRESH: readonly string[] = [
+  REFRESH_PATH,
+  '/auth/request-code',
+  '/auth/verify-code',
+]
+
 export const createHttpClient = (config: HttpConfig = {}): HttpClient => {
   const baseUrl = config.baseUrl ?? '/api/v1'
   const mode: HttpMode = config.mode ?? 'browser'
@@ -104,7 +123,7 @@ export const createHttpClient = (config: HttpConfig = {}): HttpClient => {
     const mayRefresh =
       response.status === 401 &&
       !options._isRetry &&
-      path !== REFRESH_PATH &&
+      !NEVER_REFRESH.includes(path) &&
       // A server-mode client must NOT refresh, and this is the subtle one.
       //
       // Refresh tokens rotate strictly: a successful rotation invalidates the

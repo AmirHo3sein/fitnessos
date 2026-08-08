@@ -4,7 +4,7 @@ import type {
   AvailabilitySnapshot,
   ExperienceLevel,
   TrainingIdentitySnapshot,
-} from '@fitnessos/core'
+} from '@fitnessos/core/athlete'
 import { AthleteSchema, type components } from '@fitnessos/contracts'
 import { idFrom, isOk, type Quantity, seconds } from '@fitnessos/kernel'
 import type { z } from 'zod'

@@ -107,3 +107,51 @@ test.describe('no credential leaks into the client bundle', () => {
     expect(bundle).not.toMatch(/api\.(openai|anthropic)\.com/)
   })
 })
+
+test.describe('sign-in form', () => {
+  test('@critical accepts Persian digits and reaches the code step', async ({ page }) => {
+    // The whole flow in one assertion: a Persian keyboard produces ۰۹۱۲…, which is
+    // not an ASCII digit, so without normalisation the user types the number that is
+    // printed on their own SIM and the form calls it invalid.
+    //
+    // No backend here, so this asserts as far as the client can get on its own: the
+    // number was accepted as well-formed and a request was attempted.
+    await page.goto('/sign-in')
+    await page.getByLabel('شماره‌ی موبایل').fill('۰۹۱۲۳۴۵۶۷۸۹')
+    await page.getByRole('button', { name: 'ارسال کد' }).click()
+
+    // Either the code step (if something answered) or the generic error — but never
+    // the "not an Iranian mobile" message, which would mean normalisation failed.
+    await expect(page.getByText('این شماره‌ی موبایل ایران به نظر نمی‌رسد.')).toBeHidden()
+  })
+
+  test('@critical rejects a landline with a specific message', async ({ page }) => {
+    await page.goto('/sign-in')
+    await page.getByLabel('شماره‌ی موبایل').fill('۰۲۱۲۳۴۵۶۷۸')
+    await page.getByRole('button', { name: 'ارسال کد' }).click()
+
+    // `#phone-error`, not getByRole('alert'): Next injects its own route announcer
+    // with role="alert", so the role selector matches two elements. This is also the
+    // element `aria-errormessage` points at, so asserting on it checks the wiring a
+    // screen reader actually follows.
+    await expect(page.locator('#phone-error')).toContainText('ایران به نظر نمی‌رسد')
+    await expect(page.getByLabel('شماره‌ی موبایل')).toHaveAttribute('aria-invalid', 'true')
+  })
+
+  test('@critical the phone field renders LTR inside the RTL page', async ({ page }) => {
+    // Without dir="ltr" the bidi algorithm reorders the number's groups, so the user
+    // sees a different number to the one they typed.
+    await page.goto('/sign-in')
+    await expect(page.getByLabel('شماره‌ی موبایل')).toHaveAttribute('dir', 'ltr')
+    await expect(page.locator('html')).toHaveAttribute('dir', 'rtl')
+  })
+
+  test('@critical stays prerendered despite reading search params', async ({ request }) => {
+    // SignInClient calls useSearchParams(), which opts a route out of prerendering
+    // unless it sits inside a Suspense boundary. The symptom of losing that boundary
+    // is not an error — the page just silently becomes client-rendered, and the form
+    // stops appearing in the first response.
+    const html = await (await request.get('/sign-in')).text()
+    expect(html).toContain('شماره‌ی موبایل')
+  })
+})
