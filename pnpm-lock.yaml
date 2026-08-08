@@ -41,6 +41,9 @@ importers:
       '@fitnessos/kernel':
         specifier: workspace:*
         version: link:../../packages/kernel
+      '@fitnessos/telemetry':
+        specifier: workspace:*
+        version: link:../../packages/telemetry
       '@fitnessos/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -242,6 +245,18 @@ importers:
       uuidv7:
         specifier: ^1.0.2
         version: 1.2.1
+    devDependencies:
+      '@fitnessos/config':
+        specifier: workspace:*
+        version: link:../config
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.4
+        version: 2.1.9(@types/node@22.20.1)(jsdom@28.1.0)(lightningcss@1.32.0)(msw@2.15.0(@types/node@22.20.1)(typescript@5.9.3))
+
+  packages/telemetry:
     devDependencies:
       '@fitnessos/config':
         specifier: workspace:*

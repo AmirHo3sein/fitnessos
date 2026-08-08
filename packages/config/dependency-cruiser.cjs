@@ -130,6 +130,22 @@ module.exports = {
       },
     },
     {
+      name: 'no-telemetry-vendor-sdk',
+      comment:
+        'ADR-0032. Observability vendors are reached only through the TelemetryPort, and ' +
+        'the sink is built in apps/web/composition. A vendor SDK imported anywhere else ' +
+        'bypasses the closed event vocabulary — and these SDKs capture messages, stacks, ' +
+        'breadcrumbs and request bodies by DEFAULT, which is the opposite of the ' +
+        'guarantee the seam exists to provide.',
+      severity: 'error',
+      from: { pathNot: '^apps/web/composition/' },
+      to: {
+        path:
+          '^(@sentry/[^/]+|@datadog/[^/]+|dd-trace|@opentelemetry/[^/]+|' +
+          'posthog-js|mixpanel-browser|@amplitude/[^/]+|logrocket|@bugsnag/[^/]+)($|/)',
+      },
+    },
+    {
       name: 'no-circular',
       comment: 'Circular imports inside a package indicate a missing boundary.',
       severity: 'error',
