@@ -8,7 +8,9 @@
  */
 
 export class ApiError extends Error {
-  override readonly name = 'ApiError'
+  // Typed `string` rather than the literal, so a subclass can narrow the name. The literal reads
+  // better in isolation and makes `ConflictError` below impossible to declare.
+  override readonly name: string = 'ApiError'
 
   constructor(
     readonly status: number,
@@ -22,6 +24,29 @@ export class ApiError extends Error {
   /** A session problem the caller may be able to resolve by refreshing. */
   get isUnauthorized(): boolean {
     return this.status === 401
+  }
+}
+
+/**
+ * A 409 whose body was read.
+ *
+ * `ApiError` deliberately keeps only the code, because `request` discards the body of any non-ok
+ * response. For a session-log conflict the body IS the point: it is the record the server already
+ * holds, and without it the athlete can be told that something collided but not with what.
+ *
+ * A subclass rather than a separate type, so every existing `status === 409` check keeps working
+ * and only the code that wants the record has to know this exists.
+ */
+export class ConflictError extends ApiError {
+  override readonly name = 'ConflictError'
+
+  constructor(
+    /** The server's record. Unvalidated — mapping it is the caller's business. */
+    readonly existing: unknown,
+    code: string | null,
+    message: string,
+  ) {
+    super(409, code, message)
   }
 }
 

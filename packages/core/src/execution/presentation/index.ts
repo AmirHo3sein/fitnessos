@@ -12,3 +12,5 @@ export {
   type LoggerLabels,
   type SessionLoggerProps,
 } from './views/SessionLogger'
+export { useSyncIssues, type UseSyncIssues } from './hooks/useSyncIssues'
+export { SyncIssues, type SyncIssueLabels, type SyncIssuesProps } from './views/SyncIssues'

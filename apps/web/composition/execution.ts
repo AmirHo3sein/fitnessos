@@ -29,7 +29,18 @@ import type { AuthContext, HttpClient } from './container'
  * in a pocket; these two events are precisely the moments when a drain can succeed — the network
  * came back, or the athlete opened the app.
  */
-export const createExecutionPorts = (http: HttpClient, auth: AuthContext): ExecutionPorts => {
+export const createExecutionPorts = (
+  http: HttpClient,
+  auth: AuthContext,
+  /**
+   * Called when a replay records an issue.
+   *
+   * The durable record is the mechanism (see the note in `queue.ts`); this only lets a mounted UI
+   * update immediately rather than on its next read. Optional, because the composition root on
+   * the server has no cache to invalidate.
+   */
+  onIssue?: () => void,
+): ExecutionPorts => {
   const isBrowser = typeof indexedDB !== 'undefined'
   const store = isBrowser ? createIndexedDbStore() : createMemoryStore()
 
@@ -38,6 +49,7 @@ export const createExecutionPorts = (http: HttpClient, auth: AuthContext): Execu
     send: createMutationSender(http, auth),
     newId: () => newPerformedSessionId(),
     now: () => Date.now(),
+    ...(onIssue ? { onIssue } : {}),
   })
 
   if (isBrowser) {

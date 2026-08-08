@@ -1,4 +1,9 @@
-import { QUEUE_SCHEMA_VERSION, type MutationStore, type QueuedMutation } from './queue'
+import {
+  QUEUE_SCHEMA_VERSION,
+  type MutationStore,
+  type QueuedMutation,
+  type SyncIssue,
+} from './queue'
 
 /**
  * IndexedDB-backed store. The browser implementation.
@@ -14,9 +19,18 @@ import { QUEUE_SCHEMA_VERSION, type MutationStore, type QueuedMutation } from '.
  */
 
 const DB_NAME = 'fitnessos-sync'
-const DB_VERSION = 1
+/**
+ * Bumped to 2 when quarantine became the issue log.
+ *
+ * The old `quarantine` store is READ during the upgrade and its records carried forward, not
+ * dropped. A deploy that silently discarded an athlete's failed logs would be the same data loss
+ * this whole subsystem exists to prevent, arriving by a different route.
+ */
+const DB_VERSION = 2
 const PENDING = 'pending'
-const QUARANTINE = 'quarantine'
+const ISSUES = 'issues'
+/** v1's name for what is now the issue log. Read once during upgrade, then left alone. */
+const LEGACY_QUARANTINE = 'quarantine'
 
 /**
  * Migration for records written by an older build.
@@ -57,11 +71,37 @@ const migrate = (raw: unknown): QueuedMutation | null => {
 const open = (): Promise<IDBDatabase> =>
   new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION)
-    request.onupgradeneeded = () => {
+    request.onupgradeneeded = (event) => {
       const db = request.result
       if (!db.objectStoreNames.contains(PENDING)) db.createObjectStore(PENDING, { keyPath: 'id' })
-      if (!db.objectStoreNames.contains(QUARANTINE)) {
-        db.createObjectStore(QUARANTINE, { keyPath: 'id' })
+      if (!db.objectStoreNames.contains(ISSUES)) db.createObjectStore(ISSUES, { keyPath: 'id' })
+
+      // v1 → v2. Carried across inside the upgrade transaction, which is the only place both
+      // stores can be touched atomically; a copy afterwards could be interrupted and lose them.
+      if (event.oldVersion < 2 && db.objectStoreNames.contains(LEGACY_QUARANTINE)) {
+        const tx = request.transaction
+        if (tx !== null) {
+          const legacy = tx.objectStore(LEGACY_QUARANTINE)
+          const issues = tx.objectStore(ISSUES)
+          legacy.getAll().onsuccess = (read) => {
+            const rows = (read.target as IDBRequest<unknown[]>).result
+            for (const row of rows) {
+              const mutation = migrate(row)
+              if (mutation === null) continue
+              issues.put({
+                id: mutation.id,
+                kind: mutation.kind,
+                reason: 'rejected',
+                payload: mutation.payload,
+                existing: null,
+                detail: mutation.lastError,
+                // The original timestamp, not now. A migration must not make an old failure look
+                // like it happened during the upgrade.
+                at: mutation.createdAt,
+              } satisfies SyncIssue)
+            }
+          }
+        }
       }
     }
     request.onsuccess = () => {
@@ -105,6 +145,15 @@ const readAll = async (storeName: string): Promise<readonly QueuedMutation[]> =>
   return migrated
 }
 
+const isSyncIssue = (raw: unknown): raw is SyncIssue => {
+  if (typeof raw !== 'object' || raw === null) return false
+  const record = raw as Partial<SyncIssue>
+  return (
+    typeof record.id === 'string' &&
+    (record.reason === 'conflict' || record.reason === 'rejected' || record.reason === 'gave-up')
+  )
+}
+
 export const createIndexedDbStore = (): MutationStore => ({
   enqueue: async (mutation) => {
     await run(PENDING, 'readwrite', (store) => store.put(mutation))
@@ -116,11 +165,18 @@ export const createIndexedDbStore = (): MutationStore => ({
   update: async (mutation) => {
     await run(PENDING, 'readwrite', (store) => store.put(mutation))
   },
-  quarantine: async (mutation, reason) => {
-    await run(QUARANTINE, 'readwrite', (store) => store.put({ ...mutation, lastError: reason }))
-    await run(PENDING, 'readwrite', (store) => store.delete(mutation.id))
+  recordIssue: async (issue) => {
+    await run(ISSUES, 'readwrite', (store) => store.put(issue))
   },
-  quarantined: () => readAll(QUARANTINE),
+  issues: async () => {
+    const raw = await run<unknown[]>(ISSUES, 'readonly', (store) => store.getAll())
+    // Same rule as the queue: ONE undecodable record must not make the whole issue log
+    // unreadable, which would hide every other failed log behind a single bad row.
+    return raw.filter(isSyncIssue)
+  },
+  dismissIssue: async (id) => {
+    await run(ISSUES, 'readwrite', (store) => store.delete(id))
+  },
 })
 
 /**

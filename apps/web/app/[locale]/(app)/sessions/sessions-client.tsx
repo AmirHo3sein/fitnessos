@@ -2,10 +2,12 @@
 
 import {
   SessionLogger,
+  SyncIssues,
   UpcomingSessions,
   useUpcomingSessions,
   type LoggerLabels,
   type SessionLabels,
+  type SyncIssueLabels,
 } from '@fitnessos/core/execution/presentation'
 import { Button } from '@fitnessos/ui'
 import type { Locale } from '@fitnessos/kernel'
@@ -25,6 +27,7 @@ export const SessionsClient = ({
   logCta,
   cancel,
   savedOffline,
+  syncIssueLabels,
 }: {
   locale: Locale
   labels: SessionLabels
@@ -32,6 +35,7 @@ export const SessionsClient = ({
   logCta: string
   cancel: string
   savedOffline: string
+  syncIssueLabels: SyncIssueLabels
 }) => {
   const [loggingId, setLoggingId] = useState<string | null>(null)
   const [justLogged, setJustLogged] = useState(false)
@@ -67,6 +71,12 @@ export const SessionsClient = ({
 
   return (
     <div className="space-y-4">
+      {/*
+        FIRST, above the list. A log that never saved is more urgent than what is coming next, and
+        an athlete who has to scroll to find out their session was lost will not find out.
+      */}
+      <SyncIssues locale={locale} labels={syncIssueLabels} />
+
       {/*
         Worded carefully: the log is DURABLE, not necessarily sent (ADR-0033). Telling an athlete
         in a basement gym that their session is on the server would be a lie, and one they would

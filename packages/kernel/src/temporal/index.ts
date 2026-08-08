@@ -128,3 +128,28 @@ export interface Clock {
 
 export const systemClock: Clock = { now: () => Date.now() }
 export const fixedClock = (epochMs: number): Clock => ({ now: () => epochMs })
+
+/**
+ * A calendar date, rendered in the reader's own calendar.
+ *
+ * `timeZone: 'UTC'` with the date constructed from its own components is the whole point, and it
+ * is subtle enough to be worth having in one place. A `PlainDate` is a calendar fact with no time
+ * and no zone; letting the runtime interpret it locally is how the 10th becomes the 9th for
+ * everyone west of Greenwich. That bug is invisible to whoever writes it and permanent for
+ * whoever reads it.
+ *
+ * For a Persian locale `Intl` selects the Jalali calendar on its own — an athlete in Tehran sees
+ * ۱۹ مرداد, not a Gregorian date transliterated into Persian digits.
+ *
+ * The formatter is constructed per call. `Intl.DateTimeFormat` is expensive enough that a list
+ * should hoist it; a single date is not worth the ceremony, and a module-level cache keyed by
+ * locale would leak across requests on the server.
+ */
+export const formatPlainDate = (
+  date: PlainDate,
+  locale: string,
+  options: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'long', year: 'numeric' },
+): string =>
+  new Intl.DateTimeFormat(locale, { ...options, timeZone: 'UTC' }).format(
+    Date.UTC(date.year, date.month - 1, date.day),
+  )

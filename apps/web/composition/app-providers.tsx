@@ -4,6 +4,7 @@ import { AthletePortsProvider } from '@fitnessos/core/athlete/presentation'
 import { GoalPortsProvider } from '@fitnessos/core/goal/presentation'
 import { PrescriptionPortsProvider } from '@fitnessos/ctx-prescription/presentation'
 import { ExecutionPortsProvider } from '@fitnessos/core/execution/presentation'
+import { useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useRef, type ReactNode } from 'react'
 import { createAthletePorts } from './athlete'
@@ -39,6 +40,9 @@ import { createHttp } from './container'
  */
 export const AppProviders = ({ children }: { children: ReactNode }) => {
   const router = useRouter()
+  // Stable for the life of the provider above, so it can go in the memo's deps without rebuilding
+  // the container — unlike `router`, whose identity changes on navigation.
+  const queryClient = useQueryClient()
 
   // A ref so `onSessionLost` closes over the router exactly once. Putting `router` in
   // the memo's dependency list would rebuild the whole container whenever the
@@ -76,9 +80,13 @@ export const AppProviders = ({ children }: { children: ReactNode }) => {
       athlete: createAthletePorts(http, {}),
       goal,
       prescription: createPrescriptionPorts(http, {}, goal),
-      execution: createExecutionPorts(http, {}),
+      // Invalidates the issue query so a conflict recorded by a background drain appears without
+      // the athlete reloading. The record itself is already durable — this only shortens the wait.
+      execution: createExecutionPorts(http, {}, () => {
+        void queryClient.invalidateQueries({ queryKey: ['sync-issues'] })
+      }),
     }
-  }, [])
+  }, [queryClient])
 
   return (
     <AthletePortsProvider value={ports.athlete}>

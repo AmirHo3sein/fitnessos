@@ -1,4 +1,4 @@
-import type { MutationStore, QueuedMutation } from './queue'
+import type { MutationStore, QueuedMutation, SyncIssue } from './queue'
 
 /**
  * In-memory store.
@@ -13,7 +13,7 @@ import type { MutationStore, QueuedMutation } from './queue'
  */
 export const createMemoryStore = (): MutationStore => {
   const queue = new Map<string, QueuedMutation>()
-  const dead = new Map<string, QueuedMutation>()
+  const issues = new Map<string, SyncIssue>()
 
   return {
     enqueue: (mutation) => {
@@ -29,11 +29,14 @@ export const createMemoryStore = (): MutationStore => {
       queue.set(mutation.id, mutation)
       return Promise.resolve()
     },
-    quarantine: (mutation, reason) => {
-      queue.delete(mutation.id)
-      dead.set(mutation.id, { ...mutation, lastError: reason })
+    recordIssue: (issue) => {
+      issues.set(issue.id, issue)
       return Promise.resolve()
     },
-    quarantined: () => Promise.resolve([...dead.values()]),
+    issues: () => Promise.resolve([...issues.values()]),
+    dismissIssue: (id) => {
+      issues.delete(id)
+      return Promise.resolve()
+    },
   }
 }

@@ -49,6 +49,30 @@ export interface LogSessionInput {
   readonly note: string | null
 }
 
+/**
+ * A log that never reached the server, in terms an athlete can be shown (ADR-0033).
+ *
+ * A read model (D-06): no invariants, and deliberately small. What an athlete needs to decide is
+ * which record is true, and for that they need the date and the shape of each — not a field-level
+ * diff of every set, which is a bigger tool than the decision requires.
+ */
+export interface SyncIssueSnapshot {
+  readonly id: string
+  /**
+   * `conflict`  the server already holds a record for this session — usually another device.
+   * `rejected`  it was refused, or retried until we gave up. It is not recorded anywhere.
+   *
+   * Two, not three: `rejected` and `gave-up` are the same fact to an athlete — "this is not
+   * saved" — and splitting them would ask them to care about a distinction that is ours.
+   */
+  readonly reason: 'conflict' | 'rejected'
+  /** What the athlete recorded. Null when the stored payload could not be read. */
+  readonly mine: { readonly performedOn: PlainDate | null; readonly setCount: number } | null
+  /** What the server holds instead. Conflicts only, and null when the body was unavailable. */
+  readonly theirs: { readonly performedOn: PlainDate | null; readonly setCount: number } | null
+  readonly at: number
+}
+
 export interface ExecutionWritePort {
   /**
    * Record a performed session.
@@ -65,6 +89,20 @@ export interface ExecutionWritePort {
 
   /** Logs still waiting to reach the server. Drives the "n pending" indicator. */
   readonly pendingLogCount: () => Promise<number>
+
+  /**
+   * Logs that will never arrive on their own, and have not been acknowledged.
+   *
+   * Durable and survives the app closing, because the replay that produces them runs on
+   * connectivity and visibility events — often with nothing mounted to be told.
+   */
+  readonly syncIssues: () => Promise<readonly SyncIssueSnapshot[]>
+
+  /**
+   * Acknowledge one. Nothing else clears an issue — anything that did would amount to deciding
+   * on the athlete's behalf that they had seen it.
+   */
+  readonly dismissSyncIssue: (id: string) => Promise<void>
 }
 
 export interface ExecutionPorts {

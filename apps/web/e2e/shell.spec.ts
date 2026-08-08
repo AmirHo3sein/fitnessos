@@ -904,3 +904,131 @@ test.describe('cross-document references', () => {
     await expect(page.getByText(/base phase before the build-up/)).toHaveCount(0)
   })
 })
+
+test.describe('a log that never arrived', () => {
+  const GOOD_CODE = '۰۰۰۰۰۰'
+
+  const phoneFor = (testCode: string, project: string) => {
+    const projectCode = project === 'chromium' ? '770' : '880'
+    const ascii = `0912${testCode}${projectCode}9`
+    return [...ascii].map((d) => '۰۱۲۳۴۵۶۷۸۹'[Number(d)]).join('')
+  }
+
+  const signIn = async (page: import('@playwright/test').Page, phone: string) => {
+    await page.goto('/sign-in')
+    await page.getByLabel('شماره‌ی موبایل').fill(phone)
+    await page.getByRole('button', { name: 'ارسال کد' }).click()
+    await page.getByLabel('کد تأیید').fill(GOOD_CODE)
+    await page.getByRole('button', { name: 'تأیید و ورود' }).click()
+    await expect(page).not.toHaveURL(/\/sign-in/)
+  }
+
+  test('@critical a session logged on another device surfaces as a conflict with both records', async ({
+    page,
+  }) => {
+    /*
+     * The exact race ADR-0033 exists for, driven end to end rather than described.
+     *
+     * The athlete opens the logger. Another device records the same session before they submit.
+     * Their log is queued, replayed, and refused — and the whole point is what happens next: the
+     * athlete is TOLD, and their own record survives so they can say which one is true.
+     *
+     * Before this, both sides of that were silent. The engine fired a callback nobody subscribed
+     * to, and the log was dropped after the product had said "saved".
+     */
+    await signIn(page, phoneFor('111', test.info().project.name))
+
+    // Open the logger first. Once another device logs the session it stops being upcoming, so
+    // this ordering is not a convenience — it is the only way to reach the conflict.
+    await page.goto('/sessions')
+    await page.getByRole('button', { name: 'ثبت این جلسه' }).first().click()
+    await expect(page.getByRole('button', { name: 'ثبت جلسه' })).toBeVisible()
+
+    const cookieHeader = (await page.context().cookies())
+      .map((c) => `${c.name}=${c.value}`)
+      .join('; ')
+    const headers = { cookie: cookieHeader }
+
+    // Read the real prescribed session rather than reconstructing its deterministic id here — a
+    // test that recomputes the stub's id scheme breaks when the scheme changes, for no reason.
+    const upcoming = await (
+      await page.request.get('http://127.0.0.1:8791/api/v1/sessions/upcoming', { headers })
+    ).json()
+    const prescribed = upcoming[0] as { id: string; items: { id: string }[] }
+
+    // The other device. A different log id, so this is a genuine second record rather than a
+    // replay of the athlete's own.
+    const elsewhere = await page.request.post(
+      'http://127.0.0.1:8791/api/v1/sessions/performed',
+      {
+        headers,
+        data: {
+          id: '018f2c8a-0009-7000-8000-0000000000aa',
+          prescribedSessionId: prescribed.id,
+          performedOn: '2026-08-10',
+          sets: [
+            { id: '018f2c8a-000a-7000-8000-000000000001', prescribedItemId: prescribed.items[0]!.id, setNumber: 1, reps: 8 },
+          ],
+        },
+      },
+    )
+    expect(elsewhere.status()).toBe(201)
+
+    await page.getByRole('button', { name: 'ثبت جلسه' }).click()
+
+    // The banner. Not a thrown error, not a silent drop.
+    await expect(page.getByText('این جلسه پیش‌تر ثبت شده بود')).toBeVisible()
+
+    // BOTH records, because only the athlete knows which describes what they actually did.
+    // `exact`, because the body text above also contains the phrase "ثبت شما".
+    await expect(page.getByText('ثبت شما', { exact: true })).toBeVisible()
+    await expect(page.getByText('ثبت‌شده', { exact: true })).toBeVisible()
+  })
+
+  test('@critical the issue survives a reload, and only dismissal clears it', async ({ page }) => {
+    /*
+     * Why the record is durable rather than a callback: the replay runs on `online` and
+     * `visibilitychange`, which fire when no UI is mounted and sometimes as the app is closing.
+     * An in-memory notification would be lost exactly when it mattered.
+     */
+    await signIn(page, phoneFor('222', test.info().project.name))
+    await page.goto('/sessions')
+    await page.getByRole('button', { name: 'ثبت این جلسه' }).first().click()
+    await expect(page.getByRole('button', { name: 'ثبت جلسه' })).toBeVisible()
+
+    const cookieHeader = (await page.context().cookies())
+      .map((c) => `${c.name}=${c.value}`)
+      .join('; ')
+    const headers = { cookie: cookieHeader }
+    const upcoming = await (
+      await page.request.get('http://127.0.0.1:8791/api/v1/sessions/upcoming', { headers })
+    ).json()
+    const prescribed = upcoming[0] as { id: string; items: { id: string }[] }
+
+    await page.request.post('http://127.0.0.1:8791/api/v1/sessions/performed', {
+      headers,
+      data: {
+        id: '018f2c8a-0009-7000-8000-0000000000bb',
+        prescribedSessionId: prescribed.id,
+        performedOn: '2026-08-10',
+        sets: [
+          { id: '018f2c8a-000a-7000-8000-000000000002', prescribedItemId: prescribed.items[0]!.id, setNumber: 1, reps: 8 },
+        ],
+      },
+    })
+
+    await page.getByRole('button', { name: 'ثبت جلسه' }).click()
+    await expect(page.getByText('این جلسه پیش‌تر ثبت شده بود')).toBeVisible()
+
+    await page.reload()
+    await expect(page.getByText('این جلسه پیش‌تر ثبت شده بود')).toBeVisible()
+
+    await page.getByRole('button', { name: 'متوجه شدم' }).click()
+    await expect(page.getByText('این جلسه پیش‌تر ثبت شده بود')).toHaveCount(0)
+
+    // And it stays gone. Reappearing from a stale cache would teach the athlete that dismissing
+    // does not work.
+    await page.reload()
+    await expect(page.getByText('این جلسه پیش‌تر ثبت شده بود')).toHaveCount(0)
+  })
+})

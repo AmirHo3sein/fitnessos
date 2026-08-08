@@ -1,7 +1,7 @@
 'use client'
 
 import { Card, CardDescription, CardTitle, Skeleton } from '@fitnessos/ui'
-import { plainDateKey, type Locale } from '@fitnessos/kernel'
+import { formatPlainDate, plainDateKey, type Locale } from '@fitnessos/kernel'
 import { useUpcomingSessions } from '../hooks/useUpcomingSessions'
 
 export interface SessionLabels {
@@ -63,19 +63,18 @@ export const UpcomingSessions = ({ locale, labels }: UpcomingSessionsProps) => {
    * fact with no time and no zone; letting the runtime interpret it in local time is how the
    * 10th becomes the 9th for anyone west of Greenwich.
    */
-  const df = new Intl.DateTimeFormat(locale, {
+  const dateOptions: Intl.DateTimeFormatOptions = {
     day: 'numeric',
     month: 'long',
     weekday: 'long',
-    timeZone: 'UTC',
-  })
+  }
 
   return (
     <div className="space-y-4">
       {data.map((session) => (
         <Card key={session.id}>
           <CardTitle>
-            {df.format(Date.UTC(session.scheduledFor.year, session.scheduledFor.month - 1, session.scheduledFor.day))}
+            {formatPlainDate(session.scheduledFor, locale, dateOptions)}
           </CardTitle>
 
           {/*
