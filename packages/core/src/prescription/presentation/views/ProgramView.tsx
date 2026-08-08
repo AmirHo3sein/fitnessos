@@ -61,7 +61,7 @@ export const ProgramView = ({ locale, labels }: ProgramViewProps) => {
       <Card>
         <CardTitle>{labels.title}</CardTitle>
         <CardDescription>{labels.noProgram}</CardDescription>
-        <p className="text-faint mt-2 text-sm">{labels.noProgramHint}</p>
+        <p className="text-disabled mt-2 text-sm">{labels.noProgramHint}</p>
       </Card>
     )
   }
@@ -87,15 +87,15 @@ export const ProgramView = ({ locale, labels }: ProgramViewProps) => {
       */}
       <ol className="mt-5 space-y-3">
         {version.blocks.map((block) => (
-          <li key={block.id} className="border-line bg-elevated rounded-md border p-4">
+          <li key={block.id} className="border-default bg-surface-elevated rounded-md border p-4">
             <div className="flex items-baseline justify-between gap-3">
-              <span className="text-fg font-medium">{block.name}</span>
+              <span className="text-primary font-medium">{block.name}</span>
               <span className="text-muted shrink-0 text-xs">
                 {labels.progression[block.progression.kind] ?? block.progression.kind}
               </span>
             </div>
             {block.progression.ratePercent !== null && (
-              <p className="text-faint mt-1 text-xs">
+              <p className="text-disabled mt-1 text-xs">
                 <span className="nums">{nf.format(block.progression.ratePercent)}%</span>{' '}
                 {labels.ratePerCycle}
               </p>

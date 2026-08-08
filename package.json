@@ -7,12 +7,12 @@
   },
   "scripts": {
     "typecheck": "turbo run typecheck",
-    "lint": "turbo run lint && pnpm lint:boundaries",
+    "lint": "turbo run lint && pnpm lint:boundaries && pnpm color:lint",
     "lint:boundaries": "depcruise --config packages/config/dependency-cruiser.cjs packages apps",
     "test": "turbo run test",
     "test:unit": "turbo run test:unit",
     "build": "turbo run build",
-    "check": "pnpm typecheck && pnpm lint && pnpm test:unit && pnpm test:integration && pnpm test:component",
+    "check": "pnpm typecheck && pnpm lint && pnpm tokens:check && pnpm color:contrast && pnpm test:unit && pnpm test:integration && pnpm test:component",
     "contracts:generate": "turbo run contracts:generate",
     "gen": "plop --plopfile tools/generators/plopfile.mjs",
     "gen:context": "plop --plopfile tools/generators/plopfile.mjs context",
@@ -20,7 +20,11 @@
     "test:component": "turbo run test:component",
     "bundle:budget": "node tools/bundle-budget.mjs",
     "e2e:critical": "pnpm --filter @fitnessos/web e2e:critical",
-    "dev:api": "pnpm --filter @fitnessos/stub-api start"
+    "dev:api": "pnpm --filter @fitnessos/stub-api start",
+    "tokens:build": "node tools/color/emit.mjs",
+    "tokens:check": "node tools/color/check-tokens.mjs",
+    "color:contrast": "node tools/color/contrast-report.mjs",
+    "color:lint": "node tools/color/lint-usage.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.9.0",

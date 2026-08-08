@@ -32,3 +32,6 @@ test-results/
 *.log
 npm-debug.log*
 pnpm-debug.log*
+
+# visual capture output
+theme-*.png

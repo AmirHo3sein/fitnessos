@@ -82,15 +82,15 @@ export default async function AppLayout({
 
   return (
     <div className="min-h-dvh">
-      <header className="border-line bg-surface/80 sticky top-0 z-10 border-b backdrop-blur">
+      <header className="border-default bg-surface/80 sticky top-0 z-10 border-b backdrop-blur">
         <div className="mx-auto flex h-14 max-w-5xl items-center gap-6 px-6">
-          <span className="text-display text-fg">{t('name')}</span>
+          <span className="text-display text-primary">{t('name')}</span>
           <nav className="flex items-center gap-4 text-sm">
             {nav.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
-                className="text-muted hover:text-fg transition-colors"
+                className="text-muted hover:text-primary transition-colors"
               >
                 {item.label}
               </Link>

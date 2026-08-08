@@ -70,11 +70,11 @@ export const AthleteSummary = ({ locale, labels }: AthleteSummaryProps) => {
       <dl className="mt-4 space-y-1 text-sm">
         <div className="flex justify-between">
           <dt className="text-muted">{labels.daysPerWeek}</dt>
-          <dd className="nums text-fg">{nf.format(data.availability.daysPerWeek)}</dd>
+          <dd className="nums text-primary">{nf.format(data.availability.daysPerWeek)}</dd>
         </div>
         <div className="flex justify-between">
           <dt className="text-muted">{labels.ceiling}</dt>
-          <dd className="nums text-fg">
+          <dd className="nums text-primary">
             {ceiling === null
               ? labels.noCeiling
               : // toBase returns seconds; the label decides the unit it names.
