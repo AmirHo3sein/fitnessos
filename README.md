@@ -28,7 +28,9 @@ packages/core         un-graduated bounded contexts; each exposes `./{ctx}` and 
 packages/ctx-*        graduated bounded contexts
 packages/ui           shared React layer — primitives, patterns, DI factory
 packages/telemetry    observability seam — closed event vocabulary, no vendor (ADR-0032)
+packages/design-tokens  the colour system — generated, contrast-gated (see its README)
 tools/generators      plop generators
+tools/color           palette generator + WCAG gate + token-usage lint
 tools/stub-api        stands in for the backend in e2e and local dev
 tools/bundle-budget   CI stage 9
 ```

@@ -15,10 +15,10 @@ export interface ButtonProps extends Omit<AriaButtonProps, 'className' | 'childr
 }
 
 const VARIANT: Record<ButtonVariant, string> = {
-  primary: 'bg-accent text-accent-contrast hover:bg-accent-strong',
-  secondary: 'bg-elevated text-fg border border-line-strong hover:border-accent',
-  ghost: 'text-muted hover:text-fg hover:bg-elevated',
-  danger: 'bg-danger text-white hover:brightness-110',
+  primary: 'bg-action text-action-fg hover:bg-action-hover',
+  secondary: 'bg-surface-elevated text-primary border border-strong hover:border-brand-border',
+  ghost: 'text-muted hover:text-primary hover:bg-surface-elevated',
+  danger: 'bg-destructive text-white hover:brightness-110',
 }
 
 const SIZE: Record<ButtonSize, string> = {

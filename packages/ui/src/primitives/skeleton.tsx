@@ -15,6 +15,6 @@ export const Skeleton = ({ className, label }: SkeletonProps) => (
     role="status"
     aria-busy="true"
     aria-label={label}
-    className={cn('bg-elevated animate-pulse rounded-md', className)}
+    className={cn('bg-surface-elevated animate-pulse rounded-md', className)}
   />
 )

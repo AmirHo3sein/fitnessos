@@ -90,15 +90,15 @@ export const SignInForm = ({ labels, onSignedIn }: SignInFormProps) => {
             placeholder={labels.phonePlaceholder}
             aria-describedby="phone-hint"
             {...(error === null ? {} : { 'aria-invalid': true, 'aria-errormessage': 'phone-error' })}
-            className="border-line bg-elevated text-fg focus:border-accent nums h-12 w-full rounded-md border px-4 outline-none"
+            className="border-default bg-surface-elevated text-primary focus:border-brand-border nums h-12 w-full rounded-md border px-4 outline-none"
           />
-          <p id="phone-hint" className="text-faint mt-1.5 text-xs">
+          <p id="phone-hint" className="text-disabled mt-1.5 text-xs">
             {labels.phoneHint}
           </p>
           {error !== null && (
             // `role="alert"` so a screen reader announces it. A message that only
             // appears visually is invisible to the users most likely to mistype.
-            <p id="phone-error" role="alert" className="text-danger mt-1.5 text-sm">
+            <p id="phone-error" role="alert" className="text-error-fg mt-1.5 text-sm">
               {error}
             </p>
           )}
@@ -122,7 +122,7 @@ export const SignInForm = ({ labels, onSignedIn }: SignInFormProps) => {
       className="space-y-4"
     >
       <p className="text-muted text-sm">
-        {labels.codeSentTo} <span className="nums text-fg">{maskPhone(normalized)}</span>
+        {labels.codeSentTo} <span className="nums text-primary">{maskPhone(normalized)}</span>
       </p>
       <div>
         <label htmlFor="code" className="text-muted mb-1.5 block text-sm">
@@ -144,10 +144,10 @@ export const SignInForm = ({ labels, onSignedIn }: SignInFormProps) => {
             setCode(event.target.value)
           }}
           {...(error === null ? {} : { 'aria-invalid': true, 'aria-errormessage': 'code-error' })}
-          className="border-line bg-elevated text-fg focus:border-accent nums h-12 w-full rounded-md border px-4 text-center tracking-[0.4em] outline-none"
+          className="border-default bg-surface-elevated text-primary focus:border-brand-border nums h-12 w-full rounded-md border px-4 text-center tracking-[0.4em] outline-none"
         />
         {error !== null && (
-          <p id="code-error" role="alert" className="text-danger mt-1.5 text-sm">
+          <p id="code-error" role="alert" className="text-error-fg mt-1.5 text-sm">
             {error}
           </p>
         )}

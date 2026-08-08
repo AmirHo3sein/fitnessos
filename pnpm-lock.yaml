@@ -212,6 +212,15 @@ importers:
         specifier: ^2.1.4
         version: 2.1.9(@types/node@22.20.1)(jsdom@28.1.0)(lightningcss@1.32.0)(msw@2.15.0(@types/node@22.20.1)(typescript@5.9.3))
 
+  packages/design-tokens:
+    devDependencies:
+      '@fitnessos/config':
+        specifier: workspace:*
+        version: link:../config
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+
   packages/infra:
     dependencies:
       '@fitnessos/contracts':
@@ -270,6 +279,9 @@ importers:
 
   packages/ui:
     dependencies:
+      '@fitnessos/design-tokens':
+        specifier: workspace:*
+        version: link:../design-tokens
       '@fitnessos/kernel':
         specifier: workspace:*
         version: link:../kernel

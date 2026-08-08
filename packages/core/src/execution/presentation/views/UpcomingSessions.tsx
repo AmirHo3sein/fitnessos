@@ -47,7 +47,7 @@ export const UpcomingSessions = ({ locale, labels }: UpcomingSessionsProps) => {
       <Card>
         <CardTitle>{labels.title}</CardTitle>
         <CardDescription>{labels.none}</CardDescription>
-        <p className="text-faint mt-2 text-sm">{labels.noneHint}</p>
+        <p className="text-disabled mt-2 text-sm">{labels.noneHint}</p>
       </Card>
     )
   }
@@ -93,7 +93,7 @@ export const UpcomingSessions = ({ locale, labels }: UpcomingSessionsProps) => {
                 when in fact it is explained and the viewer is not entitled to the explanation.
               */}
               {session.screening.basis === null && session.screening.basisWithheld && (
-                <span className="text-faint"> — {labels.basisWithheld}</span>
+                <span className="text-disabled"> — {labels.basisWithheld}</span>
               )}
             </CardDescription>
           )}
@@ -102,9 +102,9 @@ export const UpcomingSessions = ({ locale, labels }: UpcomingSessionsProps) => {
             {session.items.map((item) => (
               <li
                 key={item.id}
-                className="border-line flex items-baseline justify-between gap-3 border-b pb-2 last:border-0"
+                className="border-default flex items-baseline justify-between gap-3 border-b pb-2 last:border-0"
               >
-                <span className="text-fg text-sm">{item.movementName}</span>
+                <span className="text-primary text-sm">{item.movementName}</span>
                 <span className="text-muted shrink-0 text-xs">
                   <span className="nums">
                     {nf.format(item.sets)}×{nf.format(item.reps)}

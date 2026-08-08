@@ -36,6 +36,15 @@ jobs:
       - name: contract drift
         run: pnpm --filter @fitnessos/contracts contracts:check
 
+      # Stage 2b — the colour system. Tokens must match their generator, and every
+      # documented contrast pair must meet its WCAG threshold. Accessibility is checked,
+      # not asserted: "designed for AA" is not a property a codebase has.
+      - name: design tokens are current
+        run: pnpm tokens:check
+
+      - name: WCAG contrast
+        run: pnpm color:contrast
+
       # Stage 3
       - name: typecheck
         run: pnpm typecheck

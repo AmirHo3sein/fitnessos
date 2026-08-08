@@ -30,7 +30,7 @@ export default async function LandingPage({
       <div className="mt-8">
         <Link
           href="/sign-in"
-          className="bg-accent text-accent-contrast hover:bg-accent-strong inline-flex h-12 items-center rounded-lg px-6 font-medium transition-colors"
+          className="bg-action text-action-fg hover:bg-action-hover inline-flex h-12 items-center rounded-lg px-6 font-medium transition-colors"
         >
           {t('signIn')}
         </Link>
