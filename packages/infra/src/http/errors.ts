@@ -36,6 +36,16 @@ export class NetworkError extends Error {
 export interface ContractIssue {
   /** Dotted path to the offending field, e.g. `availability.daysPerWeek`. */
   readonly path: string
+  /**
+   * The validator's issue code — `invalid_type`, `too_big`, `invalid_enum_value`.
+   *
+   * Carried separately from `message` because this is the field that may leave the device.
+   * Messages are mostly value-free, but `invalid_enum_value` renders the received value
+   * verbatim, so a field holding user input would ship that input to an observability
+   * vendor. Codes are a closed vocabulary and cannot.
+   */
+  readonly code: string
+  /** Human-readable, for a developer reading a stack trace. Never sent anywhere. */
   readonly message: string
 }
 

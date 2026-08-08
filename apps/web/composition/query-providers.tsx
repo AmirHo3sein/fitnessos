@@ -3,6 +3,7 @@
 import { QueryClientProvider } from '@tanstack/react-query'
 import { useState, type ReactNode } from 'react'
 import { createQueryClient } from './query-client'
+import { createTelemetry } from './telemetry'
 
 /**
  * The root client boundary: a QueryClient and nothing else.
@@ -20,6 +21,10 @@ import { createQueryClient } from './query-client'
  * the cache.
  */
 export const QueryProviders = ({ children }: { children: ReactNode }) => {
-  const [queryClient] = useState(createQueryClient)
+  // Built once per browser session, inside `useState`, for the same reason as the client
+  // itself. The initialiser is a lambda rather than `createQueryClient` directly because
+  // it now takes an argument — passing a function that receives React's setState argument
+  // would silently hand it the previous state as a telemetry sink.
+  const [queryClient] = useState(() => createQueryClient(createTelemetry()))
   return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
 }

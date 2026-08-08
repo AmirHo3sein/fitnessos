@@ -49,6 +49,8 @@ export const parseContract = <T>(schema: ZodType<T>, raw: unknown, resource: str
     resource,
     result.error.issues.map((issue) => ({
       path: issue.path.join('.'),
+      // `code` is what telemetry reports; `message` stays local. See ContractIssue.
+      code: issue.code,
       message: issue.message,
     })),
   )
