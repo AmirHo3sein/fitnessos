@@ -31,7 +31,9 @@ import {
   CompleteOnboardingBodySchema,
   DeclareGoalBodySchema,
   GoalSchema,
+  PrescribedSessionSchema,
   ProblemSchema,
+  ProgramSchema,
   RequestCodeBodySchema,
   RequestCodeResultSchema,
   VerifyCodeBodySchema,
@@ -92,6 +94,62 @@ interface StubGoal {
 
 /** Keyed by phone, for the same isolation reason as athletes. */
 const goals = new Map<string, StubGoal[]>()
+
+/**
+ * A phone whose last digit is 9 gets a programme; everyone else gets none.
+ *
+ * Both paths need covering and neither is an error: "no programme yet" is the normal state for
+ * a newly-onboarded athlete. Keying it off the phone rather than a mutable flag keeps the
+ * choice deterministic and per-test, the same reason athlete state is keyed by phone.
+ */
+const hasProgramme = (phone: string) => phone.endsWith('9')
+
+const programmeFor = (phone: string) => {
+  const { personId, athleteId } = idsFor(phone)
+  const versionId = `018f2c8a-0004-7000-8000-${phone.replace(/\D/g, '').slice(-12)}`
+  return {
+    id: `018f2c8a-0003-7000-8000-${phone.replace(/\D/g, '').slice(-12)}`,
+    athleteId: personId,
+    title: 'Base strength',
+    currentVersion: {
+      id: versionId,
+      programId: `018f2c8a-0003-7000-8000-${phone.replace(/\D/g, '').slice(-12)}`,
+      versionNumber: 2,
+      // Deliberately supplied OUT of order, so the mapper's sort is exercised rather than
+      // assumed. The contract promises no ordering.
+      blocks: [
+        { id: '018f2c8a-0005-7000-8000-000000000002', name: 'Accumulation', order: 1,
+          progressionIntent: { kind: 'linear', ratePercent: 2.5 } },
+        { id: '018f2c8a-0005-7000-8000-000000000001', name: 'Preparation', order: 0,
+          progressionIntent: { kind: 'fixed' } },
+      ],
+      authoringDecision: { decidedBy: 'coach-1', proposedBy: 'human', rationale: 'base phase' },
+    },
+    _athleteId: athleteId,
+  }
+}
+
+const sessionsFor = (phone: string) => {
+  const digits = phone.replace(/\D/g, '').slice(-12)
+  return [
+    {
+      id: `018f2c8a-0006-7000-8000-${digits}`,
+      programVersionId: `018f2c8a-0004-7000-8000-${digits}`,
+      scheduledFor: '2026-08-10',
+      items: [
+        { id: '018f2c8a-0007-7000-8000-000000000002', movementName: 'Back squat', order: 1,
+          sets: 5, reps: 5, loadKg: 100 },
+        // No loadKg: bodyweight. Absent, never 0 -- the mapper normalises to null.
+        { id: '018f2c8a-0007-7000-8000-000000000001', movementName: 'Push-up', order: 0,
+          sets: 3, reps: 12 },
+      ],
+      // A MODIFIED verdict with a withheld basis, which is the case worth covering: the athlete
+      // must be told the session was modified AND that the reason is not theirs to see
+      // (ADR-0002 / ADR-0014). Saying nothing would imply it is unexplained.
+      screening: { level: 'modified', basisWithheld: true },
+    },
+  ]
+}
 
 const athleteFor = (phone: string): StubAthlete => {
   const existing = athletes.get(phone)
@@ -325,6 +383,40 @@ const handlers: Record<string, (req: IncomingMessage, res: ServerResponse) => Pr
     send(res, 201, GoalSchema, declared)
   },
 
+  'GET /api/v1/programs/current': async (req, res) => {
+    const phone = phoneFromToken(cookiesOf(req)['access_token'])
+    if (phone === null) {
+      problem(res, 401, 'unauthenticated', 'no valid session')
+      return
+    }
+    if (!hasProgramme(phone)) {
+      // 204, which the adapter maps to null. "No programme yet" is data, not an error.
+      res.writeHead(204).end()
+      return
+    }
+    const { _athleteId: _unused, ...programme } = programmeFor(phone)
+    send(res, 200, ProgramSchema, programme)
+  },
+
+  'GET /api/v1/sessions/upcoming': async (req, res) => {
+    const phone = phoneFromToken(cookiesOf(req)['access_token'])
+    if (phone === null) {
+      problem(res, 401, 'unauthenticated', 'no valid session')
+      return
+    }
+    const list = hasProgramme(phone) ? sessionsFor(phone) : []
+    for (const session of list) {
+      const parsed = PrescribedSessionSchema.safeParse(session)
+      if (!parsed.success) {
+        console.error('stub produced an invalid PrescribedSession', parsed.error)
+        res.writeHead(500).end()
+        return
+      }
+    }
+    res.writeHead(200, { 'content-type': 'application/json' })
+    res.end(JSON.stringify(list))
+  },
+
   'GET /api/v1/athletes/me': async (req, res) => {
     // The check that makes the forged-cookie e2e meaningful. A cookie that is present
     // but not one this server issued is refused — which is what the real backend does
@@ -362,4 +454,5 @@ createServer((req, res) => {
   console.log(`  code that verifies: ${GOOD_CODE}`)
   console.log(`  phone ending ${NEW_PERSON_SUFFIX} is treated as a new person`)
   console.log('  state is keyed by phone — each number is a distinct athlete')
+  console.log('  a phone ending in 9 has a programme; others have none')
 })

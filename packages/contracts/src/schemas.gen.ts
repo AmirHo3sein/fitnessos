@@ -33,3 +33,21 @@ export const CompleteOnboardingBodySchema = z.object({ "trainingIdentity": Train
 export const GoalSchema = z.object({ "id": z.string().uuid(), "athleteId": z.string().uuid(), "intent": z.string().min(1).max(200).describe("The athlete's own words, verbatim. Never a normalised or translated form -- losing the phrasing is not recoverable."), "declaredOn": z.string().date().describe("ISO date, no time. The declaration is a calendar fact in the athlete's zone."), "horizon": z.string().date().describe("Absent means open-ended, which is a valid answer.").optional(), "cadenceDays": z.number().int().gte(7).lte(365).describe("Evaluation cadence. NOT a status: staleness and expiry are derived from this plus a date (ADR-0006), never stored.") })
 
 export const DeclareGoalBodySchema = z.object({ "intent": z.string().min(1).max(200), "horizon": z.string().date().optional(), "cadenceDays": z.number().int().gte(7).lte(365) })
+
+export const ProgressionIntentSchema = z.object({ "kind": z.enum(["fixed","linear","autoregulated"]), "ratePercent": z.number().gt(0).lte(20).describe("Percent per cycle. Present only for kind=linear. Percent rather than absolute because the same increment is trivial for one athlete and impossible for another.").optional() })
+
+export const BlockSchema = z.object({ "id": z.string().uuid(), "name": z.string().min(1), "order": z.number().int().gte(0).describe("Zero-based. Orders across a version must be exactly 0..n-1, each once."), "progressionIntent": ProgressionIntentSchema })
+
+export const ServesGoalSchema = z.object({ "goalId": z.string().uuid(), "rationale": z.string().optional() }).describe("States current purpose. NEVER an input to outcome evaluation (ADR-0008).")
+
+export const AuthoringDecisionSchema = z.object({ "decidedBy": z.string(), "proposedBy": z.enum(["human","assistant"]).describe("Separate from decidedBy: an AI-proposed programme accepted by a coach was DECIDED by the coach. Collapsing them loses the fact that makes ADR-0003 auditable."), "rationale": z.string().optional() })
+
+export const ProgramVersionSchema = z.object({ "id": z.string().uuid(), "programId": z.string().uuid(), "versionNumber": z.number().int().gte(1), "blocks": z.array(BlockSchema).min(1), "servesGoal": ServesGoalSchema.optional(), "authoringDecision": AuthoringDecisionSchema })
+
+export const ProgramSchema = z.object({ "id": z.string().uuid(), "athleteId": z.string().uuid(), "title": z.string().min(1), "currentVersion": ProgramVersionSchema }).describe("The LINEAGE plus its current structure. Program and ProgramVersion are separate aggregates (ADR-0008); this envelope is a read projection, not a merge.")
+
+export const ScreeningVerdictSchema = z.object({ "level": z.enum(["clear","modified","blocked"]), "basis": z.string().describe("Why. Absent when consent-gated (ADR-0002/0014), which is NOT the same as absent because there is no reason -- see basisWithheld.").optional(), "basisWithheld": z.boolean().describe("True when a basis exists but this viewer may not see it. Distinguishes the two reasons basis can be absent.") })
+
+export const PrescribedItemSchema = z.object({ "id": z.string().uuid(), "movementName": z.string().min(1), "order": z.number().int().gte(0), "sets": z.number().int().gte(1), "reps": z.number().int().gte(1), "loadKg": z.number().gt(0).describe("Resolved load in kilograms. ABSENT for bodyweight or time-based work -- never 0, which is what an unresolved progression writes.").optional() })
+
+export const PrescribedSessionSchema = z.object({ "id": z.string().uuid(), "programVersionId": z.string().uuid(), "scheduledFor": z.string().date(), "items": z.array(PrescribedItemSchema).min(1), "screening": ScreeningVerdictSchema }).describe("Required screening is ADR-0021: a PrescribedSession cannot exist without a verdict covering its final RESOLVED dose. Screening an intent is worthless -- an intent has no numbers to screen.")

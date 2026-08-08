@@ -86,7 +86,7 @@ Phase 0 and the Phase 1 scaffold are complete.
 - [x] `apps/web` — route groups, middleware guard, RSC prefetch, per-group composition, **working sign-in** · 24 e2e
 - [x] CI stages 1–11
 
-**283 tests + 56 e2e. All CI stages live.**
+**293 tests + 70 e2e. All CI stages live.**
 
 ## Import convention
 
@@ -366,6 +366,7 @@ pnpm dev:api    # http://127.0.0.1:8791
 |---|---|
 | code that verifies | `000000` |
 | state | keyed by phone — each number is a distinct athlete |
+| phone ending `9` | has a programme; others have none, which is the normal first-run state |
 | phone ending `0000` | treated as a new person, so onboarding is reachable |
 | any other code | 400 `code_invalid` |
 | unissued `access_token` | 401 `unauthenticated` |
@@ -529,3 +530,93 @@ declaring a goal late at night would have a horizon rejected for being one day t
 A goal declared to get past a form becomes the thing every future prescription and
 evaluation is judged against. Arriving without one is better, so onboarding's second step
 has a first-class "later" that posts nothing, and an e2e test asserts it posts nothing.
+
+## Prescription and Execution
+
+Both are **read-only**, and in both cases the missing write path is a decision rather than
+an omission.
+
+**No Program Builder.** It needs `packages/editor-engine` (handbook D-01–D-04, D-11):
+inverse-action history with checkpoints, a spatial index, branded coordinate spaces. That is
+a phase of work, not a file, and half of it is worse than none — an editor that can open a
+coach's programme and cannot reliably undo is a way to lose their work.
+
+**No session logging.** It is a write path against a live session with offline requirements
+(`infra/sync`, storage adapters, `serialization/migrate`), none of which exists. A logger
+that silently drops a set an athlete completed in a basement gym with no signal is worse
+than no logger — and that is the normal case here, not the edge case.
+
+What is proven out is the read path an editor and a logger will sit on: the aggregates, the
+invariants, the contract, the mappers, and the ordering guarantees.
+
+### ADR-0008 — two aggregates, not one
+
+`Program` is the **lineage** (mutable, owns which version is current). `ProgramVersion` is
+the **structure** (immutable from creation). `revise()` returns a new version and leaves the
+input untouched; a test asserts it.
+
+The split exists because a prescription that has been followed cannot be edited. A
+`PerformedSession` records what an athlete did against a specific structure — if that
+structure could change afterwards, you can no longer tell whether they under-performed or
+the target moved.
+
+`ServesGoal` states current purpose and is **never an input to outcome evaluation**. There
+is deliberately no function taking a `ServesGoal` and returning anything about success, and
+a test guards the absence. Judging a programme by whether its stated goal was reached sounds
+obviously right and is wrong: purpose can be restated at any time, which would retroactively
+rewrite what the programme is being judged against. Evaluation belongs to the `Hypothesis` on
+the authoring record (ADR-0007) and `DecisionOutcome` in Learning.
+
+`AuthoringDecision` keeps `proposedBy` separate from `decidedBy`, because they differ in the
+case that matters: an AI-proposed programme accepted by a coach was *decided* by the coach.
+Collapsing them loses the only fact that makes ADR-0003 auditable. A revision requires a
+fresh decision rather than inheriting one.
+
+### ADR-0021 — screening comes after resolution, before existence
+
+A `PrescribedSession` **cannot be constructed** without a `ScreeningVerdict` covering its
+final resolved dose. Not "should have one": the verdict is a required argument and a
+`blocked` verdict is refused.
+
+The ordering is the point and is easy to get backwards. Screening an *intent* is worthless —
+an intent has no numbers to screen. Only a resolved dose can be checked against a
+restriction, so screening happens after resolution and before the session exists. A session
+that existed first and was screened afterwards would have a window in which it was
+prescribable and unscreened, and that window is where someone gets hurt.
+
+The block check runs **before** structural validation, so a blocked session with malformed
+items reports the block. Reporting "sets must be positive" for a session the athlete must not
+attempt at all buries the only fact worth acting on.
+
+### Two nulls that mean different things
+
+`ScreeningVerdict.basis` is null in two unrelated cases, and ADR-0002/0014 make the
+difference matter: there may be no reason, or there may be a reason the viewer is not
+entitled to see. `basisWithheld` distinguishes them, is carried on the wire rather than
+inferred, and the UI says *"the reason is not visible to you"* rather than saying nothing —
+which would imply the modification was unexplained.
+
+The same shape appears in `loadKg`: absent means **bodyweight**, and never zero. Zero is what
+an unresolved progression writes; it reads as a mistake to the athlete and as a valid number
+to anything computing volume. The domain refuses it and the mapper normalises absence to
+`null`.
+
+### Ordering is an invariant, not a convention
+
+Block and item `order` must be exactly `0..n-1`, each once. This catches the specific bug a
+drag-reorder produces — writing back `order` for only the moved element. Nothing throws; the
+list just renders in an order nobody chose, differently depending on whether the consumer
+sorted stably, and the athlete follows the wrong week.
+
+The first version of that check compared `orders.length` to the expected set size, which are
+equal by construction, so `[0, 0]` sailed through. The test caught it. Both the aggregate and
+the mapper sort, because the contract promises no order and two clients rendering the same
+programme differently is indistinguishable from a data bug.
+
+### Dates in the Persian calendar
+
+`Intl.DateTimeFormat('fa')` selects the Jalali calendar by default. 1405/05/19 and 2026-08-10
+are the same day, and showing a Gregorian date to an Iranian athlete is showing them a date
+they have to convert in their head. Formatted from the `PlainDate` components in **UTC**,
+because the value is a calendar fact with no time and no zone — letting the runtime interpret
+it locally is how the 10th becomes the 9th for anyone west of Greenwich.

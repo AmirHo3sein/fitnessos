@@ -100,5 +100,38 @@
         "generic": "That did not save. Please try again."
       }
     }
+  },
+  "programme": {
+    "heading": "Programme",
+    "title": "Training programme",
+    "version": "Version",
+    "noProgram": "You do not have a programme yet.",
+    "noProgramHint": "It will appear here once one has been built for you.",
+    "progression": {
+      "fixed": "Fixed",
+      "linear": "Linear",
+      "autoregulated": "Autoregulated"
+    },
+    "ratePerCycle": "per cycle",
+    "authoredByHuman": "Written by your coach",
+    "authoredByAssistant": "Proposed by the assistant, approved by your coach",
+    "loading": "Loading your programme",
+    "failed": "Your programme could not be loaded."
+  },
+  "sessions": {
+    "heading": "Sessions",
+    "title": "Upcoming sessions",
+    "none": "You have no upcoming sessions.",
+    "noneHint": "They will appear here once your programme has been built.",
+    "setsReps": "sets × reps",
+    "bodyweight": "bodyweight",
+    "screening": {
+      "clear": "No restrictions",
+      "modified": "Modified",
+      "blocked": "Blocked"
+    },
+    "basisWithheld": "the reason is not visible to you",
+    "loading": "Loading your sessions",
+    "failed": "Your sessions could not be loaded."
   }
 }

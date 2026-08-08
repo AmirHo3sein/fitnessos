@@ -24,6 +24,8 @@ export { createAthleteReadAdapter } from './adapters/athleteReadAdapter'
 export { createAuthAdapter } from './adapters/authAdapter'
 export { createAthleteWriteAdapter } from './adapters/athleteWriteAdapter'
 export { createGoalAdapter } from './adapters/goalAdapter'
+export { createPrescriptionAdapter } from './adapters/prescriptionAdapter'
+export { createExecutionAdapter } from './adapters/executionAdapter'
 
 // Only the mapping FUNCTION is exported, never a type. The types it produces are
 // declared by the application layer and re-exported from there; a type family
@@ -32,4 +34,6 @@ export { createGoalAdapter } from './adapters/goalAdapter'
 export { athleteFrom, onboardingBodyFrom } from './mappers/athlete'
 export { codeRequestedFrom, sessionEstablishedFrom } from './mappers/auth'
 export { declareGoalBodyFrom, goalFrom, goalsFrom } from './mappers/goal'
+export { programFrom } from './mappers/program'
+export { sessionFrom, sessionsFrom } from './mappers/session'
 export { parseContract } from './mappers/parse'

@@ -2,10 +2,14 @@
 
 import { AthletePortsProvider } from '@fitnessos/core/athlete/presentation'
 import { GoalPortsProvider } from '@fitnessos/core/goal/presentation'
+import { PrescriptionPortsProvider } from '@fitnessos/core/prescription/presentation'
+import { ExecutionPortsProvider } from '@fitnessos/core/execution/presentation'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useRef, type ReactNode } from 'react'
 import { createAthletePorts } from './athlete'
 import { createGoalPorts } from './goal'
+import { createPrescriptionPorts } from './prescription'
+import { createExecutionPorts } from './execution'
 import { createHttp } from './container'
 
 /**
@@ -64,12 +68,21 @@ export const AppProviders = ({ children }: { children: ReactNode }) => {
     // rotate the refresh token and revoke each other's session.
     //
     // Browser requests carry cookies automatically, so there is no cookie to forward.
-    return { athlete: createAthletePorts(http, {}), goal: createGoalPorts(http, {}) }
+    return {
+      athlete: createAthletePorts(http, {}),
+      goal: createGoalPorts(http, {}),
+      prescription: createPrescriptionPorts(http, {}),
+      execution: createExecutionPorts(http, {}),
+    }
   }, [])
 
   return (
     <AthletePortsProvider value={ports.athlete}>
-      <GoalPortsProvider value={ports.goal}>{children}</GoalPortsProvider>
+      <GoalPortsProvider value={ports.goal}>
+        <PrescriptionPortsProvider value={ports.prescription}>
+          <ExecutionPortsProvider value={ports.execution}>{children}</ExecutionPortsProvider>
+        </PrescriptionPortsProvider>
+      </GoalPortsProvider>
     </AthletePortsProvider>
   )
 }
