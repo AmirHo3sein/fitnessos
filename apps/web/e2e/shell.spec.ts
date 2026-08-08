@@ -150,11 +150,19 @@ test.describe('sign-in form', () => {
     await expect(page.locator('html')).toHaveAttribute('dir', 'rtl')
   })
 
-  test('@critical stays prerendered despite reading search params', async ({ request }) => {
-    // SignInClient calls useSearchParams(), which opts a route out of prerendering
-    // unless it sits inside a Suspense boundary. The symptom of losing that boundary
-    // is not an error — the page just silently becomes client-rendered, and the form
-    // stops appearing in the first response.
+  test('@critical the form is in the first response, not added after hydration', async ({
+    request,
+  }) => {
+    /*
+     * `SignInClient` calls `useSearchParams()`, and without the Suspense boundary around it that
+     * read suspends the whole page — the form then arrives only after hydration. The symptom is
+     * not an error: the page just goes blank for a moment on the slowest connection in the
+     * product, which is the one signing in on gym wifi.
+     *
+     * This route used to be prerendered, and the test used to say so. It is now rendered per
+     * request because a prerendered page cannot carry a CSP nonce — see the note on the page.
+     * The property being protected is unchanged; only the reason it might break is.
+     */
     const html = await (await request.get('/sign-in')).text()
     expect(html).toContain('شماره‌ی موبایل')
   })
@@ -1030,5 +1038,179 @@ test.describe('a log that never arrived', () => {
     // does not work.
     await page.reload()
     await expect(page.getByText('این جلسه پیش‌تر ثبت شده بود')).toHaveCount(0)
+  })
+})
+
+test.describe('content security policy', () => {
+  const GOOD_CODE = '۰۰۰۰۰۰'
+  const PHONE = '۰۹۱۲۳۴۵۶۷۸۹'
+
+  /**
+   * Collect CSP violations as the browser reports them.
+   *
+   * `securitypolicyviolation` rather than scraping the console, because the console text is a
+   * browser implementation detail and this event is the specified one. Registered with
+   * `addInitScript` so it is installed before any page script runs — a violation during bootstrap
+   * is precisely the one worth catching, and a listener attached after load would miss it.
+   */
+  const watchViolations = async (page: import('@playwright/test').Page) => {
+    const violations: string[] = []
+    await page.exposeFunction('__reportCsp', (entry: string) => {
+      violations.push(entry)
+    })
+    await page.addInitScript(() => {
+      document.addEventListener('securitypolicyviolation', (event) => {
+        const e = event as SecurityPolicyViolationEvent
+        void (window as unknown as { __reportCsp: (s: string) => void }).__reportCsp(
+          `${e.effectiveDirective}: ${e.blockedURI}`,
+        )
+      })
+    })
+    return violations
+  }
+
+  test('@critical the policy is served, with a nonce and no inline-script escape hatch', async ({
+    request,
+  }) => {
+    const response = await request.get('/')
+    const policy = response.headers()['content-security-policy'] ?? ''
+
+    expect(policy).toMatch(/script-src [^;]*'nonce-[A-Za-z0-9+/=]+'/)
+    // The assertion the whole header exists for. `'unsafe-inline'` in script-src permits the
+    // attacker's inline script alongside ours, which makes the rest of this decorative.
+    expect(policy).not.toMatch(/script-src[^;]*'unsafe-inline'/)
+    expect(policy).toMatch(/object-src 'none'/)
+    expect(policy).toMatch(/base-uri 'none'/)
+    expect(policy).toMatch(/frame-ancestors 'none'/)
+  })
+
+  test('@critical the nonce is unpredictable and differs per request', async ({ request }) => {
+    // A reused or guessable nonce is worth exactly as much to an attacker as no nonce, and the
+    // difference is invisible in every other test.
+    const nonces = await Promise.all(
+      [0, 1, 2].map(async () => {
+        const policy = (await request.get('/')).headers()['content-security-policy'] ?? ''
+        return /'nonce-([^']+)'/.exec(policy)?.[1] ?? ''
+      }),
+    )
+
+    expect(new Set(nonces).size).toBe(3)
+    for (const nonce of nonces) expect(nonce.length).toBeGreaterThanOrEqual(20)
+  })
+
+  test('@critical every script the app serves carries the nonce', async ({ page }) => {
+    // A route rendered without one would be inert under `strict-dynamic` — the failure mode that
+    // made prerendering incompatible with this policy.
+    await page.goto('/sign-in')
+    const total = await page.locator('script').count()
+    const nonced = await page.locator('script[nonce]').count()
+
+    expect(total).toBeGreaterThan(0)
+    // Playwright reads the live DOM, where the browser hides the nonce ATTRIBUTE value but keeps
+    // the property. Presence is what matters here; the value is asserted from the header above.
+    expect(nonced).toBe(total)
+  })
+
+  test('@critical nothing is blocked on the public page', async ({ page }) => {
+    const violations = await watchViolations(page)
+    await page.goto('/')
+    await expect(page.locator('html')).toHaveAttribute('dir', 'rtl')
+    expect(violations).toEqual([])
+  })
+
+  test('@critical nothing is blocked through sign-in and the authenticated shell', async ({
+    page,
+  }) => {
+    /*
+     * The real verification, and the one the handbook asked for by name: React Aria positions
+     * with inline STYLE ATTRIBUTES, which a nonce on `style-src` would silently forbid. This
+     * walks a flow that mounts React Aria buttons, next/font's injected faces, and the query
+     * client, and asserts the browser refused nothing.
+     */
+    const violations = await watchViolations(page)
+
+    await page.goto('/sign-in')
+    await page.getByLabel('شماره‌ی موبایل').fill(PHONE)
+    await page.getByRole('button', { name: 'ارسال کد' }).click()
+    await page.getByLabel('کد تأیید').fill(GOOD_CODE)
+    await page.getByRole('button', { name: 'تأیید و ورود' }).click()
+    await expect(page).toHaveURL(/\/dashboard/)
+
+    await page.goto('/programme')
+    await page.getByRole('button', { name: 'ویرایش برنامه' }).click()
+    await expect(page.getByRole('button', { name: 'ذخیره' })).toBeVisible()
+
+    expect(violations).toEqual([])
+  })
+
+  test('@critical an injected inline event handler IS refused', async ({ page }) => {
+    /*
+     * The probe. Every other test in this block asserts that NOTHING was blocked, and a detector
+     * that silently never fires would make all of them pass against no policy at all. This one
+     * does what an attacker would and checks the browser refuses it.
+     *
+     * ## Why an event-handler attribute rather than an injected <script>
+     *
+     * `'strict-dynamic'` deliberately trusts any script inserted through the DOM API — the
+     * reasoning being that an attacker who can already call `document.createElement('script')`
+     * has won regardless. So `page.addScriptTag` is ALLOWED by this policy, by design, and a
+     * probe built on it would fail while the policy was working correctly.
+     *
+     * What `strict-dynamic` does not trust is markup: a parser-inserted script, or an inline
+     * handler attribute. That is exactly the shape HTML injection takes, which is the vector
+     * `<SafeHtml>` sanitises and this header backstops.
+     */
+    const violations = await watchViolations(page)
+    await page.goto('/')
+
+    await page.evaluate(() => {
+      const el = document.createElement('button')
+      el.setAttribute('onclick', 'window.__injected = true')
+      el.id = 'csp-probe'
+      // Text and explicit size: an empty zero-area button is not clickable, and the probe would
+      // then fail for a reason that has nothing to do with the policy.
+      el.textContent = 'probe'
+      el.setAttribute('style', 'position:fixed;inset:0;width:100px;height:40px;z-index:9999')
+      document.body.append(el)
+    })
+    await page.locator('#csp-probe').click()
+
+    await expect.poll(() => violations.filter((v) => v.startsWith('script-src'))).not.toEqual([])
+    expect(await page.evaluate(() => '__injected' in window)).toBe(false)
+  })
+
+  test('@critical even the 404 page carries the policy and is not blocked by it', async ({
+    page,
+    request,
+  }) => {
+    /*
+     * The gap this closes. An unknown URL used to fall through to Next's framework-level
+     * not-found page, which is prerendered — and prerendered HTML has no nonce, so the policy
+     * refused all eleven of its scripts on every mistyped link. Nothing visibly broke, which is
+     * what made it worth fixing: the violations were pure noise, and a violation stream that is
+     * mostly noise is one nobody reads on the day a real one appears in it.
+     */
+    const response = await request.get('/nope-does-not-exist')
+    expect(response.status()).toBe(404)
+
+    const violations = await watchViolations(page)
+    await page.goto('/nope-does-not-exist')
+
+    await expect(page.getByText('چنین صفحه‌ای وجود ندارد')).toBeVisible()
+    expect(violations).toEqual([])
+  })
+
+  test('@critical the API is reachable under connect-src', async ({ page }) => {
+    // `connect-src 'self'` is only correct because the API is same-origin behind the proxy
+    // (ADR-0025). If that topology ever changed, every fetch would be refused — and it would be
+    // refused silently, as a page that never loads its data rather than as an error.
+    const violations = await watchViolations(page)
+
+    await page.goto('/sign-in')
+    await page.getByLabel('شماره‌ی موبایل').fill(PHONE)
+    await page.getByRole('button', { name: 'ارسال کد' }).click()
+    await expect(page.getByLabel('کد تأیید')).toBeVisible()
+
+    expect(violations.filter((v) => v.startsWith('connect-src'))).toEqual([])
   })
 })

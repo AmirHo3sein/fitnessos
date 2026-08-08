@@ -189,5 +189,10 @@
       "unknownRecord": "details unavailable",
       "dismiss": "Got it"
     }
+  },
+  "notFound": {
+    "title": "That page does not exist",
+    "body": "The link may be out of date, or the address mistyped.",
+    "home": "Back to the start"
   }
 }
