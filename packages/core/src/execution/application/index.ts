@@ -12,11 +12,13 @@ export type {
   LoggedSetInput,
   PrescribedItemSnapshot,
   PrescribedSessionSnapshot,
+  SyncIssueSnapshot,
 } from './ports/index'
 
 export {
   sessionInvalidations,
   sessionKeys,
+  syncIssuesQuery,
   upcomingSessionsQuery,
   type Invalidator,
   type QueryDefinition,

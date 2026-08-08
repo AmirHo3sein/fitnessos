@@ -177,6 +177,17 @@
       }
     },
     "logCta": "Log this session",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "syncIssues": {
+      "conflictTitle": "This session was already recorded",
+      "conflictBody": "Another device recorded this session before yours arrived. Both are shown below — yours was not sent.",
+      "rejectedTitle": "A session could not be saved",
+      "rejectedBody": "We could not record this session and it is not saved anywhere. You will need to log it again.",
+      "mine": "You logged",
+      "theirs": "Recorded",
+      "summary": "{count} sets on {date}",
+      "unknownRecord": "details unavailable",
+      "dismiss": "Got it"
+    }
   }
 }

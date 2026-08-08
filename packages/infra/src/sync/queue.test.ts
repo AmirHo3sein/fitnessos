@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
-import { ApiError, NetworkError } from '../http/errors'
+import { ApiError, ConflictError, NetworkError } from '../http/errors'
 import { createMemoryStore } from './memoryStore'
-import { createSyncEngine, type QueuedMutation, type SyncConfig } from './queue'
+import { createSyncEngine, type SyncConfig } from './queue'
 
 /**
  * The queue's guarantees, each stated as the failure it prevents.
@@ -31,6 +31,7 @@ const engineWith = (
 }
 
 const apiError = (status: number) => new ApiError(status, null, `HTTP ${String(status)}`)
+const conflictError = (existing: unknown) => new ConflictError(existing, null, 'already logged')
 
 describe('happy path', () => {
   it('drains queued mutations in id order', async () => {
@@ -98,7 +99,7 @@ describe('transient failures stop the drain', () => {
     await engine.enqueue('log-session', {})
     const outcome = await engine.drain()
 
-    expect(outcome.quarantined).toBe(0)
+    expect(outcome.failed).toBe(0)
     expect(await engine.pending()).toBe(1)
   })
 
@@ -135,7 +136,7 @@ describe('transient failures stop the drain', () => {
     await engine.drain()
 
     expect(await engine.pending()).toBe(0)
-    expect((await engine.quarantined()).length).toBe(1)
+    expect((await engine.issues()).length).toBe(1)
   })
 })
 
@@ -159,18 +160,19 @@ describe('permanent failures do not block the queue', () => {
 
     expect(seen).toEqual([{ set: 1 }, { set: 3 }])
     expect(outcome.sent).toBe(2)
-    expect(outcome.quarantined).toBe(1)
+    expect(outcome.failed).toBe(1)
     expect(await engine.pending()).toBe(0)
   })
 
-  it('quarantines rather than deleting, so nothing is silently destroyed', async () => {
+  it('keeps the athlete’s payload, so nothing is silently destroyed', async () => {
     const { engine } = engineWith(() => Promise.reject(apiError(422)))
     await engine.enqueue('log-session', { set: 7 })
     await engine.drain()
 
-    const dead = await engine.quarantined()
-    expect(dead).toHaveLength(1)
-    expect(dead[0]!.payload).toEqual({ set: 7 })
+    const issues = await engine.issues()
+    expect(issues).toHaveLength(1)
+    expect(issues[0]!.payload).toEqual({ set: 7 })
+    expect(issues[0]!.reason).toBe('rejected')
   })
 
   it('quarantines a permanent failure on the FIRST attempt', async () => {
@@ -185,13 +187,38 @@ describe('permanent failures do not block the queue', () => {
     expect(send).toHaveBeenCalledTimes(1)
   })
 
-  it('reports the quarantine so it can be surfaced', async () => {
-    const onQuarantine = vi.fn()
-    const { engine } = engineWith(() => Promise.reject(apiError(400)), { onQuarantine })
+  it('records the failure DURABLY, not just as a callback', async () => {
+    /**
+     * The bug this replaced. The engine used to fire `onQuarantine` and nothing subscribed —
+     * and a callback is the wrong mechanism regardless, because the drain runs on `online` and
+     * `visibilitychange`, which fire when no UI is mounted and sometimes as the app is closing.
+     * A log discarded after the product said "saved" is the worst outcome this subsystem has.
+     */
+    const onIssue = vi.fn()
+    const { engine } = engineWith(() => Promise.reject(apiError(400)), { onIssue })
+    await engine.enqueue('log-session', { set: 4 })
+    await engine.drain()
+
+    // Durable first — this is what survives the app closing.
+    const issues = await engine.issues()
+    expect(issues).toHaveLength(1)
+    expect(issues[0]!.payload).toEqual({ set: 4 })
+
+    // The callback is a convenience on top of it.
+    expect(onIssue).toHaveBeenCalledOnce()
+  })
+
+  it('an issue stays until it is explicitly dismissed', async () => {
+    // Anything else amounts to deciding on the athlete's behalf that they have seen it.
+    const { engine } = engineWith(() => Promise.reject(apiError(400)))
     await engine.enqueue('log-session', {})
     await engine.drain()
 
-    expect(onQuarantine).toHaveBeenCalledOnce()
+    await engine.drain()
+    expect(await engine.issues()).toHaveLength(1)
+
+    await engine.dismissIssue((await engine.issues())[0]!.id)
+    expect(await engine.issues()).toHaveLength(0)
   })
 })
 
@@ -206,7 +233,7 @@ describe('409 means already applied', () => {
     const outcome = await engine.drain()
 
     expect(outcome.conflicted).toBe(1)
-    expect(outcome.quarantined).toBe(0)
+    expect(outcome.failed).toBe(0)
     expect(await engine.pending()).toBe(0)
   })
 
@@ -226,18 +253,30 @@ describe('409 means already applied', () => {
     expect(seen).toEqual([{ set: 2 }])
   })
 
-  it('surfaces the conflict rather than swallowing it', async () => {
-    // A 409 on a session log means another device got there first, and the athlete may now have
-    // two different records of the same session (ADR-0033). Silently discarding ours would lose a
-    // set they actually performed.
-    const onConflict = vi.fn()
-    const { engine } = engineWith(() => Promise.reject(apiError(409)), { onConflict })
+  it('records the conflict with BOTH records, not just ours', async () => {
+    // A 409 on a session log can mean another device got there first, and the athlete now has
+    // two different records of the same session (ADR-0033). Only they can say which is true, so
+    // both have to survive until they do.
+    const theirs = { id: 'server-1', sets: [{ reps: 5 }] }
+    const { engine } = engineWith(() => Promise.reject(conflictError(theirs)))
     await engine.enqueue('log-session', { set: 1 })
     await engine.drain()
 
-    expect(onConflict).toHaveBeenCalledOnce()
-    const [mutation] = onConflict.mock.calls[0] as [QueuedMutation]
-    expect(mutation.payload).toEqual({ set: 1 })
+    const [issue] = await engine.issues()
+    expect(issue?.reason).toBe('conflict')
+    expect(issue?.payload).toEqual({ set: 1 })
+    expect(issue?.existing).toEqual(theirs)
+  })
+
+  it('records the conflict even when the server’s record could not be read', async () => {
+    // A plain ApiError carries no body. "Recorded elsewhere" is still worth saying.
+    const { engine } = engineWith(() => Promise.reject(apiError(409)))
+    await engine.enqueue('log-session', { set: 1 })
+    await engine.drain()
+
+    const [issue] = await engine.issues()
+    expect(issue?.reason).toBe('conflict')
+    expect(issue?.existing).toBeNull()
   })
 })
 

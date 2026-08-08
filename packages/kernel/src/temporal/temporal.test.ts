@@ -5,6 +5,7 @@ import {
   contains,
   dateRange,
   daysBetween,
+  formatPlainDate,
   localDate,
   overlaps,
   plainDateKey,
@@ -95,5 +96,25 @@ describe('DateRange — affiliation effectiveness', () => {
     const a = unwrap(dateRange(start, end, TEHRAN))
     const b = unwrap(dateRange(end, null, TEHRAN))
     expect(overlaps(a, b)).toBe(false)
+  })
+})
+
+describe('formatPlainDate', () => {
+  it('renders the day it was given, not the day before', () => {
+    // The bug it exists to prevent. Without `timeZone: 'UTC'` this renders as the 9th for every
+    // reader west of Greenwich — invisible to whoever writes it, permanent for whoever reads it.
+    expect(formatPlainDate({ year: 2026, month: 8, day: 10 }, 'en-GB')).toContain('10')
+  })
+
+  it('uses the Jalali calendar for a Persian locale', () => {
+    // Not a transliteration of a Gregorian date into Persian digits — a different calendar. An
+    // athlete in Tehran does not think in August.
+    const out = formatPlainDate({ year: 2026, month: 8, day: 10 }, 'fa-IR')
+    expect(out).toContain('مرداد')
+  })
+
+  it('accepts alternative options without losing the zone', () => {
+    const out = formatPlainDate({ year: 2026, month: 8, day: 10 }, 'en-GB', { weekday: 'long' })
+    expect(out).toBe('Monday')
   })
 })

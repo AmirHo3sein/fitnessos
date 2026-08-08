@@ -62,6 +62,17 @@ export default async function SessionsPage({
           loading: t('loading'),
           failed: t('failed'),
         }}
+        syncIssueLabels={{
+          conflictTitle: t('syncIssues.conflictTitle'),
+          conflictBody: t('syncIssues.conflictBody'),
+          rejectedTitle: t('syncIssues.rejectedTitle'),
+          rejectedBody: t('syncIssues.rejectedBody'),
+          mine: t('syncIssues.mine'),
+          theirs: t('syncIssues.theirs'),
+          summary: t('syncIssues.summary'),
+          unknownRecord: t('syncIssues.unknownRecord'),
+          dismiss: t('syncIssues.dismiss'),
+        }}
       />
     </main>
   )
