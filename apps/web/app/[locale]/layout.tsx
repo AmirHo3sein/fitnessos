@@ -54,6 +54,12 @@ export const generateMetadata = async ({
   const t = await getTranslations({ locale, namespace: 'app' })
   return {
     title: { template: `%s · ${t('name')}`, default: t('name') },
+    /*
+     * A description, because Lighthouse's SEO audit was right to ask and because a link shared
+     * into a chat with no summary looks broken rather than sparse. Localised: a Persian-language
+     * product whose preview text is English is one that reads as translated.
+     */
+    description: t('description'),
   }
 }
 
