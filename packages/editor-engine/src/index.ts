@@ -53,6 +53,7 @@ export {
   commitBoundary,
   createHistory,
   push,
+  pushBatch,
   redo,
   undo,
   type HistoryConfig,

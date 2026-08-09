@@ -4,16 +4,20 @@ import { Button, Card } from '@fitnessos/ui'
 import { newEntityId, type Locale } from '@fitnessos/kernel'
 import {
   SpatialHash,
+  align,
   applySnap,
   clientPoint,
   documentPoint,
   documentRect,
   fromClient,
+  distribute,
   hitPoint,
   screenPixels,
   snap,
   toDocument,
+  type Alignment,
   type DocumentPoint,
+  type EditorAction,
   type GuideLine,
   type NodeId,
   type Viewport,
@@ -26,6 +30,7 @@ import {
   useEphemeral,
   useHistoryControls,
   useNode,
+  useSelection,
 } from '@fitnessos/editor-react'
 import { useMemo, useRef, useState } from 'react'
 import { TILE_NODE, commit, hydrate, rectOfNode, type ReportSnapshot } from '../../editor/schema'
@@ -37,6 +42,9 @@ export interface ReportBuilderLabels {
   readonly undo: string
   readonly redo: string
   readonly save: string
+  readonly alignLeft: string
+  readonly alignTop: string
+  readonly distributeX: string
   readonly newTileLabel: string
   readonly empty: string
 }
@@ -111,6 +119,7 @@ const BuilderShell = ({
 }) => {
   const store = useEditorStore()
   const tileIds = useChildIds(null)
+  const selected = useSelection()
   const history = useHistoryControls()
   const canvas = useRef<HTMLDivElement>(null)
   const [guides, setGuides] = useState<readonly GuideLine[]>([])
@@ -145,6 +154,42 @@ const BuilderShell = ({
     const box = canvas.current?.getBoundingClientRect()
     if (box === undefined) return null
     return toDocument(viewport, fromClient(box, clientPoint(event.clientX, event.clientY)))
+  }
+
+  /**
+   * Align or distribute the selection as ONE undo entry.
+   *
+   * `dispatchBatch`, not a loop of `dispatch`. Aligning six tiles is one thing the user did;
+   * one entry per tile would mean a single undo reversed only the last, and the user watched
+   * most of their command stay applied. That primitive did not exist until this builder needed
+   * it — see the note on `pushBatch`.
+   *
+   * The engine returns POSITIONS rather than moving anything, which is what makes assembling one
+   * entry possible at all.
+   */
+  const arrange = (compute: (items: { id: NodeId; rect: ReturnType<typeof rectOfNode> }[]) => readonly { id: NodeId; rect: ReturnType<typeof rectOfNode> }[]) => {
+    const items = selected
+      .map((id) => ({ id, node: state.document.nodes[id] }))
+      .filter((entry): entry is { id: NodeId; node: NonNullable<typeof entry.node> } => entry.node !== undefined)
+      .map((entry) => ({ id: entry.id, rect: rectOfNode(entry.node.props) }))
+
+    // Fewer than two is not an error, it is a no-op — and the engine already returns the input
+    // unchanged. Dispatching nothing keeps an empty entry out of history.
+    if (items.length < 2) return
+
+    const actions: EditorAction[] = []
+    for (const placed of compute(items)) {
+      const before = items.find((item) => item.id === placed.id)
+      // Only what actually moved. A tile already in position contributes no action, so the entry
+      // is the size of the change rather than the size of the selection.
+      if (before?.rect.x !== placed.rect.x) {
+        actions.push({ type: 'SetProperty', nodeId: placed.id, key: 'x', value: placed.rect.x })
+      }
+      if (before?.rect.y !== placed.rect.y) {
+        actions.push({ type: 'SetProperty', nodeId: placed.id, key: 'y', value: placed.rect.y })
+      }
+    }
+    if (actions.length > 0) store.dispatchBatch(actions, { label: 'arrange tiles' })
   }
 
   const addTile = () => {
@@ -198,7 +243,10 @@ const BuilderShell = ({
       return
     }
 
-    store.setEphemeral({ selected: [top] })
+    // Shift extends the selection, which is what makes align and distribute reachable at all.
+    const extended = event.shiftKey && !selected.includes(top) ? [...selected, top] : [top]
+    store.setEphemeral({ selected: extended })
+
     const node = state.document.nodes[top]
     if (node === undefined) return
 
@@ -257,6 +305,41 @@ const BuilderShell = ({
         </Button>
         <Button type="button" variant="secondary" size="sm" onPress={addTile}>
           {labels.addTile}
+        </Button>
+        {/* Disabled below two, because aligning one thing to itself does nothing visible and a
+            button that appears to do nothing reads as broken. */}
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          isDisabled={selected.length < 2}
+          onPress={() => {
+            arrange((items) => align(items, 'left' satisfies Alignment))
+          }}
+        >
+          {labels.alignLeft}
+        </Button>
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          isDisabled={selected.length < 2}
+          onPress={() => {
+            arrange((items) => align(items, 'top' satisfies Alignment))
+          }}
+        >
+          {labels.alignTop}
+        </Button>
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          isDisabled={selected.length < 3}
+          onPress={() => {
+            arrange((items) => distribute(items, 'x'))
+          }}
+        >
+          {labels.distributeX}
         </Button>
         <Button type="button" size="sm" isDisabled={isSaving} onPress={() => void onSave()}>
           {labels.save}
