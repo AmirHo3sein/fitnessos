@@ -10,5 +10,14 @@ import { componentTestConfig } from '@fitnessos/config/vitest.component.ts'
  * it looks exactly like a suite that passed.
  */
 export default mergeConfig(componentTestConfig, {
+  /*
+   * `jsx: 'automatic'`, which the workspace packages do not need.
+   *
+   * Vitest transforms with esbuild, which takes its JSX setting from tsconfig. Packages compile
+   * with `"jsx": "react-jsx"`; this app uses `"jsx": "preserve"` because Next owns the
+   * transform. Under test there is no Next, so every component rendered here failed with
+   * "React is not defined" — a build-configuration error that reads like a missing import.
+   */
+  esbuild: { jsx: 'automatic' },
   test: { include: ['src/**/*.test.ts', 'src/**/*.test.tsx'] },
 })

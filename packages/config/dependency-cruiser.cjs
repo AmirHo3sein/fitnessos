@@ -182,6 +182,13 @@ module.exports = {
           '^apps/web/instrumentation(-client)?\\.ts$',
           '^apps/web/app/.*/(page|layout|template|loading|error|global-error|' +
             'not-found|route|default|sitemap|robots|opengraph-image|icon)\\.tsx?$',
+          // The same names directly in `app/`, as a SECOND pattern rather than making the one
+          // above optional-directory. `(.*/)?` is a nested quantifier and dependency-cruiser
+          // refuses it as ReDoS-prone — correctly, since these patterns run over every path in
+          // the repo. The original matched only nested files, so `global-error.tsx` warned on
+          // every run, and a warning that is always there is a warning nobody reads.
+          '^apps/web/app/(page|layout|template|loading|error|global-error|' +
+            'not-found|route|default|sitemap|robots|opengraph-image|icon)\\.tsx?$',
         ],
       },
       to: {},
