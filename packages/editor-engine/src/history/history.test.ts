@@ -429,14 +429,27 @@ describe('batches', () => {
     expect(pushBatch(start, [], opts('nothing', 1000))).toBe(start)
   })
 
-  it('a single-action batch behaves exactly like push, coalescing included', () => {
-    // Otherwise a caller that batched by habit would silently lose coalescing, and typing routed
-    // through it would produce one entry per keystroke.
+  it('a ONE-action batch still does not coalesce', () => {
+    /**
+     * The case got wrong first, and the reason the rule has no exception.
+     *
+     * A command's action count depends on the data: aligning two tiles where only one is out of
+     * place produces one action. The original delegated that to `push`, so it merged into the
+     * drag that had just moved the same tile — one undo reversed the align AND the drag, and the
+     * tile returned to a position the user never chose.
+     *
+     * Caught end to end rather than here, because it needs a real drag followed by a real
+     * command. This is the unit-level pin for it.
+     */
     let h = createHistory(withNodes('a'), DEFAULT_HISTORY_CONFIG)
-    h = pushBatch(h, [move('a', 1)], opts('e', 1000))
-    h = pushBatch(h, [move('a', 2)], opts('e', 1100))
+    h = push(h, move('a', 1), opts('drag', 1000))
+    h = pushBatch(h, [move('a', 2)], opts('align', 1100))
 
-    expect(h.entries).toHaveLength(1)
+    expect(h.entries).toHaveLength(2)
+
+    h = undo(h)
+    // Back to the drag's result, not past it.
+    expect(h.document.nodes[id('a')]?.props['x']).toBe(1)
   })
 
   it('restores the starting document for any batch, under fuzzing', () => {

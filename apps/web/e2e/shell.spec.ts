@@ -1542,22 +1542,14 @@ test.describe('the report builder', () => {
      * The reason `pushBatch` exists. Two tiles aligned is one thing the coach did; before the
      * batch primitive this produced an entry per tile, so a single undo left one of them moved.
      *
-     * ## Desktop only, and that is a finding rather than a convenience
+     * ## Driven through the multi-select MODE, so it runs on touch too
      *
-     * Multi-select is shift-click, and a touch device has no shift key — so on `mobile-rtl` the
-     * selection never exceeds one tile and align stays disabled. That is not a test problem: it
-     * means align and distribute are currently UNREACHABLE on touch, which the mobile project
-     * caught precisely because it runs the same specs.
-     *
-     * Skipped here rather than made to pass, because a test that reached past the UI to build a
-     * selection would report a capability the product does not have. Touch multi-select needs an
-     * affordance that does not exist yet — a selection mode, or long-press — and that is a design
-     * decision, not a fix to smuggle into a test file.
+     * This was desktop-only and skipped on `mobile-rtl`, because the only way to select two
+     * tiles was shift-click and a touch device has no shift key — so align and distribute
+     * existed only for people on laptops, in a product whose primary experience is Persian on a
+     * phone. The mode exists now, and this exercises it rather than the modifier, which means
+     * both projects run the same path a real user takes.
      */
-    test.skip(
-      test.info().project.name !== 'chromium',
-      'multi-select is shift-click; a touch device has no shift key — see the note above',
-    )
 
     await openBuilder(page, phoneFor('444', test.info().project.name))
     await page.getByRole('button', { name: 'افزودن کاشی' }).click()
@@ -1574,10 +1566,12 @@ test.describe('the report builder', () => {
     const moved = await positionOf(page, 1)
     expect(moved.x).not.toBe(first.x)
 
+    // The tile that was just dragged is ALREADY selected — dragging selects. So the mode is
+    // turned on and only the OTHER tile is tapped; tapping the dragged one would remove it,
+    // which is the toggle behaviour working correctly and not what this test wants.
+    await page.getByRole('button', { name: 'انتخاب چندتایی' }).click()
     await page.mouse.click(box.x + first.x + 20, box.y + first.y + 20)
-    await page.keyboard.down('Shift')
-    await page.mouse.click(box.x + moved.x + 20, box.y + moved.y + 20)
-    await page.keyboard.up('Shift')
+    await expect(page.getByRole('button', { name: 'چپ‌چین' })).toBeEnabled()
 
     await page.getByRole('button', { name: 'چپ‌چین' }).click()
     expect((await positionOf(page, 1)).x).toBe(first.x)

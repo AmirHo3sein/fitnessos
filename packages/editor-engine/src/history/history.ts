@@ -184,8 +184,19 @@ export const push = (
  * bug that makes a batched undo restore intermediate values, and it is the same mistake
  * coalescing had to avoid.
  *
- * A batch never coalesces into the previous entry. It is a deliberate unit; merging it into
- * whatever came before would make one undo reverse a command and an unrelated edit together.
+ * A batch never coalesces into the previous entry — including a batch that turns out to contain
+ * ONE action, which is the case that was got wrong first.
+ *
+ * The original delegated a single-action batch to `push`, reasoning that a caller batching by
+ * habit should not lose coalescing. That is backwards. A command is a deliberate unit whatever
+ * its size, and the number of actions it happens to produce depends on the data: aligning two
+ * tiles where only one is out of place produces one action. Routed through `push`, it merged
+ * into the drag that had just moved that same tile — same action type, same target, inside the
+ * coalesce window — so one undo reversed the align AND the drag, and the tile went back to
+ * where it had never been placed.
+ *
+ * Found by an end-to-end test, because it needs a real drag followed by a real command, which
+ * is not a sequence a unit test would think to write.
  */
 export const pushBatch = (
   state: HistoryState,
@@ -193,7 +204,6 @@ export const pushBatch = (
   options: PushOptions,
 ): HistoryState => {
   if (actions.length === 0) return state
-  if (actions.length === 1 && actions[0] !== undefined) return push(state, actions[0], options)
 
   let document = state.document
   const inverses: EditorAction[] = []

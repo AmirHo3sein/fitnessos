@@ -9,3 +9,14 @@
 */
 @source '../../../packages/ui/src/**/*.{ts,tsx}';
 @source '../../../packages/core/src/**/*.{ts,tsx}';
+/*
+  Every GRADUATED context, and one glob rather than three named ones so the next graduation is
+  covered by existing config rather than by someone remembering.
+
+  These were missing, and the failure was exactly what the note above describes — silently, for
+  three packages at once. The Report Builder's canvas is `h-[520px]`; that class existed nowhere
+  else, so it was absent from the stylesheet and the canvas laid out two pixels tall. Everything
+  still "worked": the e2e drove drags with absolute coordinates, and axe does not check layout.
+  What gave it away was a Playwright bounding box reporting a height of 2.
+*/
+@source '../../../packages/ctx-*/src/**/*.{ts,tsx}';

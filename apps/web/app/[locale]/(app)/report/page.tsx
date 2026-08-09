@@ -47,6 +47,7 @@ export default async function ReportPage({
             undo: t('builder.undo'),
             redo: t('builder.redo'),
             save: t('builder.save'),
+            multiSelect: t('builder.multiSelect'),
             alignLeft: t('builder.alignLeft'),
             alignTop: t('builder.alignTop'),
             distributeX: t('builder.distributeX'),

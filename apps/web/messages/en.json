@@ -272,7 +272,8 @@
       "alignTop": "Align top",
       "distributeX": "Space evenly",
       "newTileLabel": "New tile",
-      "empty": "This report is empty."
+      "empty": "This report is empty.",
+      "multiSelect": "Select several"
     }
   }
 }
