@@ -7,7 +7,8 @@
       "sessions": "Sessions",
       "settings": "Settings",
       "checkIn": "Check-in",
-      "report": "Report"
+      "report": "Report",
+      "layout": "Layout"
     },
     "description": "An operating system for physical development — programmes, sessions and the evidence that they worked."
   },
@@ -275,6 +276,30 @@
       "newTileLabel": "New tile",
       "empty": "This report is empty.",
       "multiSelect": "Select several"
+    }
+  },
+  "layout": {
+    "heading": "Layout",
+    "title": "Dashboard layout",
+    "none": "No layout yet",
+    "noneHint": "A dashboard arranges the athlete's published views on a grid. Each widget points at one; nothing is copied.",
+    "create": "Create one",
+    "loading": "Loading the layout",
+    "saveFailed": "Your changes could not be saved. They are still here — try again.",
+    "newTitle": "Overview",
+    "builder": {
+      "heading": "Widgets",
+      "addWidget": "Add widget",
+      "removeWidget": "Remove",
+      "undo": "Undo",
+      "redo": "Redo",
+      "save": "Save",
+      "newWidgetLabel": "New widget",
+      "empty": "This dashboard is empty.",
+      "content": {
+        "upcoming-sessions": "Upcoming sessions",
+        "unjudged-proposals": "Awaiting judgement"
+      }
     }
   }
 }

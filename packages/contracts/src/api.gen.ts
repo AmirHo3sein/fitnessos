@@ -368,6 +368,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/dashboards/current": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The athlete's current dashboard */
+        get: operations["getCurrentDashboard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dashboards/{dashboardId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Create or replace a dashboard
+         * @description PUT, for the same reason as a check-in form and a report: a dashboard owns only a layout and nothing references a widget, so replacing one cannot make anything else unreadable. Submitting the same body twice leaves it in the same state.
+         */
+        put: operations["saveDashboard"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -762,6 +799,33 @@ export interface components {
             title: string;
             /** @description Array ORDER IS PAINT ORDER -- which tile draws on top when two overlap. It must be preserved verbatim; sorting it changes the arrangement the coach made. */
             tiles: components["schemas"]["ReportTile"][];
+        };
+        WidgetContent: {
+            /** @enum {string} */
+            kind: "indicator" | "upcoming-sessions" | "unjudged-proposals";
+            /** @description Required when kind=indicator. A D-08 reference, resolved at render time. */
+            indicatorKind?: string;
+            /** @description Required when kind=indicator. */
+            fallbackLabel?: string;
+        };
+        Widget: {
+            /** Format: uuid */
+            id: string;
+            /** @description Grid CELLS, not pixels (D-04: cells for Dashboard). Column 0 is where the reader starts, which is the right-hand edge in a right-to-left locale. */
+            x: number;
+            y: number;
+            width: number;
+            height: number;
+            content: components["schemas"]["WidgetContent"];
+        };
+        Dashboard: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            /** @description On the DOCUMENT, not the renderer: a widget four columns wide means nothing without knowing four of how many. A renderer that assumed twelve would halve every layout authored against six. */
+            columns: number;
+            /** @description Widgets MUST NOT overlap. Unlike a report's tiles, where list order is paint order, order carries nothing here — the layout is entirely in the coordinates. */
+            widgets: components["schemas"]["Widget"][];
         };
     };
     responses: {
@@ -1418,6 +1482,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Report"];
+                };
+            };
+            /** @description invalid */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    getCurrentDashboard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ok */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Dashboard"];
+                };
+            };
+            /** @description no dashboard yet */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    saveDashboard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dashboardId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Dashboard"];
+            };
+        };
+        responses: {
+            /** @description saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Dashboard"];
                 };
             };
             /** @description invalid */

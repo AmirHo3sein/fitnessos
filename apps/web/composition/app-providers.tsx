@@ -7,6 +7,7 @@ import { ExecutionPortsProvider } from '@fitnessos/core/execution/presentation'
 import { MeasurementPortsProvider } from '@fitnessos/ctx-measurement/presentation'
 import { LearningPortsProvider } from '@fitnessos/core/learning/presentation'
 import { ReportPortsProvider } from '@fitnessos/ctx-report/presentation'
+import { DashboardPortsProvider } from '@fitnessos/ctx-dashboard/presentation'
 import { useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useRef, type ReactNode } from 'react'
@@ -17,6 +18,7 @@ import { createExecutionPorts } from './execution'
 import { createMeasurementPorts } from './measurement'
 import { createLearningPorts } from './learning'
 import { createReportPorts } from './report'
+import { createDashboardPorts } from './dashboard'
 import { createHttp } from './container'
 
 /**
@@ -91,6 +93,7 @@ export const AppProviders = ({ children }: { children: ReactNode }) => {
       measurement: createMeasurementPorts(http, {}),
       learning: createLearningPorts(http, {}),
       report: createReportPorts(http, {}),
+      dashboardLayout: createDashboardPorts(http, {}),
       execution: createExecutionPorts(http, {}, () => {
         void queryClient.invalidateQueries({ queryKey: ['sync-issues'] })
       }),
@@ -104,7 +107,9 @@ export const AppProviders = ({ children }: { children: ReactNode }) => {
           <MeasurementPortsProvider value={ports.measurement}>
             <LearningPortsProvider value={ports.learning}>
               <ReportPortsProvider value={ports.report}>
-                <ExecutionPortsProvider value={ports.execution}>{children}</ExecutionPortsProvider>
+                <DashboardPortsProvider value={ports.dashboardLayout}>
+                  <ExecutionPortsProvider value={ports.execution}>{children}</ExecutionPortsProvider>
+                </DashboardPortsProvider>
               </ReportPortsProvider>
             </LearningPortsProvider>
           </MeasurementPortsProvider>

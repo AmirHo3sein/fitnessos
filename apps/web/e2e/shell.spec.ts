@@ -1582,3 +1582,119 @@ test.describe('the report builder', () => {
     expect(await positionOf(page, 1)).toEqual(moved)
   })
 })
+
+test.describe('the dashboard builder', () => {
+  const GOOD_CODE = '۰۰۰۰۰۰'
+
+  const phoneFor = (testCode: string, project: string) => {
+    const projectCode = project === 'chromium' ? '140' : '141'
+    const ascii = `0912${testCode}${projectCode}9`
+    return [...ascii].map((d) => '۰۱۲۳۴۵۶۷۸۹'[Number(d)]).join('')
+  }
+
+  const openBuilder = async (page: import('@playwright/test').Page, phone: string) => {
+    await page.goto('/sign-in')
+    await page.getByLabel('شماره‌ی موبایل').fill(phone)
+    await page.getByRole('button', { name: 'ارسال کد' }).click()
+    await page.getByLabel('کد تأیید').fill(GOOD_CODE)
+    await page.getByRole('button', { name: 'تأیید و ورود' }).click()
+    await expect(page).not.toHaveURL(/\/sign-in/)
+
+    await page.goto('/layout')
+    await page.getByRole('button', { name: 'ساختن چیدمان' }).click()
+    await expect(page.getByRole('button', { name: 'ذخیره' })).toBeVisible()
+  }
+
+  /**
+   * The client X for a given column — direction-aware.
+   *
+   * Column 0 is where the reader starts, which is the RIGHT edge in Persian. An earlier version
+   * of this test dragged toward the left edge expecting column 0 and landed on column 10, so the
+   * collision it was written to cause never happened. The reader below was already
+   * direction-aware; the writer was not.
+   */
+  const xForCol = (grid: { x: number; width: number }, col: number, rtl: boolean) => {
+    const cell = grid.width / 12
+    return rtl ? grid.x + grid.width - (col + 0.5) * cell : grid.x + (col + 0.5) * cell
+  }
+
+  /** A widget's grid position, read back from its rendered geometry. */
+  const cellOf = async (page: import('@playwright/test').Page, index: number) => {
+    const grid = (await page.getByTestId('dashboard-grid').boundingBox())!
+    const widget = page.locator('[data-testid^="widget-"]').nth(index)
+    const box = (await widget.boundingBox())!
+    const rtl = await page.locator('html').getAttribute('dir')
+    const fromStart = rtl === 'rtl' ? grid.x + grid.width - (box.x + box.width) : box.x - grid.x
+    return {
+      col: Math.round((fromStart / grid.width) * 12),
+      row: Math.round((box.y - grid.y) / 96),
+    }
+  }
+
+  test('@critical a dragged widget lands on a cell and persists', async ({ page }) => {
+    /*
+     * The grid's own drag path: pointer → cell, collision resolution, one batched commit. Only
+     * testable here — jsdom has no geometry, so the cell arithmetic has nothing to work from.
+     */
+    await openBuilder(page, phoneFor('111', test.info().project.name))
+
+    const grid = (await page.getByTestId('dashboard-grid').boundingBox())!
+    const before = await cellOf(page, 0)
+    expect(before).toMatchObject({ col: 0, row: 0 })
+
+    const widget = (await page.locator('[data-testid^="widget-"]').first().boundingBox())!
+    await page.mouse.move(widget.x + widget.width / 2, widget.y + 20)
+    await page.mouse.down()
+    await page.mouse.move(grid.x + grid.width / 2, grid.y + 3 * 96 + 20, { steps: 10 })
+    await page.mouse.up()
+
+    const after = await cellOf(page, 0)
+    expect(after.row).toBeGreaterThan(before.row)
+
+    await page.getByRole('button', { name: 'ذخیره' }).click()
+    await page.reload()
+    expect(await cellOf(page, 0)).toEqual(after)
+  })
+
+  test('@critical dropping onto an occupied cell displaces it, and ONE undo restores both', async ({
+    page,
+  }) => {
+    /*
+     * The rule the grid topology exists for, and the reason a move is a batch: the dropped
+     * widget stays where it was put, the occupant is pushed down, and both are one gesture.
+     */
+    await openBuilder(page, phoneFor('222', test.info().project.name))
+
+    const grid = (await page.getByTestId('dashboard-grid').boundingBox())!
+    const rtl = (await page.locator('html').getAttribute('dir')) === 'rtl'
+    const secondBefore = await cellOf(page, 1)
+
+    // Drag the second widget onto the first, which starts at column 0.
+    const second = (await page.locator('[data-testid^="widget-"]').nth(1).boundingBox())!
+    await page.mouse.move(second.x + second.width / 2, second.y + 20)
+    await page.mouse.down()
+    await page.mouse.move(xForCol(grid, 0, rtl), grid.y + 20, { steps: 10 })
+    await page.mouse.up()
+
+    // The first was pushed down; the dropped one took its place.
+    const firstAfter = await cellOf(page, 0)
+    expect(firstAfter.row).toBeGreaterThan(0)
+
+    await page.getByRole('button', { name: 'واگرد' }).click()
+    expect(await cellOf(page, 0)).toMatchObject({ row: 0 })
+    expect(await cellOf(page, 1)).toEqual(secondBefore)
+  })
+
+  test('removing a widget lifts what was below it', async ({ page }) => {
+    await openBuilder(page, phoneFor('333', test.info().project.name))
+    await page.getByRole('button', { name: 'افزودن ویجت' }).click()
+
+    // The added widget sits below the two starters; removing one of those lifts it.
+    const added = await cellOf(page, 2)
+    expect(added.row).toBe(2)
+
+    await page.getByRole('button', { name: /^حذف/ }).first().click()
+    await expect(page.locator('[data-testid^="widget-"]')).toHaveCount(2)
+    expect((await cellOf(page, 1)).row).toBe(0)
+  })
+})

@@ -16,3 +16,4 @@
  */
 export * from './domain/Dashboard'
 export * from './editor/schema'
+export * from './application/index'
