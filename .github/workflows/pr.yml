@@ -30,6 +30,24 @@ jobs:
       - name: install
         run: pnpm install --frozen-lockfile
 
+      # Stage 1b — known vulnerabilities in the dependency tree.
+      #
+      # Added after an audit that had never been run found 12 advisories, two of them critical,
+      # in a codebase whose every other gate was green. All were build- and dev-time rather than
+      # shipped to a browser, which is why nothing else noticed — and a compromised build
+      # toolchain is a supply-chain risk regardless of what reaches production.
+      #
+      # Two invocations on purpose. The first REPORTS everything without failing, so a moderate
+      # advisory in a dev dependency is visible without turning CI red for something the PR did
+      # not cause. The second GATES on high and critical, which are the ones that need action
+      # now. A single strict gate would be switched off within a month; a single lenient one
+      # would never be read.
+      - name: dependency advisories (informational)
+        run: pnpm audit || true
+
+      - name: dependency advisories (high and critical block)
+        run: pnpm audit --audit-level=high
+
       # Stage 2 — ADR-0026 contract drift.
       # Running against the committed stopgap spec today; the only change when
       # @fitnessos/api-spec is published is where the spec is read from.
