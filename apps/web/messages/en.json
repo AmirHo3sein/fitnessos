@@ -194,5 +194,17 @@
     "title": "That page does not exist",
     "body": "The link may be out of date, or the address mistyped.",
     "home": "Back to the start"
+  },
+  "measurement": {
+    "title": "What your training has produced",
+    "none": "Nothing measured yet",
+    "noneHint": "Log a session or record a measurement, and it will appear here.",
+    "measuredOn": "Measured",
+    "stale": "not measured recently",
+    "notEnoughData": "Not enough data to show a change yet",
+    "kinds": {
+      "bodyweight": "Bodyweight",
+      "estimatedOneRepMax": "Estimated one-rep max"
+    }
   }
 }

@@ -457,6 +457,114 @@
           }
         }
       }
+    },
+    "/observations": {
+      "get": {
+        "operationId": "listObservations",
+        "tags": [
+          "measurement"
+        ],
+        "summary": "The athlete's recorded measurements",
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Observation"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "operationId": "recordObservation",
+        "tags": [
+          "measurement"
+        ],
+        "summary": "Record a measurement",
+        "description": "Idempotent by client-supplied id. A repeat of a stored id returns 200 with that record, never a second one -- a duplicate measurement can only be a retry, so it is indistinguishable from success. Contrast POST /sessions/performed, where a duplicate may be a genuine second record from another device and answers 409.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordObservationBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "recorded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Observation"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "this id was already stored -- a replay",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Observation"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/indicators": {
+      "get": {
+        "operationId": "listIndicators",
+        "tags": [
+          "measurement"
+        ],
+        "summary": "Published derived indicators",
+        "description": "Computed on read from observations and performed sessions (ADR-0006). The response therefore changes when a session is logged, without any observation being recorded -- a client must invalidate this on a performed session as well as on a measurement.",
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/IndicatorSeries"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1112,6 +1220,161 @@
           }
         },
         "description": "A revision creates a NEW version and leaves the old one untouched (ADR-0008): a structure an athlete has already followed cannot be edited without making every PerformedSession against it unreadable. versionNumber is assigned by the server, not sent -- it is derived from the lineage and a client that guessed it would race another author."
+      },
+      "Acquisition": {
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "self-reported",
+              "device",
+              "practitioner"
+            ]
+          },
+          "source": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Required when kind=device. An opaque identifier such as `withings-scale`, never a display name -- names are catalogue data (ADR-0012)."
+          },
+          "recordedBy": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Required when kind=practitioner."
+          }
+        },
+        "description": "How a measurement came to be known. CLOSED, unlike the indicator kind, because the variants differ in required structure (ADR-0016 / ADR-0020). Provenance is published as a coarse vocabulary rather than a confidence score (ADR-0023)."
+      },
+      "Observation": {
+        "type": "object",
+        "required": [
+          "id",
+          "athleteId",
+          "kind",
+          "value",
+          "unit",
+          "observedOn",
+          "acquisition"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "athleteId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "type": "string",
+            "minLength": 1,
+            "description": "OPEN vocabulary (ADR-0020): every variant has identical structure, so a kind this client has never seen is data, not an error."
+          },
+          "value": {
+            "type": "number",
+            "minimum": 0
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Invariant N11: a measurement is never stored without its unit."
+          },
+          "observedOn": {
+            "type": "string",
+            "format": "date",
+            "description": "The calendar day, not an instant. A bodyweight is a fact about a morning."
+          },
+          "acquisition": {
+            "$ref": "#/components/schemas/Acquisition"
+          }
+        }
+      },
+      "RecordObservationBody": {
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "value",
+          "unit",
+          "observedOn",
+          "acquisition"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "CLIENT-generated UUIDv7 (ADR-0010). The idempotency key: a repeat of a stored id MUST return 200 with the stored record rather than creating a second one. A duplicate measurement is not worth telling the athlete about -- unlike a duplicate session log, it can only be a retry."
+          },
+          "kind": {
+            "type": "string",
+            "minLength": 1
+          },
+          "value": {
+            "type": "number",
+            "minimum": 0
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "observedOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "acquisition": {
+            "$ref": "#/components/schemas/Acquisition"
+          }
+        }
+      },
+      "IndicatorPoint": {
+        "type": "object",
+        "required": [
+          "on",
+          "value"
+        ],
+        "properties": {
+          "on": {
+            "type": "string",
+            "format": "date"
+          },
+          "value": {
+            "type": "number"
+          }
+        },
+        "description": "A computed answer, not a record -- hence no id. Giving a derived point an identity would invite something to reference it and then expect it to still exist (ADR-0006)."
+      },
+      "IndicatorSeries": {
+        "type": "object",
+        "required": [
+          "kind",
+          "unit",
+          "points"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "minLength": 1
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1,
+            "description": "On the SERIES, not the point. A series whose unit changed partway through is two series, and per-point units make that representable."
+          },
+          "movementName": {
+            "type": "string",
+            "description": "For per-movement indicators such as an estimated 1RM. Absent for whole-body indicators. A name rather than an id until catalogue versioning exists (ADR-0012)."
+          },
+          "points": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IndicatorPoint"
+            }
+          }
+        },
+        "description": "A published derived indicator (ADR-0013). DERIVED on read and never stored (ADR-0006): the server computes it from observations and performed sessions when asked. Prescription consumes this to resolve progression, which is why it is a published language rather than an internal shape."
       }
     }
   }

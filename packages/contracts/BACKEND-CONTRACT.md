@@ -54,7 +54,17 @@ returns the first, and the client surfaces both and waits.
 does not distinguish them, deliberately: from the athlete's side, "already
 recorded" is one fact.
 
-### 1.3 `POST /programs/{programId}/versions` — 200 on a duplicate `id`
+### 1.3 `POST /observations` — 200 on a duplicate `id`
+
+**Required.** A body whose `id` is already stored MUST return **200** with that record, never a
+second one.
+
+**Why the difference from 1.1.** A duplicate measurement can only be a retry. Nobody records
+the same bodyweight twice by accident on two devices in the way they might log the same session
+twice — so unlike a session log, there is nothing here worth telling the athlete about, and the
+replay should be indistinguishable from success.
+
+### 1.4 `POST /programs/{programId}/versions` — 200 on a duplicate `id`
 
 **Required.** A body whose `id` matches a version already stored MUST return
 **200** with that version. Not 409, and not a second version.
@@ -222,6 +232,21 @@ because the workaround is load-bearing.
   these yet and nothing should be until one exists to build against.
 - **File upload.** Signed-URL direct-to-storage (handbook Part 5). The contract is
   a Phase 1 deliverable and has not been authored; the implementation is Phase 4.
+
+### 4.3 `GET /indicators` must derive on read
+
+Not a gap — a requirement stated here because it is the one thing about Measurement a schema
+cannot express, and the one thing most likely to be "optimised" away.
+
+There must be **no indicator table**. ADR-0006: staleness, trends and derivations are queries,
+not state. `GET /indicators` computes its answer from stored observations and performed sessions
+each time it is asked.
+
+The consequence a caching layer would break: **logging a session changes this response, with no
+observation recorded**. That is ADR-0024's cycle — Execution feeds Measurement feeds Prescription
+— and it is asserted end to end in `shell.spec.ts` ("the loop closes"). A stored indicator would
+be correct until the first session was logged and silently stale thereafter, and the athlete
+would see their estimated one-rep max fail to move after the session that moved it.
 
 ---
 

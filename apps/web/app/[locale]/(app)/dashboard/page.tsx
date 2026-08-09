@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { getTranslations } from 'next-intl/server'
 import { AthleteSummary } from '@fitnessos/core/athlete/presentation'
+import { IndicatorList } from '@fitnessos/core/measurement/presentation'
 import { hasLocale } from 'next-intl'
 import { routing } from '../../../../src/i18n/routing'
 import { enableStaticRendering } from '../../../../src/i18n/static'
@@ -51,6 +52,18 @@ export default async function DashboardPage({
   enableStaticRendering(locale)
   const t = await getTranslations('athlete.summary')
   const page = await getTranslations('dashboard')
+  const indicators = await getTranslations('measurement')
+
+  /*
+   * Today, resolved on the SERVER and passed down.
+   *
+   * Staleness is derived (ADR-0006), so it is computed from this date rather than from a clock
+   * inside the component. A `new Date()` in the client would also differ between the server
+   * render and hydration — a mismatch React resolves in favour of whichever ran second, which
+   * means the warning flickers on for some athletes and not others.
+   */
+  const now = new Date()
+  const asOf = { year: now.getFullYear(), month: now.getMonth() + 1, day: now.getDate() }
 
   return (
     <main>
@@ -70,6 +83,25 @@ export default async function DashboardPage({
             noCeiling: t('noCeiling'),
             loading: t('loading'),
             failed: t('failed'),
+          }}
+        />
+      </div>
+
+      <div className="mt-6">
+        <IndicatorList
+          locale={hasLocale(routing.locales, locale) ? locale : routing.defaultLocale}
+          asOf={asOf}
+          labels={{
+            title: indicators('title'),
+            none: indicators('none'),
+            noneHint: indicators('noneHint'),
+            measuredOn: indicators('measuredOn'),
+            stale: indicators('stale'),
+            notEnoughData: indicators('notEnoughData'),
+            kinds: {
+              bodyweight: indicators('kinds.bodyweight'),
+              'estimated-1rm': indicators('kinds.estimatedOneRepMax'),
+            },
           }}
         />
       </div>

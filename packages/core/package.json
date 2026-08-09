@@ -15,7 +15,9 @@
     "./goal": "./src/goal/index.ts",
     "./goal/presentation": "./src/goal/presentation/index.ts",
     "./execution": "./src/execution/index.ts",
-    "./execution/presentation": "./src/execution/presentation/index.ts"
+    "./execution/presentation": "./src/execution/presentation/index.ts",
+    "./measurement": "./src/measurement/index.ts",
+    "./measurement/presentation": "./src/measurement/presentation/index.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
