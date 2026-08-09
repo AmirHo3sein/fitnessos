@@ -23,6 +23,7 @@ const LABELS: ReportBuilderLabels = {
   undo: 'Undo',
   redo: 'Redo',
   save: 'Save',
+  multiSelect: 'Select several',
   alignLeft: 'Align left',
   alignTop: 'Align top',
   distributeX: 'Distribute',

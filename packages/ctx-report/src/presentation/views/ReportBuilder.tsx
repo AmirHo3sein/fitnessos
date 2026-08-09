@@ -42,6 +42,7 @@ export interface ReportBuilderLabels {
   readonly undo: string
   readonly redo: string
   readonly save: string
+  readonly multiSelect: string
   readonly alignLeft: string
   readonly alignTop: string
   readonly distributeX: string
@@ -123,6 +124,25 @@ const BuilderShell = ({
   const history = useHistoryControls()
   const canvas = useRef<HTMLDivElement>(null)
   const [guides, setGuides] = useState<readonly GuideLine[]>([])
+
+  /*
+   * Multi-select as a MODE, not only as a modifier key.
+   *
+   * Shift-click is the desktop habit and it stays. It is also unreachable on a touch device,
+   * which has no shift key — so on a phone, align and distribute were disabled forever. That is
+   * not an acceptable limitation in a product whose primary experience is Persian on mobile; it
+   * was a feature that existed only for people on laptops.
+   *
+   * A mode rather than long-press: long-press competes with the drag this canvas is built
+   * around, and the two are told apart by a timer, which is exactly the interaction that feels
+   * broken when a finger moves slightly. A visible toggle is discoverable, says what state you
+   * are in, and behaves identically with a mouse.
+   *
+   * While it is on, a tap toggles membership and nothing drags. Modal, deliberately: a canvas
+   * where a tap sometimes selects and sometimes starts a drag is a canvas where every tap is a
+   * small gamble.
+   */
+  const [multiSelect, setMultiSelect] = useState(false)
 
   /*
    * The viewport is fixed at 1:1 for now — pan and zoom are a later interaction, and the code
@@ -239,12 +259,36 @@ const BuilderShell = ({
 
     const [top] = hitPoint(index, state.document.rootIds, point)
     if (top === undefined) {
-      store.setEphemeral({ selected: [] })
+      // A tap on empty canvas clears the selection — but not in multi-select mode, where it
+      // would undo a careful selection with one stray finger.
+      if (!multiSelect) store.setEphemeral({ selected: [] })
       return
     }
 
-    // Shift extends the selection, which is what makes align and distribute reachable at all.
-    const extended = event.shiftKey && !selected.includes(top) ? [...selected, top] : [top]
+    /*
+     * Read from the STORE, not from the render-time `selected`.
+     *
+     * The handler closes over the selection as it was when this render happened. Two taps in
+     * quick succession both run against that closure before React has re-rendered, so the second
+     * overwrites the first and one of the two tiles is silently dropped — which is exactly how a
+     * person taps when selecting things, and exactly what made align stay disabled.
+     *
+     * The store always holds the current value, so reading it here makes the update functional
+     * in effect without needing a functional API.
+     */
+    const current = store.getEphemeral().selected
+
+    if (multiSelect) {
+      // Toggle membership. Tapping a selected tile removes it, which is the only way to correct
+      // a mis-tap without starting the selection again.
+      store.setEphemeral({
+        selected: current.includes(top) ? current.filter((id) => id !== top) : [...current, top],
+      })
+      return
+    }
+
+    // Shift extends the selection on a keyboard-and-pointer device.
+    const extended = event.shiftKey && !current.includes(top) ? [...current, top] : [top]
     store.setEphemeral({ selected: extended })
 
     const node = state.document.nodes[top]
@@ -305,6 +349,17 @@ const BuilderShell = ({
         </Button>
         <Button type="button" variant="secondary" size="sm" onPress={addTile}>
           {labels.addTile}
+        </Button>
+        <Button
+          type="button"
+          variant={multiSelect ? 'primary' : 'secondary'}
+          size="sm"
+          aria-pressed={multiSelect}
+          onPress={() => {
+            setMultiSelect((on) => !on)
+          }}
+        >
+          {labels.multiSelect}
         </Button>
         {/* Disabled below two, because aligning one thing to itself does nothing visible and a
             button that appears to do nothing reads as broken. */}
