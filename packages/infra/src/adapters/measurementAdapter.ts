@@ -1,4 +1,5 @@
 import type {
+  CheckInFormSnapshot,
   MeasurementReadPort,
   MeasurementWritePort,
   ObservationSnapshot,
@@ -6,6 +7,8 @@ import type {
 } from '@fitnessos/ctx-measurement'
 import type { AuthContext, HttpClient } from '../http/client'
 import {
+  checkInFormBodyFrom,
+  checkInFormFrom,
   indicatorsFrom,
   observationFrom,
   observationsFrom,
@@ -33,6 +36,31 @@ export const createMeasurementAdapter = (
 
   indicators: async (signal?: AbortSignal) =>
     indicatorsFrom(await http.request('/indicators', { auth, ...(signal ? { signal } : {}) })),
+
+  checkInForm: async (signal?: AbortSignal): Promise<CheckInFormSnapshot | null> => {
+    const raw = await http.request('/check-in-forms/current', {
+      auth,
+      ...(signal ? { signal } : {}),
+    })
+    // A 204 becomes null. "No form yet" is the normal state before a coach authors one, and
+    // `undefined` reaching a component is how that becomes a blank screen with no explanation.
+    if (raw === undefined || raw === null) return null
+    return checkInFormFrom(raw)
+  },
+
+  saveCheckInForm: async (form, signal?: AbortSignal): Promise<CheckInFormSnapshot> => {
+    // PUT: a form is not versioned, so submitting the same body twice leaves it in the same
+    // state. That is what makes a retry safe here without a client-generated request id.
+    const body = checkInFormBodyFrom(form)
+    return checkInFormFrom(
+      await http.request(`/check-in-forms/${form.id}`, {
+        method: 'PUT',
+        body,
+        auth,
+        ...(signal ? { signal } : {}),
+      }),
+    )
+  },
 
   record: async (
     input: RecordObservationInput,

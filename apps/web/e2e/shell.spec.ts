@@ -1347,3 +1347,89 @@ test.describe('the obligation to find out', () => {
     await expect(page.getByText('در انتظار داوری شما')).toHaveCount(0)
   })
 })
+
+test.describe('authoring a check-in form', () => {
+  const GOOD_CODE = '۰۰۰۰۰۰'
+
+  const phoneFor = (testCode: string, project: string) => {
+    const projectCode = project === 'chromium' ? '114' : '115'
+    const ascii = `0912${testCode}${projectCode}9`
+    return [...ascii].map((d) => '۰۱۲۳۴۵۶۷۸۹'[Number(d)]).join('')
+  }
+
+  const signIn = async (page: import('@playwright/test').Page, phone: string) => {
+    await page.goto('/sign-in')
+    await page.getByLabel('شماره‌ی موبایل').fill(phone)
+    await page.getByRole('button', { name: 'ارسال کد' }).click()
+    await page.getByLabel('کد تأیید').fill(GOOD_CODE)
+    await page.getByRole('button', { name: 'تأیید و ورود' }).click()
+    await expect(page).not.toHaveURL(/\/sign-in/)
+  }
+
+  test('@critical no form yet is an explained empty state with a way out', async ({ page }) => {
+    // The normal state before a coach authors one. An empty editor would be worse: the aggregate
+    // refuses a form with no fields, so the first thing the coach learned would be an error they
+    // did not cause.
+    await signIn(page, phoneFor('111', test.info().project.name))
+    await page.goto('/check-in')
+
+    await expect(page.getByText('هنوز فرمی ساخته نشده')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'ساختن فرم' })).toBeVisible()
+  })
+
+  test('@critical a form is created, edited, and survives a reload', async ({ page }) => {
+    /*
+     * The Form Builder end to end — the second consumer of `editor-engine` driving a real
+     * document through hydrate, edit, commit, the wire, and back.
+     */
+    await signIn(page, phoneFor('222', test.info().project.name))
+    await page.goto('/check-in')
+
+    await page.getByRole('button', { name: 'ساختن فرم' }).click()
+    await expect(page.getByRole('button', { name: 'ذخیره' })).toBeVisible()
+
+    // `exact`, because the remove button's aria-label is "حذف <question>" and therefore also
+    // contains the word — an inexact locator matches two elements per field.
+    const question = page.getByLabel('پرسش', { exact: true }).first()
+    await question.fill('How much did you weigh?')
+    await page.getByRole('button', { name: 'ذخیره' }).click()
+
+    await page.reload()
+    await expect(page.getByLabel('پرسش', { exact: true }).first()).toHaveValue('How much did you weigh?')
+  })
+
+  test('@critical a question added in the builder is persisted', async ({ page }) => {
+    await signIn(page, phoneFor('333', test.info().project.name))
+    await page.goto('/check-in')
+    await page.getByRole('button', { name: 'ساختن فرم' }).click()
+
+    await page.getByRole('button', { name: 'افزودن پرسش' }).click()
+
+    // Every field must record something and carry a unit — the aggregate refuses a question that
+    // produces no observation, so a new one is unsaveable until both are filled in.
+    await page.getByLabel('ثبت می‌کند').nth(1).fill('sleep')
+    await page.getByLabel('یکا').nth(1).fill('h')
+    await page.getByRole('button', { name: 'ذخیره' }).click()
+
+    await page.reload()
+    await expect(page.getByLabel('پرسش', { exact: true })).toHaveCount(2)
+    await expect(page.getByLabel('ثبت می‌کند').nth(1)).toHaveValue('sleep')
+  })
+
+  test('@critical undo reverses a deletion before it is ever sent', async ({ page }) => {
+    // Same engine, same guarantee as the Program Builder — which is the point of there being an
+    // engine rather than two builders that each grew their own history.
+    await signIn(page, phoneFor('444', test.info().project.name))
+    await page.goto('/check-in')
+    await page.getByRole('button', { name: 'ساختن فرم' }).click()
+
+    await page.getByRole('button', { name: 'افزودن پرسش' }).click()
+    await expect(page.getByLabel('پرسش', { exact: true })).toHaveCount(2)
+
+    await page.getByRole('button', { name: /^حذف/ }).last().click()
+    await expect(page.getByLabel('پرسش', { exact: true })).toHaveCount(1)
+
+    await page.getByRole('button', { name: 'واگرد' }).click()
+    await expect(page.getByLabel('پرسش', { exact: true })).toHaveCount(2)
+  })
+})

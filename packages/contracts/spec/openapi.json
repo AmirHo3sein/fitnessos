@@ -686,6 +686,89 @@
           }
         }
       }
+    },
+    "/check-in-forms/current": {
+      "get": {
+        "operationId": "getCurrentCheckInForm",
+        "tags": [
+          "measurement"
+        ],
+        "summary": "The athlete's current check-in form",
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckInForm"
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "no form yet -- the normal state before a coach authors one, not an error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/check-in-forms/{formId}": {
+      "put": {
+        "operationId": "saveCheckInForm",
+        "tags": [
+          "measurement"
+        ],
+        "summary": "Create or replace a check-in form",
+        "description": "PUT, not POST. A form is not versioned -- observations reference an indicator kind, not a field id, so editing one cannot make an existing observation unreadable. Submitting the same body twice must therefore leave the form in the same state, which is what makes a retry safe here without a client-generated request id (contrast POST /programs/{id}/versions, where every save is a new immutable version).",
+        "parameters": [
+          {
+            "name": "formId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckInForm"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckInForm"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1657,6 +1740,104 @@
             "description": "Present when correcting. The superseded outcome MUST NOT be deleted or mutated."
           }
         }
+      },
+      "AnswerShape": {
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "number",
+              "scale",
+              "choice"
+            ]
+          },
+          "min": {
+            "type": "number",
+            "description": "Required when kind=scale. Must be below max."
+          },
+          "max": {
+            "type": "number",
+            "description": "Required when kind=scale."
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Required and non-empty when kind=choice."
+          }
+        },
+        "description": "How the athlete answers. CLOSED, because the variants differ in required structure (ADR-0020's exception). Flattened rather than a oneOf so a single field of a variant can be addressed by one SetProperty in the editor -- see the note in ctx-measurement/src/editor/schema.ts."
+      },
+      "FormField": {
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "records",
+          "unit",
+          "answer",
+          "order"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1
+          },
+          "records": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The IndicatorKind the answer becomes. Every field must record something: a question that produces no observation is a survey question, and this product needs measurements. Open vocabulary (ADR-0020)."
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Invariant N11: an answer is never recorded without its unit."
+          },
+          "answer": {
+            "$ref": "#/components/schemas/AnswerShape"
+          },
+          "order": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Zero-based. Orders across a form must be exactly 0..n-1, each once."
+          }
+        }
+      },
+      "CheckInForm": {
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "fields"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "fields": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/components/schemas/FormField"
+            }
+          }
+        },
+        "description": "The instrument by which a self-reported measurement is acquired. NOT versioned, unlike ProgramVersion: observations reference an indicator kind rather than a field id, so editing a form cannot make an existing observation unreadable. That is why this is a PUT and a programme revision is a POST."
       }
     }
   }

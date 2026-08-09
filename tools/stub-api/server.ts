@@ -37,6 +37,7 @@ import {
   ProblemSchema,
   ProgramSchema,
   RequestCodeBodySchema,
+  CheckInFormSchema,
   DecisionOutcomeSchema,
   IndicatorSeriesSchema,
   ObservationSchema,
@@ -125,6 +126,9 @@ const revisions = new Map<string, { current: unknown; versions: Map<string, unkn
 
 /** Recorded measurements, keyed by phone then by the CLIENT-supplied id (ADR-0010). */
 const observations = new Map<string, Map<string, unknown>>()
+
+/** Check-in forms, one per phone. Replaced wholesale by PUT — a form is not versioned. */
+const checkInForms = new Map<string, unknown>()
 
 /** Rendered verdicts, keyed by phone then by client id. Superseded ones are KEPT (ADR-0007). */
 const outcomes = new Map<string, Map<string, unknown>>()
@@ -534,6 +538,7 @@ const handlers: Record<string, (req: IncomingMessage, res: ServerResponse) => Pr
     revisions.clear()
     observations.clear()
     outcomes.clear()
+    checkInForms.clear()
     res.writeHead(204).end()
     return Promise.resolve()
   },
@@ -742,6 +747,40 @@ const handlers: Record<string, (req: IncomingMessage, res: ServerResponse) => Pr
     res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(series))
   },
 
+  'GET /api/v1/check-in-forms/current': async (req, res) => {
+    const phone = phoneFromToken(cookiesOf(req)['access_token'])
+    if (phone === null) {
+      problem(res, 401, 'unauthenticated', 'no valid session')
+      return
+    }
+    const form = checkInForms.get(phone)
+    if (form === undefined) {
+      // 204, which the adapter maps to null. "No form yet" is data, not an error.
+      res.writeHead(204).end()
+      return
+    }
+    send(res, 200, CheckInFormSchema, form)
+  },
+
+  'PUT /api/v1/check-in-forms/:formId': async (req, res) => {
+    const phone = phoneFromToken(cookiesOf(req)['access_token'])
+    if (phone === null) {
+      problem(res, 401, 'unauthenticated', 'no valid session')
+      return
+    }
+
+    const body = CheckInFormSchema.safeParse(await readBody(req))
+    if (!body.success) {
+      problem(res, 400, 'invalid_request', body.error.issues[0]?.message ?? 'invalid')
+      return
+    }
+
+    // A wholesale replace. Submitting the same body twice leaves the form in the same state,
+    // which is what makes PUT correct here and a retry safe with no client-generated id.
+    checkInForms.set(phone, body.data)
+    send(res, 200, CheckInFormSchema, body.data)
+  },
+
   'GET /api/v1/proposals': async (req, res) => {
     const phone = phoneFromToken(cookiesOf(req)['access_token'])
     if (phone === null) {
@@ -831,6 +870,7 @@ createServer((req, res) => {
   const path = raw
     .replace(/^\/api\/v1\/programs\/[^/]+\/versions$/, '/api/v1/programs/:programId/versions')
     .replace(/^\/api\/v1\/proposals\/[^/]+\/outcome$/, '/api/v1/proposals/:proposalId/outcome')
+    .replace(/^\/api\/v1\/check-in-forms\/(?!current$)[^/]+$/, '/api/v1/check-in-forms/:formId')
   const handler = handlers[`${req.method ?? 'GET'} ${path}`]
 
   if (!handler) {
