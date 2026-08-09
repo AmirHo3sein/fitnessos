@@ -113,7 +113,7 @@ test.describe('no credential leaks into the client bundle', () => {
 })
 
 test.describe('sign-in form', () => {
-  test('@critical accepts Persian digits and reaches the code step', async ({ page }) => {
+  test('accepts Persian digits and reaches the code step', async ({ page }) => {
     // The whole flow in one assertion: a Persian keyboard produces ۰۹۱۲…, which is
     // not an ASCII digit, so without normalisation the user types the number that is
     // printed on their own SIM and the form calls it invalid.
@@ -129,7 +129,7 @@ test.describe('sign-in form', () => {
     await expect(page.getByText('این شماره‌ی موبایل ایران به نظر نمی‌رسد.')).toBeHidden()
   })
 
-  test('@critical rejects a landline with a specific message', async ({ page }) => {
+  test('rejects a landline with a specific message', async ({ page }) => {
     await page.goto('/sign-in')
     await page.getByLabel('شماره‌ی موبایل').fill('۰۲۱۲۳۴۵۶۷۸')
     await page.getByRole('button', { name: 'ارسال کد' }).click()
@@ -142,7 +142,7 @@ test.describe('sign-in form', () => {
     await expect(page.getByLabel('شماره‌ی موبایل')).toHaveAttribute('aria-invalid', 'true')
   })
 
-  test('@critical the phone field renders LTR inside the RTL page', async ({ page }) => {
+  test('the phone field renders LTR inside the RTL page', async ({ page }) => {
     // Without dir="ltr" the bidi algorithm reorders the number's groups, so the user
     // sees a different number to the one they typed.
     await page.goto('/sign-in')
@@ -150,7 +150,7 @@ test.describe('sign-in form', () => {
     await expect(page.locator('html')).toHaveAttribute('dir', 'rtl')
   })
 
-  test('@critical the form is in the first response, not added after hydration', async ({
+  test('the form is in the first response, not added after hydration', async ({
     request,
   }) => {
     /*
@@ -306,7 +306,7 @@ test.describe('onboarding', () => {
     await expect(page).toHaveURL(/\/onboarding/)
   }
 
-  test('@critical a new athlete completes onboarding and lands on the dashboard', async ({
+  test('a new athlete completes onboarding and lands on the dashboard', async ({
     page,
   }) => {
     // The full write path: form → domain value objects → outbound validation → PUT →
@@ -336,7 +336,7 @@ test.describe('onboarding', () => {
     await expect(page.getByText('۶۰')).toBeVisible()
   })
 
-  test('@critical the domain refuses an empty discipline list, before any request', async ({
+  test('the domain refuses an empty discipline list, before any request', async ({
     page,
   }) => {
     await signInAsNewPerson(page, PHONE_NO_DISCIPLINE)
@@ -347,7 +347,7 @@ test.describe('onboarding', () => {
     await expect(page).toHaveURL(/\/onboarding/)
   })
 
-  test('@critical a zero ceiling is refused with a message naming the alternative', async ({
+  test('a zero ceiling is refused with a message naming the alternative', async ({
     page,
   }) => {
     // Zero means "cannot train at all", which is a different statement from "no limit".
@@ -360,12 +360,12 @@ test.describe('onboarding', () => {
     await expect(page.locator('#onboarding-error')).toContainText('خالی بگذار')
   })
 
-  test('@critical onboarding requires a session', async ({ page }) => {
+  test('onboarding requires a session', async ({ page }) => {
     await page.goto('/onboarding')
     await expect(page).toHaveURL(/\/sign-in/)
   })
 
-  test('@critical the back button does not return to a completed form', async ({ page }) => {
+  test('the back button does not return to a completed form', async ({ page }) => {
     // `replace`, not `push`. Otherwise the athlete can go back and resubmit what they
     // just recorded — harmless under PUT, but confusing, and it would show a form that
     // no longer reflects their state.
@@ -399,7 +399,7 @@ test.describe('goal declaration', () => {
     await expect(page.getByLabel('چه چیزی می‌خواهی؟')).toBeVisible()
   }
 
-  test('@critical a Persian goal is declared verbatim, ZWNJ intact', async ({ page }) => {
+  test('a Persian goal is declared verbatim, ZWNJ intact', async ({ page }) => {
     // The assertion this whole context exists for. `می‌خواهم` carries a zero-width
     // non-joiner, which is a letter-level joiner in Persian: strip it and the word
     // becomes `میخواهم`, which reads to a Persian speaker as a spelling error the product
@@ -422,7 +422,7 @@ test.describe('goal declaration', () => {
     expect(sent).toContain('\u200c')
   })
 
-  test('@critical an empty goal is refused before any request', async ({ page }) => {
+  test('an empty goal is refused before any request', async ({ page }) => {
     let requested = false
     page.on('request', (request) => {
       if (request.url().endsWith('/goals') && request.method() === 'POST') requested = true
@@ -435,7 +435,7 @@ test.describe('goal declaration', () => {
     expect(requested).toBe(false)
   })
 
-  test('@critical skipping is a real outcome, not a dead end', async ({ page }) => {
+  test('skipping is a real outcome, not a dead end', async ({ page }) => {
     // A goal declared to get past a form becomes the thing every future prescription and
     // evaluation is judged against — worse than arriving without one. So skipping must
     // reach the dashboard, and must not post anything.
@@ -451,7 +451,7 @@ test.describe('goal declaration', () => {
     expect(requested).toBe(false)
   })
 
-  test('@critical the character counter counts code points, not UTF-16 units', async ({
+  test('the character counter counts code points, not UTF-16 units', async ({
     page,
   }) => {
     // A goal ending in an emoji must not be reported as one character longer than it is.
@@ -488,7 +488,7 @@ test.describe('programme and sessions', () => {
     await expect(page).not.toHaveURL(/\/sign-in/)
   }
 
-  test('@critical the programme renders its blocks in order', async ({ page }) => {
+  test('the programme renders its blocks in order', async ({ page }) => {
     // The stub supplies blocks OUT of order deliberately — the contract promises no ordering,
     // so this asserts the mapper sorts rather than rendering whatever arrived. Two clients
     // showing the same programme in different orders is indistinguishable from a data bug.
@@ -503,7 +503,7 @@ test.describe('programme and sessions', () => {
     await expect(blocks.nth(1)).toContainText('Accumulation')
   })
 
-  test('@critical a linear block shows its rate and a fixed block does not', async ({ page }) => {
+  test('a linear block shows its rate and a fixed block does not', async ({ page }) => {
     await signIn(page, PHONE_WITH_PROGRAMME)
     await page.goto('/programme')
 
@@ -513,7 +513,7 @@ test.describe('programme and sessions', () => {
     await expect(page.getByText('۲٫۵%')).toBeVisible()
   })
 
-  test('@critical no programme is an explained empty state, not a spinner', async ({ page }) => {
+  test('no programme is an explained empty state, not a spinner', async ({ page }) => {
     // A 204 maps to null, and null is DATA. If it were left as undefined the query would never
     // settle and a newly-onboarded athlete would watch a spinner forever.
     await signIn(page, PHONE_NO_PROGRAMME)
@@ -523,7 +523,7 @@ test.describe('programme and sessions', () => {
     await expect(page.getByRole('status')).toHaveCount(0)
   })
 
-  test('@critical sessions show sets, reps, load, and bodyweight distinctly', async ({ page }) => {
+  test('sessions show sets, reps, load, and bodyweight distinctly', async ({ page }) => {
     await signIn(page, PHONE_WITH_PROGRAMME)
     await page.goto('/sessions')
 
@@ -535,7 +535,7 @@ test.describe('programme and sessions', () => {
     await expect(page.getByText('۱۰۰')).toBeVisible()
   })
 
-  test('@critical a withheld screening basis says so rather than saying nothing', async ({
+  test('a withheld screening basis says so rather than saying nothing', async ({
     page,
   }) => {
     // ADR-0002 / ADR-0014. "Modified, and here is why" and "modified, and you are not entitled
@@ -548,7 +548,7 @@ test.describe('programme and sessions', () => {
     await expect(page.getByText('دلیلش برای تو قابل نمایش نیست')).toBeVisible()
   })
 
-  test('@critical the session date renders in the Persian calendar', async ({ page }) => {
+  test('the session date renders in the Persian calendar', async ({ page }) => {
     // 2026-08-10 is 1405/05/19 Jalali. Showing a Gregorian date to an Iranian athlete is
     // showing them a date they have to convert in their head. Asserting on the Persian month
     // name proves the calendar, not just the numerals.
@@ -557,7 +557,7 @@ test.describe('programme and sessions', () => {
     await expect(page.getByText('مرداد')).toBeVisible()
   })
 
-  test('@critical both new routes require a session', async ({ page }) => {
+  test('both new routes require a session', async ({ page }) => {
     await page.goto('/programme')
     await expect(page).toHaveURL(/\/sign-in/)
     await page.goto('/sessions')
@@ -718,7 +718,7 @@ test.describe('the program builder', () => {
     await expect(page.getByRole('button', { name: 'ذخیره' })).toBeVisible()
   }
 
-  test('@critical a renamed block survives a save and a reload', async ({ page }) => {
+  test('a renamed block survives a save and a reload', async ({ page }) => {
     /*
      * The whole vertical, exercised once: editor document → commit → domain validation →
      * outbound mapper → HTTP → stub → read path → mapper → view. Each layer has its own test;
@@ -740,7 +740,7 @@ test.describe('the program builder', () => {
     await expect(page.locator('ol li').first()).toContainText('Base phase')
   })
 
-  test('@critical saving bumps the version number', async ({ page }) => {
+  test('saving bumps the version number', async ({ page }) => {
     // Assigned by the lineage, not the client. If the client ever started sending its own, this
     // is what would notice.
     await signIn(page, phoneFor('222', test.info().project.name))
@@ -755,7 +755,7 @@ test.describe('the program builder', () => {
     await expect(page.getByText('نسخه')).toContainText('۳')
   })
 
-  test('@critical an added block is persisted with a contiguous order', async ({ page }) => {
+  test('an added block is persisted with a contiguous order', async ({ page }) => {
     await signIn(page, phoneFor('333', test.info().project.name))
     await openBuilder(page)
 
@@ -768,7 +768,7 @@ test.describe('the program builder', () => {
     await expect(page.locator('ol li').nth(2)).toContainText('بلوک تازه')
   })
 
-  test('@critical undo reverses a deletion before it is ever sent', async ({ page }) => {
+  test('undo reverses a deletion before it is ever sent', async ({ page }) => {
     await signIn(page, phoneFor('444', test.info().project.name))
     await openBuilder(page)
 
@@ -784,7 +784,7 @@ test.describe('the program builder', () => {
     await expect(page.locator('ol li')).toHaveCount(2)
   })
 
-  test('@critical a stale save reports a conflict and keeps the local edits', async ({
+  test('a stale save reports a conflict and keeps the local edits', async ({
     page,
     request,
   }) => {
@@ -859,7 +859,7 @@ test.describe('cross-document references', () => {
     await expect(page).not.toHaveURL(/\/sign-in/)
   }
 
-  test('@critical a goal the athlete has NOT declared renders broken, and the page still works', async ({
+  test('a goal the athlete has NOT declared renders broken, and the page still works', async ({
     page,
   }) => {
     /*
@@ -881,7 +881,7 @@ test.describe('cross-document references', () => {
     await expect(page.getByRole('link', { name: /base phase/ })).toHaveCount(0)
   })
 
-  test('@critical a declared goal resolves to its own words and links to it', async ({ page }) => {
+  test('a declared goal resolves to its own words and links to it', async ({ page }) => {
     const phone = phoneFor('222', test.info().project.name)
     await signIn(page, phone)
 
@@ -931,7 +931,7 @@ test.describe('a log that never arrived', () => {
     await expect(page).not.toHaveURL(/\/sign-in/)
   }
 
-  test('@critical a session logged on another device surfaces as a conflict with both records', async ({
+  test('a session logged on another device surfaces as a conflict with both records', async ({
     page,
   }) => {
     /*
@@ -993,7 +993,7 @@ test.describe('a log that never arrived', () => {
     await expect(page.getByText('ثبت‌شده', { exact: true })).toBeVisible()
   })
 
-  test('@critical the issue survives a reload, and only dismissal clears it', async ({ page }) => {
+  test('the issue survives a reload, and only dismissal clears it', async ({ page }) => {
     /*
      * Why the record is durable rather than a callback: the replay runs on `online` and
      * `visibilitychange`, which fire when no UI is mounted and sometimes as the app is closing.
@@ -1301,7 +1301,7 @@ test.describe('the obligation to find out', () => {
     await expect(page).not.toHaveURL(/\/sign-in/)
   }
 
-  test('@critical an accepted proposal past its horizon demands a verdict', async ({ page }) => {
+  test('an accepted proposal past its horizon demands a verdict', async ({ page }) => {
     /*
      * ADR-0003 is satisfiable on paper by a product that accepts every suggestion and never
      * looks back. This is what stops that: the accepted proposal whose claim came due in
@@ -1317,7 +1317,7 @@ test.describe('the obligation to find out', () => {
     await expect(page.getByText('Add a deload week before the next block')).toHaveCount(0)
   })
 
-  test('@critical a verdict cannot be recorded without a reason', async ({ page }) => {
+  test('a verdict cannot be recorded without a reason', async ({ page }) => {
     // ADR-0003's third clause enforced at the point of entry. "It worked" with no reason is a
     // rating, not a verdict — and refused locally rather than sent, since the domain would
     // refuse it too and a round trip to learn what the form already knows is wasted.
@@ -1330,7 +1330,7 @@ test.describe('the obligation to find out', () => {
     await expect(page.getByText('Raise the accumulation block to 5% per cycle')).toBeVisible()
   })
 
-  test('@critical recording a verdict discharges the obligation, and it stays discharged', async ({
+  test('recording a verdict discharges the obligation, and it stays discharged', async ({
     page,
   }) => {
     await signIn(page, phoneFor('333', test.info().project.name))
@@ -1366,7 +1366,7 @@ test.describe('authoring a check-in form', () => {
     await expect(page).not.toHaveURL(/\/sign-in/)
   }
 
-  test('@critical no form yet is an explained empty state with a way out', async ({ page }) => {
+  test('no form yet is an explained empty state with a way out', async ({ page }) => {
     // The normal state before a coach authors one. An empty editor would be worse: the aggregate
     // refuses a form with no fields, so the first thing the coach learned would be an error they
     // did not cause.
@@ -1377,7 +1377,7 @@ test.describe('authoring a check-in form', () => {
     await expect(page.getByRole('button', { name: 'ساختن فرم' })).toBeVisible()
   })
 
-  test('@critical a form is created, edited, and survives a reload', async ({ page }) => {
+  test('a form is created, edited, and survives a reload', async ({ page }) => {
     /*
      * The Form Builder end to end — the second consumer of `editor-engine` driving a real
      * document through hydrate, edit, commit, the wire, and back.
@@ -1398,7 +1398,7 @@ test.describe('authoring a check-in form', () => {
     await expect(page.getByLabel('پرسش', { exact: true }).first()).toHaveValue('How much did you weigh?')
   })
 
-  test('@critical a question added in the builder is persisted', async ({ page }) => {
+  test('a question added in the builder is persisted', async ({ page }) => {
     await signIn(page, phoneFor('333', test.info().project.name))
     await page.goto('/check-in')
     await page.getByRole('button', { name: 'ساختن فرم' }).click()
@@ -1416,7 +1416,7 @@ test.describe('authoring a check-in form', () => {
     await expect(page.getByLabel('ثبت می‌کند').nth(1)).toHaveValue('sleep')
   })
 
-  test('@critical undo reverses a deletion before it is ever sent', async ({ page }) => {
+  test('undo reverses a deletion before it is ever sent', async ({ page }) => {
     // Same engine, same guarantee as the Program Builder — which is the point of there being an
     // engine rather than two builders that each grew their own history.
     await signIn(page, phoneFor('444', test.info().project.name))
@@ -1468,7 +1468,7 @@ test.describe('the report builder', () => {
     }))
   }
 
-  test('@critical a dragged tile lands where it was dropped, and persists', async ({ page }) => {
+  test('a dragged tile lands where it was dropped, and persists', async ({ page }) => {
     /*
      * The test that can only exist here.
      *
@@ -1500,7 +1500,7 @@ test.describe('the report builder', () => {
     expect(await positionOf(page)).toEqual(after)
   })
 
-  test('@critical one undo reverses a whole drag', async ({ page }) => {
+  test('one undo reverses a whole drag', async ({ page }) => {
     // A spatial move writes x AND y. Without coalescing, undo would restore one and leave the
     // other, and the tile would land somewhere the user never put it.
     await openBuilder(page, phoneFor('222', test.info().project.name))
@@ -1518,7 +1518,7 @@ test.describe('the report builder', () => {
     expect(await positionOf(page)).toEqual(before)
   })
 
-  test('@critical snapping aligns a tile to its neighbour', async ({ page }) => {
+  test('snapping aligns a tile to its neighbour', async ({ page }) => {
     // The threshold is in SCREEN pixels, converted at query time. Dropping near an edge should
     // land exactly on it rather than near it.
     await openBuilder(page, phoneFor('333', test.info().project.name))
@@ -1537,7 +1537,7 @@ test.describe('the report builder', () => {
     expect((await positionOf(page, 1)).x).toBe(first.x)
   })
 
-  test('@critical align is ONE undo for the whole selection', async ({ page }) => {
+  test('align is ONE undo for the whole selection', async ({ page }) => {
     /*
      * The reason `pushBatch` exists. Two tiles aligned is one thing the coach did; before the
      * batch primitive this produced an entry per tile, so a single undo left one of them moved.

@@ -4,13 +4,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "next dev",
     "build": "next build",
-    "start": "next start",
-    "typecheck": "tsc --noEmit",
+    "dev": "next dev",
+    "e2e:critical": "playwright test --grep @critical",
+    "e2e:full": "playwright test",
     "lint": "eslint app composition src middleware.ts",
+    "start": "next start",
     "test:component": "vitest run",
-    "e2e:critical": "playwright test --grep @critical"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@fitnessos/core": "workspace:*",
