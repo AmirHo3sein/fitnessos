@@ -852,6 +852,89 @@
           }
         }
       }
+    },
+    "/dashboards/current": {
+      "get": {
+        "operationId": "getCurrentDashboard",
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "The athlete's current dashboard",
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Dashboard"
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "no dashboard yet"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/dashboards/{dashboardId}": {
+      "put": {
+        "operationId": "saveDashboard",
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "Create or replace a dashboard",
+        "description": "PUT, for the same reason as a check-in form and a report: a dashboard owns only a layout and nothing references a widget, so replacing one cannot make anything else unreadable. Submitting the same body twice leaves it in the same state.",
+        "parameters": [
+          {
+            "name": "dashboardId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Dashboard"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Dashboard"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2011,6 +2094,101 @@
           }
         },
         "description": "A coach-authored arrangement of published views. Owns a LAYOUT and nothing else: every tile points at another context's published language and is resolved at render time, so a deleted indicator breaks one tile rather than the report."
+      },
+      "WidgetContent": {
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "indicator",
+              "upcoming-sessions",
+              "unjudged-proposals"
+            ]
+          },
+          "indicatorKind": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Required when kind=indicator. A D-08 reference, resolved at render time."
+          },
+          "fallbackLabel": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Required when kind=indicator."
+          }
+        }
+      },
+      "Widget": {
+        "type": "object",
+        "required": [
+          "id",
+          "x",
+          "y",
+          "width",
+          "height",
+          "content"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "x": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Grid CELLS, not pixels (D-04: cells for Dashboard). Column 0 is where the reader starts, which is the right-hand edge in a right-to-left locale."
+          },
+          "y": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "width": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "height": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "content": {
+            "$ref": "#/components/schemas/WidgetContent"
+          }
+        }
+      },
+      "Dashboard": {
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "columns",
+          "widgets"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "columns": {
+            "type": "integer",
+            "minimum": 4,
+            "maximum": 24,
+            "description": "On the DOCUMENT, not the renderer: a widget four columns wide means nothing without knowing four of how many. A renderer that assumed twelve would halve every layout authored against six."
+          },
+          "widgets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Widget"
+            },
+            "description": "Widgets MUST NOT overlap. Unlike a report's tiles, where list order is paint order, order carries nothing here \u2014 the layout is entirely in the coordinates."
+          }
+        }
       }
     }
   }

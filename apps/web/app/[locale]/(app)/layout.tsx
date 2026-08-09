@@ -80,6 +80,7 @@ export default async function AppLayout({
     { href: '/sessions', label: t('nav.sessions') },
     { href: '/check-in', label: t('nav.checkIn') },
     { href: '/report', label: t('nav.report') },
+    { href: '/layout', label: t('nav.layout') },
   ] as const
 
   return (

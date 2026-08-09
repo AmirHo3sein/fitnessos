@@ -28,6 +28,7 @@ export { createReferenceResolver, type ResolverDeps } from './adapters/reference
 export { createMeasurementAdapter } from './adapters/measurementAdapter'
 export { createLearningAdapter } from './adapters/learningAdapter'
 export { createReportAdapter } from './adapters/reportAdapter'
+export { createDashboardAdapter } from './adapters/dashboardAdapter'
 export {
   createPrescriptionAdapter,
   createPrescriptionWriteAdapter,

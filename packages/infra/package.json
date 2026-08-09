@@ -18,6 +18,7 @@
   "dependencies": {
     "@fitnessos/contracts": "workspace:*",
     "@fitnessos/core": "workspace:*",
+    "@fitnessos/ctx-dashboard": "workspace:*",
     "@fitnessos/ctx-measurement": "workspace:*",
     "@fitnessos/ctx-prescription": "workspace:*",
     "@fitnessos/ctx-report": "workspace:*",

@@ -45,6 +45,9 @@ importers:
       '@fitnessos/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@fitnessos/ctx-dashboard':
+        specifier: workspace:*
+        version: link:../../packages/ctx-dashboard
       '@fitnessos/ctx-measurement':
         specifier: workspace:*
         version: link:../../packages/ctx-measurement
@@ -539,6 +542,9 @@ importers:
       '@fitnessos/core':
         specifier: workspace:*
         version: link:../core
+      '@fitnessos/ctx-dashboard':
+        specifier: workspace:*
+        version: link:../ctx-dashboard
       '@fitnessos/ctx-measurement':
         specifier: workspace:*
         version: link:../ctx-measurement
