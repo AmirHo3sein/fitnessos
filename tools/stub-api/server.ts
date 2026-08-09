@@ -134,6 +134,28 @@ const checkInForms = new Map<string, unknown>()
 /** Reports, one per phone. Same reasoning: a report owns a layout and nothing references it. */
 const reports = new Map<string, unknown>()
 
+/**
+ * Deliberate faults, per phone and per route.
+ *
+ * ## Why this exists
+ *
+ * The client makes promises about its worst moments — "your changes are still here", "we could
+ * not load this", a session that expires and lands you on sign-in — and none of them had ever
+ * been observed working, because nothing could be made to fail on demand. The alternative was
+ * test-only code in the product, which is worse than an untested path.
+ *
+ * The fault belongs HERE, in the process that is already a fabrication. `tools/stub-api` never
+ * ships anywhere; making it lie on request costs the product nothing.
+ *
+ * Keyed by phone so faults are per-test and cannot leak between parallel workers, the same way
+ * every other piece of state in this file is.
+ */
+type Fault = 'server-error' | 'malformed' | 'unauthorized' | 'rate-limited'
+const faults = new Map<string, Map<string, Fault>>()
+
+const faultFor = (phone: string | null, routeKey: string): Fault | null =>
+  phone === null ? null : (faults.get(phone)?.get(routeKey) ?? null)
+
 /** Rendered verdicts, keyed by phone then by client id. Superseded ones are KEPT (ADR-0007). */
 const outcomes = new Map<string, Map<string, unknown>>()
 
@@ -544,6 +566,7 @@ const handlers: Record<string, (req: IncomingMessage, res: ServerResponse) => Pr
     outcomes.clear()
     checkInForms.clear()
     reports.clear()
+    faults.clear()
     res.writeHead(204).end()
     return Promise.resolve()
   },
@@ -752,6 +775,27 @@ const handlers: Record<string, (req: IncomingMessage, res: ServerResponse) => Pr
     res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(series))
   },
 
+  /**
+   * Arm a fault. Test-only, and alongside `__reset` rather than under `/api/v1` so it can never
+   * be mistaken for part of the contract.
+   */
+  'POST /__fault': async (req, res) => {
+    const phone = phoneFromToken(cookiesOf(req)['access_token'])
+    if (phone === null) {
+      problem(res, 401, 'unauthenticated', 'no valid session')
+      return
+    }
+    const body = (await readBody(req)) as { route?: string; fault?: Fault }
+    if (typeof body.route !== 'string' || body.fault === undefined) {
+      problem(res, 400, 'invalid_request', 'route and fault are required')
+      return
+    }
+    const mine = faults.get(phone) ?? new Map<string, Fault>()
+    mine.set(body.route, body.fault)
+    faults.set(phone, mine)
+    res.writeHead(204).end()
+  },
+
   'GET /api/v1/check-in-forms/current': async (req, res) => {
     const phone = phoneFromToken(cookiesOf(req)['access_token'])
     if (phone === null) {
@@ -910,7 +954,38 @@ createServer((req, res) => {
     .replace(/^\/api\/v1\/proposals\/[^/]+\/outcome$/, '/api/v1/proposals/:proposalId/outcome')
     .replace(/^\/api\/v1\/check-in-forms\/(?!current$)[^/]+$/, '/api/v1/check-in-forms/:formId')
     .replace(/^\/api\/v1\/reports\/(?!current$)[^/]+$/, '/api/v1/reports/:reportId')
-  const handler = handlers[`${req.method ?? 'GET'} ${path}`]
+  const routeKey = `${req.method ?? 'GET'} ${path}`
+  const handler = handlers[routeKey]
+
+  /*
+   * A fault is checked BEFORE the handler, so an armed route never touches stored state. A fault
+   * that ran the handler first would leave a session logged or a form saved while reporting a
+   * failure, and the test after it would start from a state the product never produced.
+   */
+  const fault = faultFor(phoneFromToken(cookiesOf(req)['access_token']), routeKey)
+  if (fault !== null) {
+    if (fault === 'server-error') {
+      problem(res, 500, 'internal_error', 'deliberate fault')
+      return
+    }
+    if (fault === 'unauthorized') {
+      // Every 401 the client cannot refresh past ends the session. Refresh is armed separately
+      // so a test can choose between "recovers" and "signed out".
+      problem(res, 401, 'unauthenticated', 'deliberate fault')
+      return
+    }
+    if (fault === 'rate-limited') {
+      res.writeHead(429, { 'content-type': 'application/json' })
+      res.end(JSON.stringify({ code: 'rate_limited', detail: 'deliberate fault' }))
+      return
+    }
+    // `malformed`: a 200 whose body does not match the published schema — the case ADR-0031
+    // exists for, and the one no other test can produce. Shaped like a plausible near-miss
+    // rather than nonsense, because that is what a real backend drift looks like.
+    res.writeHead(200, { 'content-type': 'application/json' })
+    res.end(JSON.stringify({ unexpected: true, id: 'not-a-uuid' }))
+    return
+  }
 
   if (!handler) {
     // 501, not 404. A 404 is a legitimate answer the client renders; this means the
