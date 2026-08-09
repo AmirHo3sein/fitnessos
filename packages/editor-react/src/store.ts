@@ -4,6 +4,7 @@ import {
   commitBoundary,
   createHistory,
   push,
+  pushBatch,
   redo as engineRedo,
   undo as engineUndo,
   type DocumentSnapshot,
@@ -65,6 +66,17 @@ export interface EditorStore {
   readonly subscribeEphemeral: (listener: () => void) => () => void
 
   readonly dispatch: (action: EditorAction, options: DispatchOptions) => void
+  /**
+   * Several actions as ONE undo entry.
+   *
+   * For commands that change many nodes at once — align, distribute, a multi-select nudge.
+   * Dispatching those one at a time produces one entry per node, so a single undo reverses only
+   * the last, and the user watches most of their command stay applied.
+   *
+   * Not the default, and not a wrapper every caller should reach for: a batch never coalesces,
+   * so routing typing through it would produce an entry per keystroke.
+   */
+  readonly dispatchBatch: (actions: readonly EditorAction[], options: DispatchOptions) => void
   readonly setEphemeral: (patch: Partial<Ephemeral>) => void
 
   readonly undo: () => void
@@ -120,6 +132,16 @@ export const createEditorStore = (config: EditorStoreConfig): EditorStore => {
 
     dispatch: (action, options) => {
       state = push(state, action, {
+        label: options.label,
+        at: now(),
+        id: newId(),
+        ...(options.boundary === undefined ? {} : { boundary: options.boundary }),
+      })
+      notify()
+    },
+
+    dispatchBatch: (actions, options) => {
+      state = pushBatch(state, actions, {
         label: options.label,
         at: now(),
         id: newId(),

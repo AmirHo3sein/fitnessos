@@ -9,6 +9,7 @@ import {
   commitBoundary,
   createHistory,
   push,
+  pushBatch,
   redo,
   undo,
 } from './history'
@@ -349,3 +350,133 @@ describe('the round-trip property', () => {
     )
   })
 })
+
+describe('batches', () => {
+  const move = (name: string, x: number): EditorAction => ({
+    type: 'SetProperty',
+    nodeId: id(name),
+    key: 'x',
+    value: x,
+  })
+
+  it('records several actions as ONE entry', () => {
+    /**
+     * The problem the Report Builder proved: aligning six tiles is one thing the user did, and
+     * `push` per tile produced twelve entries — so a single undo left five of them moved.
+     */
+    let h = createHistory(withNodes('a', 'b', 'c'), DEFAULT_HISTORY_CONFIG)
+    h = pushBatch(h, [move('a', 10), move('b', 10), move('c', 10)], opts('align', 1000))
+
+    expect(h.entries).toHaveLength(1)
+    expect(h.document.nodes[id('a')]?.props['x']).toBe(10)
+    expect(h.document.nodes[id('c')]?.props['x']).toBe(10)
+  })
+
+  it('one undo reverses the whole batch', () => {
+    let h = createHistory(withNodes('a', 'b', 'c'), DEFAULT_HISTORY_CONFIG)
+    h = push(h, move('a', 1), opts('first', 1000))
+    h = pushBatch(h, [move('a', 10), move('b', 10), move('c', 10)], opts('align', 20_000))
+
+    h = undo(h)
+
+    // Back to the state before the batch, not before the batch's first action.
+    expect(h.document.nodes[id('a')]?.props['x']).toBe(1)
+    expect(h.document.nodes[id('b')]?.props['x']).toBeUndefined()
+    expect(h.document.nodes[id('c')]?.props['x']).toBeUndefined()
+    expect(canUndo(h)).toBe(true)
+  })
+
+  it('unwinds in reverse, so two writes to ONE node restore the original', () => {
+    /**
+     * The ordering bug this is built to avoid. Inverses are computed against the document before
+     * each action and PREPENDED, so undo applies the last action's inverse first. Appending them
+     * instead restores the intermediate value — the same mistake coalescing had to avoid, and
+     * invisible unless a batch touches the same node twice.
+     */
+    let h = createHistory(withNodes('a'), DEFAULT_HISTORY_CONFIG)
+    h = push(h, move('a', 0), opts('set', 1000))
+    h = pushBatch(h, [move('a', 5), move('a', 9)], opts('batch', 20_000))
+
+    expect(h.document.nodes[id('a')]?.props['x']).toBe(9)
+    h = undo(h)
+    expect(h.document.nodes[id('a')]?.props['x']).toBe(0)
+  })
+
+  it('redo replays the batch in order', () => {
+    let h = createHistory(withNodes('a', 'b'), DEFAULT_HISTORY_CONFIG)
+    h = pushBatch(h, [move('a', 10), move('b', 20)], opts('align', 1000))
+    h = undo(h)
+    h = redo(h)
+
+    expect(h.document.nodes[id('a')]?.props['x']).toBe(10)
+    expect(h.document.nodes[id('b')]?.props['x']).toBe(20)
+  })
+
+  it('never coalesces into the entry before it', () => {
+    // A batch is a deliberate unit. Merging it into whatever came before would make one undo
+    // reverse a command and an unrelated edit together.
+    let h = createHistory(withNodes('a'), DEFAULT_HISTORY_CONFIG)
+    h = push(h, move('a', 1), opts('typing', 1000))
+    h = pushBatch(h, [move('a', 2), move('a', 3)], opts('align', 1010))
+
+    expect(h.entries).toHaveLength(2)
+  })
+
+  it('an empty batch is a no-op rather than an empty entry', () => {
+    // An entry with no actions is indistinguishable from a commit boundary, and it would make
+    // undo appear to do nothing.
+    const start = createHistory(withNodes('a'), DEFAULT_HISTORY_CONFIG)
+    expect(pushBatch(start, [], opts('nothing', 1000))).toBe(start)
+  })
+
+  it('a single-action batch behaves exactly like push, coalescing included', () => {
+    // Otherwise a caller that batched by habit would silently lose coalescing, and typing routed
+    // through it would produce one entry per keystroke.
+    let h = createHistory(withNodes('a'), DEFAULT_HISTORY_CONFIG)
+    h = pushBatch(h, [move('a', 1)], opts('e', 1000))
+    h = pushBatch(h, [move('a', 2)], opts('e', 1100))
+
+    expect(h.entries).toHaveLength(1)
+  })
+
+  it('restores the starting document for any batch, under fuzzing', () => {
+    const names = ['a', 'b', 'c']
+
+    fc.assert(
+      fc.property(fc.array(arbBatchAction(names), { minLength: 1, maxLength: 8 }), (actions) => {
+        const start = withNodes(...names)
+        let h = createHistory(start, DEFAULT_HISTORY_CONFIG)
+        h = pushBatch(h, actions, opts('batch', 1000))
+        h = undo(h)
+
+        expect(h.document.nodes).toEqual(start.nodes)
+        expect(h.document.rootIds).toEqual(start.rootIds)
+        expect(h.document.childIds).toEqual(start.childIds)
+      }),
+      { numRuns: 300 },
+    )
+  })
+})
+
+/**
+ * Property-test actions for a batch.
+ *
+ * Restricted to `SetProperty` and `MoveNodes` — the two a real batch command issues. Insertion
+ * and removal within one batch are not something any command does, and generating them would
+ * test a combination no caller can produce.
+ */
+const arbBatchAction = (names: readonly string[]): fc.Arbitrary<EditorAction> =>
+  fc.oneof(
+    fc.record({
+      type: fc.constant('SetProperty' as const),
+      nodeId: fc.constantFrom(...names).map(id),
+      key: fc.constantFrom('x', 'y'),
+      value: fc.integer({ min: -100, max: 100 }),
+    }),
+    fc.record({
+      type: fc.constant('MoveNodes' as const),
+      nodeIds: fc.constantFrom(...names).map((n) => [id(n)]),
+      toParentId: fc.constant(null),
+      toIndex: fc.integer({ min: 0, max: 2 }),
+    }),
+  )

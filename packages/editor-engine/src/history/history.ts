@@ -160,6 +160,69 @@ export const push = (
 }
 
 /**
+ * Several actions as ONE entry — a batch.
+ *
+ * ## Why this exists, and why it did not before
+ *
+ * `push` takes one action, and coalescing merges consecutive edits only when they share a
+ * target. That is right for typing and for dragging one tile, and it is wrong for a command that
+ * moves SEVERAL things at once: aligning six tiles is one thing the user did, and it produced
+ * twelve entries, so a single undo left five of them moved.
+ *
+ * The Report Builder surfaced it — the third consumer of this engine, which is what a third
+ * consumer is for. It is recorded that way rather than quietly added, because the handbook only
+ * accepts a change to this layer against a proven problem.
+ *
+ * The entry SHAPE needed nothing: `actions` and `inverses` were already arrays, because
+ * coalescing produces multi-action entries. This is the same shape reached deliberately.
+ *
+ * ## The ordering that makes undo correct
+ *
+ * Each inverse is computed against the document as it stands BEFORE its action — the only moment
+ * the information exists — and PREPENDED, so the stored order is newest-first. `undo` applies
+ * inverses in order, which therefore unwinds the last action first. Appending instead is the
+ * bug that makes a batched undo restore intermediate values, and it is the same mistake
+ * coalescing had to avoid.
+ *
+ * A batch never coalesces into the previous entry. It is a deliberate unit; merging it into
+ * whatever came before would make one undo reverse a command and an unrelated edit together.
+ */
+export const pushBatch = (
+  state: HistoryState,
+  actions: readonly EditorAction[],
+  options: PushOptions,
+): HistoryState => {
+  if (actions.length === 0) return state
+  if (actions.length === 1 && actions[0] !== undefined) return push(state, actions[0], options)
+
+  let document = state.document
+  const inverses: EditorAction[] = []
+  for (const action of actions) {
+    inverses.unshift(invertAction(document, action))
+    document = applyAction(document, action)
+  }
+
+  const entry: HistoryEntry = {
+    id: options.id,
+    label: options.label,
+    actions: [...actions],
+    inverses,
+    at: options.at,
+    boundary: options.boundary ?? false,
+  }
+
+  const entries = [...state.entries.slice(0, state.cursor), entry]
+  const cursor = entries.length
+
+  let checkpoints = state.checkpoints
+  if (cursor % state.config.checkpointEvery === 0) {
+    checkpoints = [...checkpoints, { index: cursor, document }]
+  }
+
+  return evict({ ...state, document, entries, cursor, checkpoints })
+}
+
+/**
  * Drop the oldest entries beyond the cap, keeping the nearest checkpoint at the truncation
  * boundary.
  *

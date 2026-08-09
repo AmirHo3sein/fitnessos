@@ -23,6 +23,9 @@ const LABELS: ReportBuilderLabels = {
   undo: 'Undo',
   redo: 'Redo',
   save: 'Save',
+  alignLeft: 'Align left',
+  alignTop: 'Align top',
+  distributeX: 'Distribute',
   newTileLabel: 'New tile',
   empty: 'This report is empty.',
 }
@@ -112,6 +115,22 @@ describe('commands', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Add tile' }))
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
     expect(screen.getByRole('button', { name: 'Undo' })).toBeEnabled()
+  })
+})
+
+describe('align and distribute', () => {
+  it('are disabled below the count that makes them mean anything', () => {
+    /*
+     * Aligning one thing to itself does nothing visible, and a button that appears to do nothing
+     * reads as broken. Distribute needs three: there is no gap to equalise between two.
+     *
+     * The selection cannot be built here — that needs hit testing, which needs a layout engine
+     * jsdom does not have. What this pins is the guard, which is the part that would rot
+     * silently.
+     */
+    mount()
+    expect(screen.getByRole('button', { name: 'Align left' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Distribute' })).toBeDisabled()
   })
 })
 
