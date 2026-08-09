@@ -97,6 +97,13 @@ export {
 } from './geometry/snapping'
 
 export {
+  clampToGrid,
+  compactGrid,
+  resolveCollisions,
+  type GridItem,
+} from './geometry/grid'
+
+export {
   align,
   distribute,
   type Alignment,
