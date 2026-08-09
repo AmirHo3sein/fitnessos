@@ -331,6 +331,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/reports/current": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The athlete's current report */
+        get: operations["getCurrentReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/{reportId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Create or replace a report
+         * @description PUT for the same reason as a check-in form: a report is not versioned. It owns only a layout, and nothing references a tile, so replacing one cannot make anything else unreadable. Submitting the same body twice leaves it in the same state, which is what makes a retry safe with no client-generated request id.
+         */
+        put: operations["saveReport"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -697,6 +734,34 @@ export interface components {
             id: string;
             title: string;
             fields: components["schemas"]["FormField"][];
+        };
+        TileContent: {
+            /** @enum {string} */
+            kind: "indicator" | "note";
+            /** @description Required when kind=indicator. The published series to chart -- a D-08 reference, resolved at render time. */
+            indicatorKind?: string;
+            /** @description Required when kind=indicator. The only renderable content when the reference cannot be resolved (D-08). */
+            fallbackLabel?: string;
+            /** @description Present when kind=note. */
+            text?: string;
+        };
+        ReportTile: {
+            /** Format: uuid */
+            id: string;
+            /** @description Document PIXELS (D-04: px for Report, grid cells for Dashboard, ms for Timeline). */
+            x: number;
+            y: number;
+            width: number;
+            height: number;
+            content: components["schemas"]["TileContent"];
+        };
+        /** @description A coach-authored arrangement of published views. Owns a LAYOUT and nothing else: every tile points at another context's published language and is resolved at render time, so a deleted indicator breaks one tile rather than the report. */
+        Report: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            /** @description Array ORDER IS PAINT ORDER -- which tile draws on top when two overlap. It must be preserved verbatim; sorting it changes the arrangement the coach made. */
+            tiles: components["schemas"]["ReportTile"][];
         };
     };
     responses: {
@@ -1289,6 +1354,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CheckInForm"];
+                };
+            };
+            /** @description invalid */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    getCurrentReport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ok */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Report"];
+                };
+            };
+            /** @description no report yet */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    saveReport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reportId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Report"];
+            };
+        };
+        responses: {
+            /** @description saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Report"];
                 };
             };
             /** @description invalid */

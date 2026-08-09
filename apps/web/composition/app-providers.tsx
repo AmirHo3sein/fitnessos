@@ -6,6 +6,7 @@ import { PrescriptionPortsProvider } from '@fitnessos/ctx-prescription/presentat
 import { ExecutionPortsProvider } from '@fitnessos/core/execution/presentation'
 import { MeasurementPortsProvider } from '@fitnessos/ctx-measurement/presentation'
 import { LearningPortsProvider } from '@fitnessos/core/learning/presentation'
+import { ReportPortsProvider } from '@fitnessos/ctx-report/presentation'
 import { useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useRef, type ReactNode } from 'react'
@@ -15,6 +16,7 @@ import { createPrescriptionPorts } from './prescription'
 import { createExecutionPorts } from './execution'
 import { createMeasurementPorts } from './measurement'
 import { createLearningPorts } from './learning'
+import { createReportPorts } from './report'
 import { createHttp } from './container'
 
 /**
@@ -88,6 +90,7 @@ export const AppProviders = ({ children }: { children: ReactNode }) => {
       // the athlete reloading. The record itself is already durable — this only shortens the wait.
       measurement: createMeasurementPorts(http, {}),
       learning: createLearningPorts(http, {}),
+      report: createReportPorts(http, {}),
       execution: createExecutionPorts(http, {}, () => {
         void queryClient.invalidateQueries({ queryKey: ['sync-issues'] })
       }),
@@ -100,7 +103,9 @@ export const AppProviders = ({ children }: { children: ReactNode }) => {
         <PrescriptionPortsProvider value={ports.prescription}>
           <MeasurementPortsProvider value={ports.measurement}>
             <LearningPortsProvider value={ports.learning}>
-              <ExecutionPortsProvider value={ports.execution}>{children}</ExecutionPortsProvider>
+              <ReportPortsProvider value={ports.report}>
+                <ExecutionPortsProvider value={ports.execution}>{children}</ExecutionPortsProvider>
+              </ReportPortsProvider>
             </LearningPortsProvider>
           </MeasurementPortsProvider>
         </PrescriptionPortsProvider>

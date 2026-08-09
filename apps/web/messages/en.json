@@ -6,7 +6,8 @@
       "programme": "Programme",
       "sessions": "Sessions",
       "settings": "Settings",
-      "checkIn": "Check-in"
+      "checkIn": "Check-in",
+      "report": "Report"
     }
   },
   "public": {
@@ -249,6 +250,29 @@
       },
       "newFieldLabel": "New question",
       "empty": "This form has no questions yet."
+    }
+  },
+  "report": {
+    "heading": "Report",
+    "title": "Report",
+    "none": "No report yet",
+    "noneHint": "A report is an arrangement of the athlete's published indicators. Each tile points at one; nothing is copied.",
+    "create": "Create one",
+    "loading": "Loading the report",
+    "saveFailed": "Your changes could not be saved. They are still here — try again.",
+    "newReportTitle": "Monthly review",
+    "builder": {
+      "heading": "Layout",
+      "addTile": "Add tile",
+      "removeTile": "Remove",
+      "undo": "Undo",
+      "redo": "Redo",
+      "save": "Save",
+      "alignLeft": "Align left",
+      "alignTop": "Align top",
+      "distributeX": "Space evenly",
+      "newTileLabel": "New tile",
+      "empty": "This report is empty."
     }
   }
 }

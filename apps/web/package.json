@@ -16,6 +16,7 @@
     "@fitnessos/core": "workspace:*",
     "@fitnessos/ctx-measurement": "workspace:*",
     "@fitnessos/ctx-prescription": "workspace:*",
+    "@fitnessos/ctx-report": "workspace:*",
     "@fitnessos/infra": "workspace:*",
     "@fitnessos/kernel": "workspace:*",
     "@fitnessos/telemetry": "workspace:*",

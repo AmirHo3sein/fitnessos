@@ -13,3 +13,4 @@
  */
 export * from './domain/Report'
 export * from './editor/schema'
+export * from './application/index'

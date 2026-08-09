@@ -1433,3 +1433,158 @@ test.describe('authoring a check-in form', () => {
     await expect(page.getByLabel('پرسش', { exact: true })).toHaveCount(2)
   })
 })
+
+test.describe('the report builder', () => {
+  const GOOD_CODE = '۰۰۰۰۰۰'
+
+  const phoneFor = (testCode: string, project: string) => {
+    const projectCode = project === 'chromium' ? '118' : '119'
+    const ascii = `0912${testCode}${projectCode}9`
+    return [...ascii].map((d) => '۰۱۲۳۴۵۶۷۸۹'[Number(d)]).join('')
+  }
+
+  const signIn = async (page: import('@playwright/test').Page, phone: string) => {
+    await page.goto('/sign-in')
+    await page.getByLabel('شماره‌ی موبایل').fill(phone)
+    await page.getByRole('button', { name: 'ارسال کد' }).click()
+    await page.getByLabel('کد تأیید').fill(GOOD_CODE)
+    await page.getByRole('button', { name: 'تأیید و ورود' }).click()
+    await expect(page).not.toHaveURL(/\/sign-in/)
+  }
+
+  const openBuilder = async (page: import('@playwright/test').Page, phone: string) => {
+    await signIn(page, phone)
+    await page.goto('/report')
+    await page.getByRole('button', { name: 'ساختن گزارش' }).click()
+    await expect(page.getByRole('button', { name: 'ذخیره' })).toBeVisible()
+  }
+
+  /** The tile's position, read from the DOM rather than from what we asked for. */
+  const positionOf = async (page: import('@playwright/test').Page, index = 0) => {
+    const tile = page.locator('[data-testid^="tile-"]').nth(index)
+    return tile.evaluate((el) => ({
+      x: Number.parseFloat((el as HTMLElement).style.left),
+      y: Number.parseFloat((el as HTMLElement).style.top),
+    }))
+  }
+
+  test('@critical a dragged tile lands where it was dropped, and persists', async ({ page }) => {
+    /*
+     * The test that can only exist here.
+     *
+     * jsdom returns zeros from `getBoundingClientRect`, has no compositor and stubs pointer
+     * capture — so the entire drag path (client point → screen → document, hit test, snap,
+     * commit) is untestable in the component tier, and a passing test there would be a false
+     * positive. This is the tier the handbook reserves for exactly that.
+     */
+    await openBuilder(page, phoneFor('111', test.info().project.name))
+
+    const canvas = page.getByTestId('report-canvas')
+    const box = await canvas.boundingBox()
+    expect(box).not.toBeNull()
+
+    const before = await positionOf(page)
+    await page.mouse.move(box!.x + before.x + 30, box!.y + before.y + 20)
+    await page.mouse.down()
+    // Several moves, not one: a single jump can be swallowed as a click, and a real drag is a
+    // stream of events.
+    await page.mouse.move(box!.x + 260, box!.y + 200, { steps: 10 })
+    await page.mouse.up()
+
+    const after = await positionOf(page)
+    expect(after.x).toBeGreaterThan(before.x + 100)
+    expect(after.y).toBeGreaterThan(before.y + 100)
+
+    await page.getByRole('button', { name: 'ذخیره' }).click()
+    await page.reload()
+    expect(await positionOf(page)).toEqual(after)
+  })
+
+  test('@critical one undo reverses a whole drag', async ({ page }) => {
+    // A spatial move writes x AND y. Without coalescing, undo would restore one and leave the
+    // other, and the tile would land somewhere the user never put it.
+    await openBuilder(page, phoneFor('222', test.info().project.name))
+
+    const box = (await page.getByTestId('report-canvas').boundingBox())!
+    const before = await positionOf(page)
+
+    await page.mouse.move(box.x + before.x + 30, box.y + before.y + 20)
+    await page.mouse.down()
+    await page.mouse.move(box.x + 300, box.y + 250, { steps: 10 })
+    await page.mouse.up()
+    expect((await positionOf(page)).x).not.toBe(before.x)
+
+    await page.getByRole('button', { name: 'واگرد' }).click()
+    expect(await positionOf(page)).toEqual(before)
+  })
+
+  test('@critical snapping aligns a tile to its neighbour', async ({ page }) => {
+    // The threshold is in SCREEN pixels, converted at query time. Dropping near an edge should
+    // land exactly on it rather than near it.
+    await openBuilder(page, phoneFor('333', test.info().project.name))
+    await page.getByRole('button', { name: 'افزودن کاشی' }).click()
+
+    const box = (await page.getByTestId('report-canvas').boundingBox())!
+    const first = await positionOf(page, 0)
+    const second = await positionOf(page, 1)
+
+    // Drag the second tile to a few pixels from the first tile's left edge.
+    await page.mouse.move(box.x + second.x + 20, box.y + second.y + 20)
+    await page.mouse.down()
+    await page.mouse.move(box.x + first.x + 3 + 20, box.y + 320, { steps: 10 })
+    await page.mouse.up()
+
+    expect((await positionOf(page, 1)).x).toBe(first.x)
+  })
+
+  test('@critical align is ONE undo for the whole selection', async ({ page }) => {
+    /*
+     * The reason `pushBatch` exists. Two tiles aligned is one thing the coach did; before the
+     * batch primitive this produced an entry per tile, so a single undo left one of them moved.
+     *
+     * ## Desktop only, and that is a finding rather than a convenience
+     *
+     * Multi-select is shift-click, and a touch device has no shift key — so on `mobile-rtl` the
+     * selection never exceeds one tile and align stays disabled. That is not a test problem: it
+     * means align and distribute are currently UNREACHABLE on touch, which the mobile project
+     * caught precisely because it runs the same specs.
+     *
+     * Skipped here rather than made to pass, because a test that reached past the UI to build a
+     * selection would report a capability the product does not have. Touch multi-select needs an
+     * affordance that does not exist yet — a selection mode, or long-press — and that is a design
+     * decision, not a fix to smuggle into a test file.
+     */
+    test.skip(
+      test.info().project.name !== 'chromium',
+      'multi-select is shift-click; a touch device has no shift key — see the note above',
+    )
+
+    await openBuilder(page, phoneFor('444', test.info().project.name))
+    await page.getByRole('button', { name: 'افزودن کاشی' }).click()
+
+    const box = (await page.getByTestId('report-canvas').boundingBox())!
+    const first = await positionOf(page, 0)
+    const second = await positionOf(page, 1)
+
+    // Move the second somewhere clearly different, then select both.
+    await page.mouse.move(box.x + second.x + 20, box.y + second.y + 20)
+    await page.mouse.down()
+    await page.mouse.move(box.x + 400, box.y + 330, { steps: 8 })
+    await page.mouse.up()
+    const moved = await positionOf(page, 1)
+    expect(moved.x).not.toBe(first.x)
+
+    await page.mouse.click(box.x + first.x + 20, box.y + first.y + 20)
+    await page.keyboard.down('Shift')
+    await page.mouse.click(box.x + moved.x + 20, box.y + moved.y + 20)
+    await page.keyboard.up('Shift')
+
+    await page.getByRole('button', { name: 'چپ‌چین' }).click()
+    expect((await positionOf(page, 1)).x).toBe(first.x)
+
+    // ONE undo, and BOTH are back.
+    await page.getByRole('button', { name: 'واگرد' }).click()
+    expect(await positionOf(page, 0)).toEqual(first)
+    expect(await positionOf(page, 1)).toEqual(moved)
+  })
+})
