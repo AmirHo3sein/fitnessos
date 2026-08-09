@@ -1,4 +1,4 @@
-import type { MeasurementPorts } from '@fitnessos/core/measurement'
+import type { MeasurementPorts } from '@fitnessos/ctx-measurement'
 import { createMeasurementAdapter } from '@fitnessos/infra'
 import type { AuthContext, HttpClient } from './container'
 

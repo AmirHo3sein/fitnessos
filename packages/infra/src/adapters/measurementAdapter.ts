@@ -3,7 +3,7 @@ import type {
   MeasurementWritePort,
   ObservationSnapshot,
   RecordObservationInput,
-} from '@fitnessos/core/measurement'
+} from '@fitnessos/ctx-measurement'
 import type { AuthContext, HttpClient } from '../http/client'
 import {
   indicatorsFrom,

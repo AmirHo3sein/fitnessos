@@ -22,4 +22,11 @@ export * from './domain/Acquisition'
 export * from './domain/IndicatorKind'
 export * from './domain/Observation'
 export * from './domain/oneRepMax'
+export * from './domain/CheckInForm'
 export * from './application/index'
+
+/**
+ * The editor. Measurement graduated to its own package for this (handbook §2.1): a context
+ * graduates when it acquires one.
+ */
+export * from './editor/schema'

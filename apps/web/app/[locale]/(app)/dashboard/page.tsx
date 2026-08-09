@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { getTranslations } from 'next-intl/server'
 import { AthleteSummary } from '@fitnessos/core/athlete/presentation'
-import { IndicatorList } from '@fitnessos/core/measurement/presentation'
+import { IndicatorList } from '@fitnessos/ctx-measurement/presentation'
 import { UnjudgedHypotheses } from '@fitnessos/core/learning/presentation'
 import { hasLocale } from 'next-intl'
 import { routing } from '../../../../src/i18n/routing'
