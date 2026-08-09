@@ -39,6 +39,11 @@ jobs:
       # Stage 12 — every spec, both projects. Includes the accessibility scans that do not gate
       # a PR: a contrast regression on a page a change did not touch should be caught the same
       # day rather than blocking someone who did not cause it.
+      #
+      # Also includes `visual.spec.ts`. Its baselines are PER PLATFORM — font rasterisation
+      # differs between a laptop and this container — so the images committed from a developer's
+      # machine are not consulted here. The first run on a new platform writes its own and
+      # reports them as missing rather than failing; commit those from the run's artefact.
       - name: e2e:full
         run: pnpm --filter @fitnessos/web e2e:full
 

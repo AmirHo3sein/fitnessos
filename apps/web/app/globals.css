@@ -13,10 +13,20 @@
   Every GRADUATED context, and one glob rather than three named ones so the next graduation is
   covered by existing config rather than by someone remembering.
 
-  These were missing, and the failure was exactly what the note above describes — silently, for
-  three packages at once. The Report Builder's canvas is `h-[520px]`; that class existed nowhere
-  else, so it was absent from the stylesheet and the canvas laid out two pixels tall. Everything
-  still "worked": the e2e drove drags with absolute coordinates, and axe does not check layout.
-  What gave it away was a Playwright bounding box reporting a height of 2.
+  ## A correction to why this was added
+
+  It went in after the Report Builder's canvas — `h-[520px]`, a class used nowhere else — laid
+  out TWO PIXELS TALL while every test passed. Adding these globs and rebuilding fixed it, and
+  the commit message said the missing globs were the cause.
+
+  That attribution was not verified, and it does not hold. Removing this line and rebuilding
+  from scratch produces the class correctly: Tailwind v4 discovers sources under the project
+  root on its own, so these globs are largely redundant. The real cause was more likely a stale
+  build, possibly interacting with a dependency upgrade that happened around the same time.
+
+  The line stays regardless. Explicit sources cost nothing, they survive a change in Tailwind's
+  auto-detection, and the `@source` above for `packages/ui` exists on exactly that reasoning.
+  What is removed is the false confidence: `e2e/visual.spec.ts` is what actually guards this
+  now, and it is probe-verified to catch a canvas that loses its height.
 */
 @source '../../../packages/ctx-*/src/**/*.{ts,tsx}';
