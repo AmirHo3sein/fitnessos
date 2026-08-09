@@ -565,6 +565,127 @@
           }
         }
       }
+    },
+    "/proposals": {
+      "get": {
+        "operationId": "listProposals",
+        "tags": [
+          "learning"
+        ],
+        "summary": "Proposals made for this athlete, decided and undecided",
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Proposal"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/outcomes": {
+      "get": {
+        "operationId": "listOutcomes",
+        "tags": [
+          "learning"
+        ],
+        "summary": "Rendered verdicts, INCLUDING superseded ones",
+        "description": "Superseded outcomes are returned deliberately. A corrected verdict that vanished would make the correction invisible, which is the opposite of what the supersede rule is for (ADR-0007). Which of them a reader sees is a presentation decision.",
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DecisionOutcome"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/proposals/{proposalId}/outcome": {
+      "post": {
+        "operationId": "renderVerdict",
+        "tags": [
+          "learning"
+        ],
+        "summary": "Record whether the proposal's hypothesis held",
+        "description": "NOT 'accept a proposal'. Accepting is the moment of change and belongs to the changing context: it produces a new ProgramVersion whose authoringDecision records proposedBy=assistant and decidedBy=<the human> (ADR-0010). This records the later verdict on whether the claim turned out to be true.\\n\\nIdempotent by client-supplied id, 200 on replay. A correction supplies `supersedes` and creates a NEW outcome; the superseded one must remain readable.",
+        "parameters": [
+          {
+            "name": "proposalId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenderVerdictBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "recorded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecisionOutcome"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "this id was already stored -- a replay",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecisionOutcome"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1375,6 +1496,167 @@
           }
         },
         "description": "A published derived indicator (ADR-0013). DERIVED on read and never stored (ADR-0006): the server computes it from observations and performed sessions when asked. Prescription consumes this to resolve progression, which is why it is a published language rather than an internal shape."
+      },
+      "Hypothesis": {
+        "type": "object",
+        "required": [
+          "indicatorKind",
+          "claim",
+          "horizon"
+        ],
+        "properties": {
+          "indicatorKind": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An indicator kind Measurement publishes. Open vocabulary (ADR-0020)."
+          },
+          "claim": {
+            "type": "string",
+            "minLength": 1,
+            "description": "What is expected to happen. Falsifiable, or the record of WHY (ADR-0003) degrades into a record of clicks."
+          },
+          "horizon": {
+            "type": "string",
+            "format": "date",
+            "description": "When the claim becomes answerable. Must be after proposedOn -- a claim already due at the moment of proposing arrives in the unjudged list before the change has had any chance to act."
+          }
+        },
+        "description": "The obligation to find out whether a change worked (ADR-0007). A value object on the proposal, never an aggregate."
+      },
+      "Proposal": {
+        "type": "object",
+        "required": [
+          "id",
+          "targetKind",
+          "targetId",
+          "summary",
+          "rationale",
+          "hypothesis",
+          "proposedOn"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "targetKind": {
+            "type": "string",
+            "enum": [
+              "program",
+              "goal",
+              "session"
+            ],
+            "description": "A coarse published vocabulary (ADR-0023). Deliberately not 'which aggregate' -- that would put another context's model inside Learning, which ADR-0019 forbids."
+          },
+          "targetId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque to Learning. The screen that shows the proposal dereferences it; Learning never does."
+          },
+          "summary": {
+            "type": "string",
+            "minLength": 1
+          },
+          "rationale": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Why. Required, not optional: a suggestion with no stated reason carries authority while being unreviewable."
+          },
+          "hypothesis": {
+            "$ref": "#/components/schemas/Hypothesis"
+          },
+          "proposedOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "decidedOn": {
+            "type": "string",
+            "format": "date",
+            "description": "Absent while undecided. The moment of change is recorded in the CHANGING context (ADR-0010); this is reported back only so the client can stop offering a decision already made."
+          },
+          "accepted": {
+            "type": "boolean",
+            "description": "Absent while undecided."
+          }
+        }
+      },
+      "DecisionOutcome": {
+        "type": "object",
+        "required": [
+          "id",
+          "proposalId",
+          "verdict",
+          "rationale",
+          "decidedBy",
+          "decidedOn"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "proposalId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "verdict": {
+            "type": "string",
+            "enum": [
+              "held",
+              "did-not-hold"
+            ],
+            "description": "Two members. A third meaning 'not yet' is already represented by there being no DecisionOutcome at all, and adding it would give one state two spellings."
+          },
+          "rationale": {
+            "type": "string",
+            "minLength": 1
+          },
+          "decidedBy": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A human. An assistant may propose; it may not conclude (ADR-0003)."
+          },
+          "decidedOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "supersedes": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Set when this corrects an earlier verdict. The earlier one is PRESERVED and still returned by GET /outcomes -- a correction that hid what it replaced would make the correction invisible (ADR-0007)."
+          }
+        }
+      },
+      "RenderVerdictBody": {
+        "type": "object",
+        "required": [
+          "id",
+          "verdict",
+          "rationale"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "CLIENT-generated UUIDv7 (ADR-0010). A repeat of a stored id MUST return 200 with that outcome, never a second one."
+          },
+          "verdict": {
+            "type": "string",
+            "enum": [
+              "held",
+              "did-not-hold"
+            ]
+          },
+          "rationale": {
+            "type": "string",
+            "minLength": 1
+          },
+          "supersedes": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Present when correcting. The superseded outcome MUST NOT be deleted or mutated."
+          }
+        }
       }
     }
   }

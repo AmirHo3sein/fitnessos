@@ -26,6 +26,7 @@ export { createAthleteWriteAdapter } from './adapters/athleteWriteAdapter'
 export { createGoalAdapter } from './adapters/goalAdapter'
 export { createReferenceResolver, type ResolverDeps } from './adapters/referenceResolver'
 export { createMeasurementAdapter } from './adapters/measurementAdapter'
+export { createLearningAdapter } from './adapters/learningAdapter'
 export {
   createPrescriptionAdapter,
   createPrescriptionWriteAdapter,

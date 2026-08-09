@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { getTranslations } from 'next-intl/server'
 import { AthleteSummary } from '@fitnessos/core/athlete/presentation'
 import { IndicatorList } from '@fitnessos/core/measurement/presentation'
+import { UnjudgedHypotheses } from '@fitnessos/core/learning/presentation'
 import { hasLocale } from 'next-intl'
 import { routing } from '../../../../src/i18n/routing'
 import { enableStaticRendering } from '../../../../src/i18n/static'
@@ -53,6 +54,7 @@ export default async function DashboardPage({
   const t = await getTranslations('athlete.summary')
   const page = await getTranslations('dashboard')
   const indicators = await getTranslations('measurement')
+  const unjudged = await getTranslations('learning.unjudged')
 
   /*
    * Today, resolved on the SERVER and passed down.
@@ -83,6 +85,31 @@ export default async function DashboardPage({
             noCeiling: t('noCeiling'),
             loading: t('loading'),
             failed: t('failed'),
+          }}
+        />
+      </div>
+
+      {/*
+        ABOVE the indicators. An unanswered obligation is a question the coach owes an answer to;
+        the indicators are information they can browse. Putting the debt below the browsing is how
+        it stops being read.
+      */}
+      <div className="mt-6">
+        <UnjudgedHypotheses
+          locale={hasLocale(routing.locales, locale) ? locale : routing.defaultLocale}
+          asOf={asOf}
+          labels={{
+            title: unjudged('title'),
+            intro: unjudged('intro'),
+            claim: unjudged('claim'),
+            dueOn: unjudged('dueOn'),
+            overdue: unjudged('overdue'),
+            held: unjudged('held'),
+            didNotHold: unjudged('didNotHold'),
+            rationaleLabel: unjudged('rationaleLabel'),
+            rationalePlaceholder: unjudged('rationalePlaceholder'),
+            submit: unjudged('submit'),
+            rationaleRequired: unjudged('rationaleRequired'),
           }}
         />
       </div>

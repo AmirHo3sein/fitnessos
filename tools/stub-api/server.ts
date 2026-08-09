@@ -37,8 +37,11 @@ import {
   ProblemSchema,
   ProgramSchema,
   RequestCodeBodySchema,
+  DecisionOutcomeSchema,
   IndicatorSeriesSchema,
   ObservationSchema,
+  ProposalSchema,
+  RenderVerdictBodySchema,
   RecordObservationBodySchema,
   RequestCodeResultSchema,
   ReviseProgramBodySchema,
@@ -122,6 +125,50 @@ const revisions = new Map<string, { current: unknown; versions: Map<string, unkn
 
 /** Recorded measurements, keyed by phone then by the CLIENT-supplied id (ADR-0010). */
 const observations = new Map<string, Map<string, unknown>>()
+
+/** Rendered verdicts, keyed by phone then by client id. Superseded ones are KEPT (ADR-0007). */
+const outcomes = new Map<string, Map<string, unknown>>()
+
+/**
+ * A proposal every athlete has, accepted, whose horizon has already passed.
+ *
+ * Seeded rather than generated so the unjudged-hypothesis view has something real to surface on
+ * the first request. Dates are fixed, because a fixture computed from today's date makes a
+ * failure unreproducible tomorrow.
+ */
+const proposalsFor = (phone: string) => {
+  const digits = phone.replace(/\D/g, '').slice(-12)
+  return [
+    {
+      id: `018f2c8a-000b-7000-8000-${digits}`,
+      targetKind: 'program',
+      targetId: `018f2c8a-0003-7000-8000-${digits}`,
+      summary: 'Raise the accumulation block to 5% per cycle',
+      rationale: 'Both recent blocks finished at the top of the prescribed range',
+      hypothesis: {
+        indicatorKind: 'estimated-1rm',
+        claim: 'Back squat estimate rises by at least 5kg',
+        horizon: '2026-01-10',
+      },
+      proposedOn: '2025-12-01',
+      decidedOn: '2025-12-02',
+      accepted: true,
+    },
+    {
+      id: `018f2c8a-000c-7000-8000-${digits}`,
+      targetKind: 'program',
+      targetId: `018f2c8a-0003-7000-8000-${digits}`,
+      summary: 'Add a deload week before the next block',
+      rationale: 'Session RPE has risen for three consecutive weeks at the same load',
+      hypothesis: {
+        indicatorKind: 'estimated-1rm',
+        claim: 'The estimate holds rather than falling through the deload',
+        horizon: '2027-06-01',
+      },
+      proposedOn: '2026-08-01',
+    },
+  ]
+}
 
 /**
  * A phone whose last digit is 9 gets a programme; everyone else gets none.
@@ -486,6 +533,7 @@ const handlers: Record<string, (req: IncomingMessage, res: ServerResponse) => Pr
     loggedPrescribed.clear()
     revisions.clear()
     observations.clear()
+    outcomes.clear()
     res.writeHead(204).end()
     return Promise.resolve()
   },
@@ -694,6 +742,72 @@ const handlers: Record<string, (req: IncomingMessage, res: ServerResponse) => Pr
     res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(series))
   },
 
+  'GET /api/v1/proposals': async (req, res) => {
+    const phone = phoneFromToken(cookiesOf(req)['access_token'])
+    if (phone === null) {
+      problem(res, 401, 'unauthenticated', 'no valid session')
+      return
+    }
+    const list = proposalsFor(phone)
+    for (const one of list) {
+      const parsed = ProposalSchema.safeParse(one)
+      if (!parsed.success) {
+        problem(res, 500, 'bad_fixture', 'a proposal fixture does not match the contract')
+        return
+      }
+    }
+    res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(list))
+  },
+
+  'GET /api/v1/outcomes': async (req, res) => {
+    const phone = phoneFromToken(cookiesOf(req)['access_token'])
+    if (phone === null) {
+      problem(res, 401, 'unauthenticated', 'no valid session')
+      return
+    }
+    // Superseded outcomes included, deliberately. A correction that hid what it replaced would
+    // make the correction invisible (ADR-0007).
+    const list = [...(outcomes.get(phone) ?? new Map()).values()]
+    res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(list))
+  },
+
+  'POST /api/v1/proposals/:proposalId/outcome': async (req, res) => {
+    const phone = phoneFromToken(cookiesOf(req)['access_token'])
+    if (phone === null) {
+      problem(res, 401, 'unauthenticated', 'no valid session')
+      return
+    }
+
+    const body = RenderVerdictBodySchema.safeParse(await readBody(req))
+    if (!body.success) {
+      problem(res, 400, 'invalid_request', body.error.issues[0]?.message ?? 'invalid')
+      return
+    }
+
+    const proposalId = ((req.url ?? '').split('?')[0] ?? '').split('/')[4] ?? ''
+    const mine = outcomes.get(phone) ?? new Map<string, unknown>()
+
+    const stored = mine.get(body.data.id)
+    if (stored !== undefined) {
+      send(res, 200, DecisionOutcomeSchema, stored)
+      return
+    }
+
+    const record = {
+      id: body.data.id,
+      proposalId,
+      verdict: body.data.verdict,
+      rationale: body.data.rationale,
+      decidedBy: 'coach-1',
+      decidedOn: new Date().toISOString().slice(0, 10),
+      ...(body.data.supersedes === undefined ? {} : { supersedes: body.data.supersedes }),
+    }
+    // The superseded outcome is NOT removed. It stays readable, which is the whole point.
+    mine.set(body.data.id, record)
+    outcomes.set(phone, mine)
+    send(res, 201, DecisionOutcomeSchema, record)
+  },
+
   'GET /api/v1/athletes/me': async (req, res) => {
     // The check that makes the forged-cookie e2e meaningful. A cookie that is present
     // but not one this server issued is refused — which is what the real backend does
@@ -714,10 +828,9 @@ createServer((req, res) => {
   // introduce a router for a single parameterised path, the id is folded back into the literal
   // key it was written with — the id itself is not needed, since programme state is keyed by
   // phone like everything else here.
-  const path = raw.replace(
-    /^\/api\/v1\/programs\/[^/]+\/versions$/,
-    '/api/v1/programs/:programId/versions',
-  )
+  const path = raw
+    .replace(/^\/api\/v1\/programs\/[^/]+\/versions$/, '/api/v1/programs/:programId/versions')
+    .replace(/^\/api\/v1\/proposals\/[^/]+\/outcome$/, '/api/v1/proposals/:proposalId/outcome')
   const handler = handlers[`${req.method ?? 'GET'} ${path}`]
 
   if (!handler) {
