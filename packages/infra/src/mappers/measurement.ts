@@ -3,7 +3,7 @@ import type {
   IndicatorSeriesSnapshot,
   ObservationSnapshot,
   RecordObservationInput,
-} from '@fitnessos/core/measurement'
+} from '@fitnessos/ctx-measurement'
 import {
   IndicatorSeriesSchema,
   ObservationSchema,

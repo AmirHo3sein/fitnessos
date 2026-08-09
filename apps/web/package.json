@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@fitnessos/core": "workspace:*",
+    "@fitnessos/ctx-measurement": "workspace:*",
     "@fitnessos/ctx-prescription": "workspace:*",
     "@fitnessos/infra": "workspace:*",
     "@fitnessos/kernel": "workspace:*",

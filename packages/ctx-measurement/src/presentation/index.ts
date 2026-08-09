@@ -5,3 +5,8 @@ export {
   type IndicatorLabels,
   type IndicatorListProps,
 } from './views/IndicatorList'
+export {
+  FormBuilder,
+  type FormBuilderLabels,
+  type FormBuilderProps,
+} from './views/FormBuilder'
