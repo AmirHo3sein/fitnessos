@@ -1,4 +1,5 @@
 import type {
+  CheckInFormSnapshot,
   IndicatorSeriesSnapshot,
   MeasurementPorts,
   ObservationSnapshot,
@@ -8,6 +9,7 @@ export const measurementKeys = {
   all: ['measurement'] as const,
   observations: () => [...measurementKeys.all, 'observations'] as const,
   indicators: () => [...measurementKeys.all, 'indicators'] as const,
+  checkInForm: () => [...measurementKeys.all, 'check-in-form'] as const,
 } as const
 
 export interface QueryDefinition<T> {
@@ -33,6 +35,16 @@ export const indicatorsQuery = (
   // observations, so it moves when a session is logged — without the athlete recording anything
   // here at all.
   staleTime: 60_000,
+})
+
+export const checkInFormQuery = (
+  ports: MeasurementPorts,
+): QueryDefinition<CheckInFormSnapshot | null> => ({
+  queryKey: measurementKeys.checkInForm(),
+  queryFn: ({ signal }) => ports.measurement.checkInForm(signal),
+  // Long. A form changes when a coach authors one, which is rare, and the editor sets the cache
+  // from the save response rather than waiting for a refetch.
+  staleTime: 5 * 60_000,
 })
 
 export interface Invalidator {

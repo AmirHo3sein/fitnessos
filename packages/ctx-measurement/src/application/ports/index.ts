@@ -1,5 +1,6 @@
 import type { AthleteId, ObservationId, PlainDate } from '@fitnessos/kernel'
 import type { IndicatorKind } from '../../domain/IndicatorKind'
+import type { AnswerShape } from '../../domain/CheckInForm'
 
 /**
  * Measurement — ports.
@@ -72,7 +73,31 @@ export interface RecordObservationInput {
   readonly acquisition: AcquisitionSnapshot
 }
 
+/**
+ * The check-in form, as the wire carries it.
+ *
+ * Structurally identical to `FormSnapshot` in `editor/schema.ts`, and deliberately a separate
+ * declaration: one is what the editor round-trips, the other is what crosses the boundary, and
+ * collapsing them would make a wire change a change to the editor's document schema.
+ */
+export interface CheckInFormSnapshot {
+  readonly id: string
+  readonly title: string
+  readonly fields: readonly FormFieldSnapshot[]
+}
+
+export interface FormFieldSnapshot {
+  readonly id: string
+  readonly label: string
+  readonly records: IndicatorKind
+  readonly unit: string
+  readonly answer: AnswerShape
+  readonly order: number
+}
+
 export interface MeasurementReadPort {
+  /** The athlete's current check-in form, or null when a coach has not authored one. */
+  readonly checkInForm: (signal?: AbortSignal) => Promise<CheckInFormSnapshot | null>
   /** The athlete's recorded observations. Filtering and windowing are the server's business. */
   readonly observations: (signal?: AbortSignal) => Promise<readonly ObservationSnapshot[]>
   /**
@@ -86,6 +111,18 @@ export interface MeasurementReadPort {
 }
 
 export interface MeasurementWritePort {
+  /**
+   * Create or replace the check-in form.
+   *
+   * A replace rather than a revision: a form is not versioned, because observations reference an
+   * indicator kind rather than a field id, so editing one cannot make an existing observation
+   * unreadable. That is the whole reason this needs no client-generated id and no conflict
+   * handling, and a programme revision needs both.
+   */
+  readonly saveCheckInForm: (
+    form: CheckInFormSnapshot,
+    signal?: AbortSignal,
+  ) => Promise<CheckInFormSnapshot>
   /**
    * Record a measurement.
    *

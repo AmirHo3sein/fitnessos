@@ -5,7 +5,8 @@
       "dashboard": "Dashboard",
       "programme": "Programme",
       "sessions": "Sessions",
-      "settings": "Settings"
+      "settings": "Settings",
+      "checkIn": "Check-in"
     }
   },
   "public": {
@@ -220,6 +221,34 @@
       "rationalePlaceholder": "What you observed, in your own words",
       "submit": "Record",
       "rationaleRequired": "A verdict needs a reason."
+    }
+  },
+  "checkIn": {
+    "heading": "Check-in form",
+    "title": "Check-in form",
+    "none": "No check-in form yet",
+    "noneHint": "A check-in form is how a self-reported measurement is recorded. Each question becomes an observation.",
+    "create": "Create one",
+    "loading": "Loading the form",
+    "saveFailed": "Your changes could not be saved. They are still here — try again.",
+    "newFormTitle": "Morning check-in",
+    "builder": {
+      "heading": "Questions",
+      "addField": "Add question",
+      "removeField": "Remove",
+      "undo": "Undo",
+      "redo": "Redo",
+      "save": "Save",
+      "fieldLabel": "Question",
+      "records": "Records",
+      "unit": "Unit",
+      "answerKind": {
+        "number": "Number",
+        "scale": "Scale",
+        "choice": "Choice"
+      },
+      "newFieldLabel": "New question",
+      "empty": "This form has no questions yet."
     }
   }
 }

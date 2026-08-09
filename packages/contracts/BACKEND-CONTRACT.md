@@ -257,7 +257,20 @@ fields are reported back to Learning as a consequence, not written by it (ADR-00
 If an accept endpoint appears under `/proposals`, that is Learning writing another context's
 model, and the boundary is gone.
 
-### 4.5 `GET /indicators` must derive on read
+### 4.5 `PUT /check-in-forms/{id}` is a replace, and that is deliberate
+
+A check-in form is **not versioned**, unlike a `ProgramVersion`. Observations reference an
+indicator KIND, not a field id, so editing a form cannot make an existing observation
+unreadable — which is the entire reason programme versions are immutable.
+
+So this is a `PUT` with no client-generated request id and no conflict handling: submitting the
+same body twice must leave the form in the same state, and that is what makes a retry safe.
+
+**Do not** add versioning here by analogy with programmes. It would create a second immutable
+lineage nothing reads, and it would push the client into idempotency-key handling it does not
+need.
+
+### 4.6 `GET /indicators` must derive on read
 
 Not a gap — a requirement stated here because it is the one thing about Measurement a schema
 cannot express, and the one thing most likely to be "optimised" away.

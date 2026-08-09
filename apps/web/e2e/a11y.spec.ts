@@ -51,9 +51,25 @@ const expectNoViolations = async (page: Page) => {
   expect(readable).toEqual([])
 }
 
-const signIn = async (page: Page) => {
+/**
+ * A phone unique to this test AND this project, for tests that WRITE.
+ *
+ * Most scans here are read-only and share `PHONE`. Authoring a check-in form is not: chromium
+ * and mobile-rtl run the same specs against one stub process, so the first project to create a
+ * form left the second with no "create" button and a thirty-second timeout. The same isolation
+ * trap the session-logging tests hit, and the same fix.
+ *
+ * 0912 + testCode(3) + projectCode(3) + '9' = 11 digits, which is what an Iranian mobile is.
+ */
+const phoneFor = (testCode: string, project: string) => {
+  const projectCode = project === 'chromium' ? '116' : '117'
+  const ascii = `0912${testCode}${projectCode}9`
+  return [...ascii].map((d) => '۰۱۲۳۴۵۶۷۸۹'[Number(d)]).join('')
+}
+
+const signIn = async (page: Page, phone: string = PHONE) => {
   await page.goto('/sign-in')
-  await page.getByLabel('شماره‌ی موبایل').fill(PHONE)
+  await page.getByLabel('شماره‌ی موبایل').fill(phone)
   await page.getByRole('button', { name: 'ارسال کد' }).click()
   await page.getByLabel('کد تأیید').fill(GOOD_CODE)
   await page.getByRole('button', { name: 'تأیید و ورود' }).click()
@@ -104,6 +120,18 @@ test.describe('every page passes WCAG 2.1 AA', () => {
 
     await page.getByRole('button', { name: 'ثبت این جلسه' }).first().click()
     await expect(page.getByRole('button', { name: 'ثبت جلسه' })).toBeVisible()
+    await expectNoViolations(page)
+  })
+
+  test('@critical the check-in form builder', async ({ page }) => {
+    // The second editor, scanned in both its states: the empty one a coach lands on, and the
+    // builder they create.
+    await signIn(page, phoneFor('111', test.info().project.name))
+    await page.goto('/check-in')
+    await expectNoViolations(page)
+
+    await page.getByRole('button', { name: 'ساختن فرم' }).click()
+    await expect(page.getByRole('button', { name: 'ذخیره' })).toBeVisible()
     await expectNoViolations(page)
   })
 

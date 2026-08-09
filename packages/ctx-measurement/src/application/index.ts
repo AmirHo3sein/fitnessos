@@ -1,5 +1,7 @@
 export type {
   AcquisitionSnapshot,
+  CheckInFormSnapshot,
+  FormFieldSnapshot,
   IndicatorPoint,
   IndicatorSeriesSnapshot,
   MeasurementPorts,
@@ -23,6 +25,7 @@ export {
 } from './readmodels/IndicatorSeriesView'
 
 export {
+  checkInFormQuery,
   indicatorsQuery,
   measurementInvalidations,
   measurementKeys,

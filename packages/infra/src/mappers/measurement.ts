@@ -1,10 +1,12 @@
 import type {
   AcquisitionSnapshot,
+  CheckInFormSnapshot,
   IndicatorSeriesSnapshot,
   ObservationSnapshot,
   RecordObservationInput,
 } from '@fitnessos/ctx-measurement'
 import {
+  CheckInFormSchema,
   IndicatorSeriesSchema,
   ObservationSchema,
   RecordObservationBodySchema,
@@ -139,3 +141,76 @@ const _recordAgrees: FieldsAgree<ContractRecordBody, ValidatedRecordBody> = true
 void _observationAgrees
 void _seriesAgrees
 void _recordAgrees
+
+type ContractForm = components['schemas']['CheckInForm']
+type ValidatedForm = z.infer<typeof CheckInFormSchema>
+
+/**
+ * The answer shape, flat on the wire and reassembled here.
+ *
+ * The contract flattens the union rather than using `oneOf`, so absent bounds and absent options
+ * both mean "this variant does not have them". Defaulted rather than left undefined, because the
+ * application type declares them required per variant and `undefined` would leak into a chart
+ * axis as NaN.
+ */
+const answerShapeFrom = (raw: ValidatedForm['fields'][number]['answer']) => {
+  if (raw.kind === 'scale') return { kind: 'scale' as const, min: raw.min ?? 1, max: raw.max ?? 5 }
+  if (raw.kind === 'choice') return { kind: 'choice' as const, options: raw.options ?? [] }
+  return { kind: 'number' as const }
+}
+
+export const checkInFormFrom = (raw: unknown): CheckInFormSnapshot => {
+  const c = parseContract(CheckInFormSchema, raw, 'CheckInForm')
+  return {
+    id: c.id,
+    title: c.title,
+    // Sorted here as well as in the aggregate. The contract promises no order, and a form
+    // rendered in arrival order asks its questions in a sequence nobody chose.
+    fields: [...c.fields]
+      .sort((a, b) => a.order - b.order)
+      .map((field) => ({
+        id: field.id,
+        label: field.label,
+        records: field.records,
+        unit: field.unit,
+        answer: answerShapeFrom(field.answer),
+        order: field.order,
+      })),
+  }
+}
+
+/**
+ * Outbound, validated before it is sent.
+ *
+ * The `absent, not null` direction again: `min`, `max` and `options` are constrained, so sending
+ * them as null for a variant that has none would be refused for fields the coach never filled in.
+ */
+export const checkInFormBodyFrom = (form: CheckInFormSnapshot): ValidatedForm => {
+  const body = {
+    id: form.id,
+    title: form.title,
+    fields: form.fields.map((field) => ({
+      id: field.id,
+      label: field.label,
+      records: field.records,
+      unit: field.unit,
+      answer:
+        field.answer.kind === 'scale'
+          ? { kind: 'scale', min: field.answer.min, max: field.answer.max }
+          : field.answer.kind === 'choice'
+            ? { kind: 'choice', options: [...field.answer.options] }
+            : { kind: 'number' },
+      order: field.order,
+    })),
+  }
+  return parseContract(CheckInFormSchema, body, 'CheckInForm (request)')
+}
+
+export const CHECK_IN_FORM_COVERAGE: Record<keyof ContractForm, true> = {
+  id: true,
+  title: true,
+  fields: true,
+}
+
+const _formAgrees: FieldsAgree<ContractForm, ValidatedForm> = true
+void _formAgrees

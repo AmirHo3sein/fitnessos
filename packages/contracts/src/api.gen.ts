@@ -294,6 +294,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/check-in-forms/current": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The athlete's current check-in form */
+        get: operations["getCurrentCheckInForm"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/check-in-forms/{formId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Create or replace a check-in form
+         * @description PUT, not POST. A form is not versioned -- observations reference an indicator kind, not a field id, so editing one cannot make an existing observation unreadable. Submitting the same body twice must therefore leave the form in the same state, which is what makes a retry safe here without a client-generated request id (contrast POST /programs/{id}/versions, where every save is a new immutable version).
+         */
+        put: operations["saveCheckInForm"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -630,6 +667,36 @@ export interface components {
              * @description Present when correcting. The superseded outcome MUST NOT be deleted or mutated.
              */
             supersedes?: string;
+        };
+        /** @description How the athlete answers. CLOSED, because the variants differ in required structure (ADR-0020's exception). Flattened rather than a oneOf so a single field of a variant can be addressed by one SetProperty in the editor -- see the note in ctx-measurement/src/editor/schema.ts. */
+        AnswerShape: {
+            /** @enum {string} */
+            kind: "number" | "scale" | "choice";
+            /** @description Required when kind=scale. Must be below max. */
+            min?: number;
+            /** @description Required when kind=scale. */
+            max?: number;
+            /** @description Required and non-empty when kind=choice. */
+            options?: string[];
+        };
+        FormField: {
+            /** Format: uuid */
+            id: string;
+            label: string;
+            /** @description The IndicatorKind the answer becomes. Every field must record something: a question that produces no observation is a survey question, and this product needs measurements. Open vocabulary (ADR-0020). */
+            records: string;
+            /** @description Invariant N11: an answer is never recorded without its unit. */
+            unit: string;
+            answer: components["schemas"]["AnswerShape"];
+            /** @description Zero-based. Orders across a form must be exactly 0..n-1, each once. */
+            order: number;
+        };
+        /** @description The instrument by which a self-reported measurement is acquired. NOT versioned, unlike ProgramVersion: observations reference an indicator kind rather than a field id, so editing a form cannot make an existing observation unreadable. That is why this is a PUT and a programme revision is a POST. */
+        CheckInForm: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            fields: components["schemas"]["FormField"][];
         };
     };
     responses: {
@@ -1158,6 +1225,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DecisionOutcome"];
+                };
+            };
+            /** @description invalid */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    getCurrentCheckInForm: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ok */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckInForm"];
+                };
+            };
+            /** @description no form yet -- the normal state before a coach authors one, not an error */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    saveCheckInForm: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CheckInForm"];
+            };
+        };
+        responses: {
+            /** @description saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckInForm"];
                 };
             };
             /** @description invalid */

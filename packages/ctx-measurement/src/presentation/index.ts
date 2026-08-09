@@ -10,3 +10,9 @@ export {
   type FormBuilderLabels,
   type FormBuilderProps,
 } from './views/FormBuilder'
+export { useCheckInForm, type UseCheckInForm } from './hooks/useCheckInForm'
+export {
+  CheckInFormWorkspace,
+  type CheckInFormWorkspaceProps,
+  type WorkspaceLabels,
+} from './views/CheckInFormWorkspace'
