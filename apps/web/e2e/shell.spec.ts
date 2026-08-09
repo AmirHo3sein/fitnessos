@@ -1270,11 +1270,80 @@ test.describe('the loop closes', () => {
 
     // The estimate exists, and it is attributed to the movement it came from — two series of
     // the same kind are otherwise indistinguishable.
-    await expect(page.getByText('بیشینه‌ی تخمینی یک تکرار')).toBeVisible()
-    await expect(page.getByText('Back squat')).toBeVisible()
+    //
+    // Scoped to the indicators section: a proposal's hypothesis also names the movement, so an
+    // unscoped locator matches twice and the failure looks like a duplicate render.
+    const indicators = page.locator('section').filter({ hasText: 'نتیجه‌ی تمرین شما' })
+    await expect(indicators.getByText('بیشینه‌ی تخمینی یک تکرار')).toBeVisible()
+    await expect(indicators.getByText('Back squat')).toBeVisible()
 
     // One point is not a trend. Saying "0" here would read as "no progress" rather than "we
     // cannot tell yet", which is the opposite of the truth.
-    await expect(page.getByText('هنوز داده‌ی کافی برای نمایش تغییر نیست')).toBeVisible()
+    await expect(indicators.getByText('هنوز داده‌ی کافی برای نمایش تغییر نیست')).toBeVisible()
+  })
+})
+
+test.describe('the obligation to find out', () => {
+  const GOOD_CODE = '۰۰۰۰۰۰'
+
+  const phoneFor = (testCode: string, project: string) => {
+    const projectCode = project === 'chromium' ? '112' : '113'
+    const ascii = `0912${testCode}${projectCode}9`
+    return [...ascii].map((d) => '۰۱۲۳۴۵۶۷۸۹'[Number(d)]).join('')
+  }
+
+  const signIn = async (page: import('@playwright/test').Page, phone: string) => {
+    await page.goto('/sign-in')
+    await page.getByLabel('شماره‌ی موبایل').fill(phone)
+    await page.getByRole('button', { name: 'ارسال کد' }).click()
+    await page.getByLabel('کد تأیید').fill(GOOD_CODE)
+    await page.getByRole('button', { name: 'تأیید و ورود' }).click()
+    await expect(page).not.toHaveURL(/\/sign-in/)
+  }
+
+  test('@critical an accepted proposal past its horizon demands a verdict', async ({ page }) => {
+    /*
+     * ADR-0003 is satisfiable on paper by a product that accepts every suggestion and never
+     * looks back. This is what stops that: the accepted proposal whose claim came due in
+     * January is on the dashboard, and the one whose horizon is still in the future is not.
+     */
+    await signIn(page, phoneFor('111', test.info().project.name))
+    await expect(page).toHaveURL(/\/dashboard/)
+
+    await expect(page.getByText('در انتظار داوری شما')).toBeVisible()
+    await expect(page.getByText('Raise the accumulation block to 5% per cycle')).toBeVisible()
+
+    // Not due yet, and undecided — neither belongs in a list of debts.
+    await expect(page.getByText('Add a deload week before the next block')).toHaveCount(0)
+  })
+
+  test('@critical a verdict cannot be recorded without a reason', async ({ page }) => {
+    // ADR-0003's third clause enforced at the point of entry. "It worked" with no reason is a
+    // rating, not a verdict — and refused locally rather than sent, since the domain would
+    // refuse it too and a round trip to learn what the form already knows is wasted.
+    await signIn(page, phoneFor('222', test.info().project.name))
+
+    await page.getByRole('button', { name: 'درست بود' }).click()
+    await expect(page.getByText('داوری بدون دلیل ثبت نمی‌شود')).toBeVisible()
+
+    // Still owed. Nothing was recorded.
+    await expect(page.getByText('Raise the accumulation block to 5% per cycle')).toBeVisible()
+  })
+
+  test('@critical recording a verdict discharges the obligation, and it stays discharged', async ({
+    page,
+  }) => {
+    await signIn(page, phoneFor('333', test.info().project.name))
+
+    await page.getByLabel('چه اتفاقی افتاد؟').fill('The estimate rose by 7kg across the block')
+    await page.getByRole('button', { name: 'درست بود' }).click()
+
+    // Gone from the list, because a judged hypothesis is no longer unjudged — derived from the
+    // outcome existing, not from a flag the server set.
+    await expect(page.getByText('در انتظار داوری شما')).toHaveCount(0)
+
+    // And it survives a reload: the verdict was recorded, not merely hidden.
+    await page.reload()
+    await expect(page.getByText('در انتظار داوری شما')).toHaveCount(0)
   })
 })

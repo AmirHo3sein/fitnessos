@@ -5,6 +5,7 @@ import { GoalPortsProvider } from '@fitnessos/core/goal/presentation'
 import { PrescriptionPortsProvider } from '@fitnessos/ctx-prescription/presentation'
 import { ExecutionPortsProvider } from '@fitnessos/core/execution/presentation'
 import { MeasurementPortsProvider } from '@fitnessos/core/measurement/presentation'
+import { LearningPortsProvider } from '@fitnessos/core/learning/presentation'
 import { useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useRef, type ReactNode } from 'react'
@@ -13,6 +14,7 @@ import { createGoalPorts } from './goal'
 import { createPrescriptionPorts } from './prescription'
 import { createExecutionPorts } from './execution'
 import { createMeasurementPorts } from './measurement'
+import { createLearningPorts } from './learning'
 import { createHttp } from './container'
 
 /**
@@ -85,6 +87,7 @@ export const AppProviders = ({ children }: { children: ReactNode }) => {
       // Invalidates the issue query so a conflict recorded by a background drain appears without
       // the athlete reloading. The record itself is already durable — this only shortens the wait.
       measurement: createMeasurementPorts(http, {}),
+      learning: createLearningPorts(http, {}),
       execution: createExecutionPorts(http, {}, () => {
         void queryClient.invalidateQueries({ queryKey: ['sync-issues'] })
       }),
@@ -96,7 +99,9 @@ export const AppProviders = ({ children }: { children: ReactNode }) => {
       <GoalPortsProvider value={ports.goal}>
         <PrescriptionPortsProvider value={ports.prescription}>
           <MeasurementPortsProvider value={ports.measurement}>
-            <ExecutionPortsProvider value={ports.execution}>{children}</ExecutionPortsProvider>
+            <LearningPortsProvider value={ports.learning}>
+              <ExecutionPortsProvider value={ports.execution}>{children}</ExecutionPortsProvider>
+            </LearningPortsProvider>
           </MeasurementPortsProvider>
         </PrescriptionPortsProvider>
       </GoalPortsProvider>

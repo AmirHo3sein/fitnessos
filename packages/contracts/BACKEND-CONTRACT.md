@@ -233,7 +233,31 @@ because the workaround is load-bearing.
 - **File upload.** Signed-URL direct-to-storage (handbook Part 5). The contract is
   a Phase 1 deliverable and has not been authored; the implementation is Phase 4.
 
-### 4.3 `GET /indicators` must derive on read
+### 4.3 `POST /proposals/{id}/outcome` must preserve what it supersedes
+
+**Required.** A verdict correction supplies `supersedes` and creates a NEW outcome. The
+superseded one MUST remain readable from `GET /outcomes`. It is not deleted, not flagged, and
+not filtered out server-side.
+
+**Why.** ADR-0007: a verdict is evidence, and editing one in place would rewrite what was
+concluded at the time — the only thing that makes a later disagreement legible. A correction
+that hid what it replaced would make the correction itself invisible, which is the opposite of
+the rule's purpose.
+
+The client follows the supersede chain to decide what is still unanswered, so hiding superseded
+outcomes would also make a corrected proposal read as never judged.
+
+### 4.4 Accepting a proposal is not a Learning endpoint
+
+There is deliberately no `POST /proposals/{id}/accept`. ADR-0010 places the moment of change in
+the CHANGING context: accepting produces a new `ProgramVersion` whose `authoringDecision` records
+`proposedBy: 'assistant'` and `decidedBy: <the human>`. The proposal's `accepted` and `decidedOn`
+fields are reported back to Learning as a consequence, not written by it (ADR-0019).
+
+If an accept endpoint appears under `/proposals`, that is Learning writing another context's
+model, and the boundary is gone.
+
+### 4.5 `GET /indicators` must derive on read
 
 Not a gap — a requirement stated here because it is the one thing about Measurement a schema
 cannot express, and the one thing most likely to be "optimised" away.

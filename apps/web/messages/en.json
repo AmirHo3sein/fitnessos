@@ -206,5 +206,20 @@
       "bodyweight": "Bodyweight",
       "estimatedOneRepMax": "Estimated one-rep max"
     }
+  },
+  "learning": {
+    "unjudged": {
+      "title": "Waiting on your judgement",
+      "intro": "These changes were accepted and their claims have come due. Recording what happened is what keeps the next suggestion accountable.",
+      "claim": "Expected:",
+      "dueOn": "Due",
+      "overdue": "days overdue",
+      "held": "It held",
+      "didNotHold": "It did not hold",
+      "rationaleLabel": "What happened?",
+      "rationalePlaceholder": "What you observed, in your own words",
+      "submit": "Record",
+      "rationaleRequired": "A verdict needs a reason."
+    }
   }
 }

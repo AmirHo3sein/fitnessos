@@ -237,6 +237,63 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/proposals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Proposals made for this athlete, decided and undecided */
+        get: operations["listProposals"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/outcomes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Rendered verdicts, INCLUDING superseded ones
+         * @description Superseded outcomes are returned deliberately. A corrected verdict that vanished would make the correction invisible, which is the opposite of what the supersede rule is for (ADR-0007). Which of them a reader sees is a presentation decision.
+         */
+        get: operations["listOutcomes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/proposals/{proposalId}/outcome": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record whether the proposal's hypothesis held
+         * @description NOT 'accept a proposal'. Accepting is the moment of change and belongs to the changing context: it produces a new ProgramVersion whose authoringDecision records proposedBy=assistant and decidedBy=<the human> (ADR-0010). This records the later verdict on whether the claim turned out to be true.\n\nIdempotent by client-supplied id, 200 on replay. A correction supplies `supersedes` and creates a NEW outcome; the superseded one must remain readable.
+         */
+        post: operations["renderVerdict"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -501,6 +558,78 @@ export interface components {
             /** @description For per-movement indicators such as an estimated 1RM. Absent for whole-body indicators. A name rather than an id until catalogue versioning exists (ADR-0012). */
             movementName?: string;
             points: components["schemas"]["IndicatorPoint"][];
+        };
+        /** @description The obligation to find out whether a change worked (ADR-0007). A value object on the proposal, never an aggregate. */
+        Hypothesis: {
+            /** @description An indicator kind Measurement publishes. Open vocabulary (ADR-0020). */
+            indicatorKind: string;
+            /** @description What is expected to happen. Falsifiable, or the record of WHY (ADR-0003) degrades into a record of clicks. */
+            claim: string;
+            /**
+             * Format: date
+             * @description When the claim becomes answerable. Must be after proposedOn -- a claim already due at the moment of proposing arrives in the unjudged list before the change has had any chance to act.
+             */
+            horizon: string;
+        };
+        Proposal: {
+            /** Format: uuid */
+            id: string;
+            /**
+             * @description A coarse published vocabulary (ADR-0023). Deliberately not 'which aggregate' -- that would put another context's model inside Learning, which ADR-0019 forbids.
+             * @enum {string}
+             */
+            targetKind: "program" | "goal" | "session";
+            /** @description Opaque to Learning. The screen that shows the proposal dereferences it; Learning never does. */
+            targetId: string;
+            summary: string;
+            /** @description Why. Required, not optional: a suggestion with no stated reason carries authority while being unreviewable. */
+            rationale: string;
+            hypothesis: components["schemas"]["Hypothesis"];
+            /** Format: date */
+            proposedOn: string;
+            /**
+             * Format: date
+             * @description Absent while undecided. The moment of change is recorded in the CHANGING context (ADR-0010); this is reported back only so the client can stop offering a decision already made.
+             */
+            decidedOn?: string;
+            /** @description Absent while undecided. */
+            accepted?: boolean;
+        };
+        DecisionOutcome: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            proposalId: string;
+            /**
+             * @description Two members. A third meaning 'not yet' is already represented by there being no DecisionOutcome at all, and adding it would give one state two spellings.
+             * @enum {string}
+             */
+            verdict: "held" | "did-not-hold";
+            rationale: string;
+            /** @description A human. An assistant may propose; it may not conclude (ADR-0003). */
+            decidedBy: string;
+            /** Format: date */
+            decidedOn: string;
+            /**
+             * Format: uuid
+             * @description Set when this corrects an earlier verdict. The earlier one is PRESERVED and still returned by GET /outcomes -- a correction that hid what it replaced would make the correction invisible (ADR-0007).
+             */
+            supersedes?: string;
+        };
+        RenderVerdictBody: {
+            /**
+             * Format: uuid
+             * @description CLIENT-generated UUIDv7 (ADR-0010). A repeat of a stored id MUST return 200 with that outcome, never a second one.
+             */
+            id: string;
+            /** @enum {string} */
+            verdict: "held" | "did-not-hold";
+            rationale: string;
+            /**
+             * Format: uuid
+             * @description Present when correcting. The superseded outcome MUST NOT be deleted or mutated.
+             */
+            supersedes?: string;
         };
     };
     responses: {
@@ -951,6 +1080,93 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["IndicatorSeries"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    listProposals: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ok */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Proposal"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    listOutcomes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ok */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DecisionOutcome"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    renderVerdict: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proposalId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RenderVerdictBody"];
+            };
+        };
+        responses: {
+            /** @description this id was already stored -- a replay */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DecisionOutcome"];
+                };
+            };
+            /** @description recorded */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DecisionOutcome"];
+                };
+            };
+            /** @description invalid */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
                 };
             };
             401: components["responses"]["Unauthorized"];
