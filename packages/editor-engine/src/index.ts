@@ -7,7 +7,9 @@
  * the source of truth (D-11).
  *
  * What is here: D-01 history, D-02 flat document, D-03 spatial index, D-04 coordinate spaces,
- * D-08 cross-document references.
+ * D-08 cross-document references, and the spatial topology the Report Builder needs — hit
+ * testing, snapping and alignment. All three were ADDITIVE: Phase 4's exit gate asks that the
+ * Report Builder change nothing existing, and it changed nothing existing.
  *
  * What is not: nested sub-documents (D-07). Not an oversight — nothing in the product has a
  * nested document yet. A programme's blocks contain no sub-structure the coach authors; the
@@ -82,6 +84,23 @@ export {
 } from './geometry/spaces'
 
 export { SpatialHash } from './geometry/spatialHash'
+
+export { hitPoint, hitRect } from './geometry/hitTest'
+
+export {
+  applySnap,
+  snap,
+  type GuideLine,
+  type SnapConfig,
+  type SnapResult,
+} from './geometry/snapping'
+
+export {
+  align,
+  distribute,
+  type Alignment,
+  type Positioned,
+} from './geometry/alignment'
 
 export {
   isDocumentRef,
