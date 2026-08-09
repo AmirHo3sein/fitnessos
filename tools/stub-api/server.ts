@@ -39,6 +39,7 @@ import {
   RequestCodeBodySchema,
   CheckInFormSchema,
   DecisionOutcomeSchema,
+  ReportSchema,
   IndicatorSeriesSchema,
   ObservationSchema,
   ProposalSchema,
@@ -129,6 +130,9 @@ const observations = new Map<string, Map<string, unknown>>()
 
 /** Check-in forms, one per phone. Replaced wholesale by PUT — a form is not versioned. */
 const checkInForms = new Map<string, unknown>()
+
+/** Reports, one per phone. Same reasoning: a report owns a layout and nothing references it. */
+const reports = new Map<string, unknown>()
 
 /** Rendered verdicts, keyed by phone then by client id. Superseded ones are KEPT (ADR-0007). */
 const outcomes = new Map<string, Map<string, unknown>>()
@@ -539,6 +543,7 @@ const handlers: Record<string, (req: IncomingMessage, res: ServerResponse) => Pr
     observations.clear()
     outcomes.clear()
     checkInForms.clear()
+    reports.clear()
     res.writeHead(204).end()
     return Promise.resolve()
   },
@@ -781,6 +786,39 @@ const handlers: Record<string, (req: IncomingMessage, res: ServerResponse) => Pr
     send(res, 200, CheckInFormSchema, body.data)
   },
 
+  'GET /api/v1/reports/current': async (req, res) => {
+    const phone = phoneFromToken(cookiesOf(req)['access_token'])
+    if (phone === null) {
+      problem(res, 401, 'unauthenticated', 'no valid session')
+      return
+    }
+    const stored = reports.get(phone)
+    if (stored === undefined) {
+      res.writeHead(204).end()
+      return
+    }
+    send(res, 200, ReportSchema, stored)
+  },
+
+  'PUT /api/v1/reports/:reportId': async (req, res) => {
+    const phone = phoneFromToken(cookiesOf(req)['access_token'])
+    if (phone === null) {
+      problem(res, 401, 'unauthenticated', 'no valid session')
+      return
+    }
+
+    const body = ReportSchema.safeParse(await readBody(req))
+    if (!body.success) {
+      problem(res, 400, 'invalid_request', body.error.issues[0]?.message ?? 'invalid')
+      return
+    }
+
+    // Stored verbatim, tile order included — it is PAINT order, and reordering it here would
+    // rearrange what the coach composed.
+    reports.set(phone, body.data)
+    send(res, 200, ReportSchema, body.data)
+  },
+
   'GET /api/v1/proposals': async (req, res) => {
     const phone = phoneFromToken(cookiesOf(req)['access_token'])
     if (phone === null) {
@@ -871,6 +909,7 @@ createServer((req, res) => {
     .replace(/^\/api\/v1\/programs\/[^/]+\/versions$/, '/api/v1/programs/:programId/versions')
     .replace(/^\/api\/v1\/proposals\/[^/]+\/outcome$/, '/api/v1/proposals/:proposalId/outcome')
     .replace(/^\/api\/v1\/check-in-forms\/(?!current$)[^/]+$/, '/api/v1/check-in-forms/:formId')
+    .replace(/^\/api\/v1\/reports\/(?!current$)[^/]+$/, '/api/v1/reports/:reportId')
   const handler = handlers[`${req.method ?? 'GET'} ${path}`]
 
   if (!handler) {

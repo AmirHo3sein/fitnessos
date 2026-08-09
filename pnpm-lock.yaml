@@ -41,6 +41,9 @@ importers:
       '@fitnessos/ctx-prescription':
         specifier: workspace:*
         version: link:../../packages/ctx-prescription
+      '@fitnessos/ctx-report':
+        specifier: workspace:*
+        version: link:../../packages/ctx-report
       '@fitnessos/infra':
         specifier: workspace:*
         version: link:../../packages/infra
@@ -477,6 +480,9 @@ importers:
       '@fitnessos/ctx-prescription':
         specifier: workspace:*
         version: link:../ctx-prescription
+      '@fitnessos/ctx-report':
+        specifier: workspace:*
+        version: link:../ctx-report
       '@fitnessos/editor-engine':
         specifier: workspace:^
         version: link:../editor-engine

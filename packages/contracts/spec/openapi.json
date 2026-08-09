@@ -769,6 +769,89 @@
           }
         }
       }
+    },
+    "/reports/current": {
+      "get": {
+        "operationId": "getCurrentReport",
+        "tags": [
+          "report"
+        ],
+        "summary": "The athlete's current report",
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Report"
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "no report yet"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/reports/{reportId}": {
+      "put": {
+        "operationId": "saveReport",
+        "tags": [
+          "report"
+        ],
+        "summary": "Create or replace a report",
+        "description": "PUT for the same reason as a check-in form: a report is not versioned. It owns only a layout, and nothing references a tile, so replacing one cannot make anything else unreadable. Submitting the same body twice leaves it in the same state, which is what makes a retry safe with no client-generated request id.",
+        "parameters": [
+          {
+            "name": "reportId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Report"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Report"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1838,6 +1921,96 @@
           }
         },
         "description": "The instrument by which a self-reported measurement is acquired. NOT versioned, unlike ProgramVersion: observations reference an indicator kind rather than a field id, so editing a form cannot make an existing observation unreadable. That is why this is a PUT and a programme revision is a POST."
+      },
+      "TileContent": {
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "indicator",
+              "note"
+            ]
+          },
+          "indicatorKind": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Required when kind=indicator. The published series to chart -- a D-08 reference, resolved at render time."
+          },
+          "fallbackLabel": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Required when kind=indicator. The only renderable content when the reference cannot be resolved (D-08)."
+          },
+          "text": {
+            "type": "string",
+            "description": "Present when kind=note."
+          }
+        }
+      },
+      "ReportTile": {
+        "type": "object",
+        "required": [
+          "id",
+          "x",
+          "y",
+          "width",
+          "height",
+          "content"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "x": {
+            "type": "number",
+            "description": "Document PIXELS (D-04: px for Report, grid cells for Dashboard, ms for Timeline)."
+          },
+          "y": {
+            "type": "number"
+          },
+          "width": {
+            "type": "number",
+            "minimum": 40
+          },
+          "height": {
+            "type": "number",
+            "minimum": 40
+          },
+          "content": {
+            "$ref": "#/components/schemas/TileContent"
+          }
+        }
+      },
+      "Report": {
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "tiles"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "tiles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportTile"
+            },
+            "description": "Array ORDER IS PAINT ORDER -- which tile draws on top when two overlap. It must be preserved verbatim; sorting it changes the arrangement the coach made."
+          }
+        },
+        "description": "A coach-authored arrangement of published views. Owns a LAYOUT and nothing else: every tile points at another context's published language and is resolved at render time, so a deleted indicator breaks one tile rather than the report."
       }
     }
   }
