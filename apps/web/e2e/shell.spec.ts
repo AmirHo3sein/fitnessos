@@ -608,7 +608,7 @@ test.describe('offline session logging', () => {
     await openLogger(page)
     await page.getByRole('button', { name: 'ثبت جلسه' }).click()
 
-    await expect(page.getByText('ثبت شد')).toBeVisible()
+    await expect(page.getByText('ثبت شد. به‌محض اتصال همگام می‌شود.')).toBeVisible()
 
     // The list no longer offers it. A logged session that still appears as upcoming reads as the
     // app not having noticed.
@@ -629,7 +629,7 @@ test.describe('offline session logging', () => {
     await page.getByRole('button', { name: 'ثبت جلسه' }).click()
 
     // Confirmed, with wording that does not claim it reached the server (ADR-0033).
-    await expect(page.getByText('ثبت شد')).toBeVisible()
+    await expect(page.getByText('ثبت شد. به‌محض اتصال همگام می‌شود.')).toBeVisible()
     await expect(page.locator('#logger-error')).toBeHidden()
 
     await context.setOffline(false)
@@ -653,7 +653,7 @@ test.describe('offline session logging', () => {
 
     await context.setOffline(true)
     await page.getByRole('button', { name: 'ثبت جلسه' }).click()
-    await expect(page.getByText('ثبت شد')).toBeVisible()
+    await expect(page.getByText('ثبت شد. به‌محض اتصال همگام می‌شود.')).toBeVisible()
 
     // Armed BEFORE reconnecting, so the drain cannot be missed.
     const replay = page.waitForRequest(
@@ -1212,5 +1212,69 @@ test.describe('content security policy', () => {
     await expect(page.getByLabel('کد تأیید')).toBeVisible()
 
     expect(violations.filter((v) => v.startsWith('connect-src'))).toEqual([])
+  })
+})
+
+test.describe('the loop closes', () => {
+  const GOOD_CODE = '۰۰۰۰۰۰'
+
+  const phoneFor = (testCode: string, project: string) => {
+    const projectCode = project === 'chromium' ? '990' : '900'
+    const ascii = `0912${testCode}${projectCode}9`
+    return [...ascii].map((d) => '۰۱۲۳۴۵۶۷۸۹'[Number(d)]).join('')
+  }
+
+  const signIn = async (page: import('@playwright/test').Page, phone: string) => {
+    await page.goto('/sign-in')
+    await page.getByLabel('شماره‌ی موبایل').fill(phone)
+    await page.getByRole('button', { name: 'ارسال کد' }).click()
+    await page.getByLabel('کد تأیید').fill(GOOD_CODE)
+    await page.getByRole('button', { name: 'تأیید و ورود' }).click()
+    await expect(page).not.toHaveURL(/\/sign-in/)
+  }
+
+  test('@critical an athlete with nothing measured gets an explanation, not an empty box', async ({
+    page,
+  }) => {
+    // The normal first-run state. An empty card with a heading and no words reads as broken.
+    await signIn(page, phoneFor('111', test.info().project.name))
+    await expect(page).toHaveURL(/\/dashboard/)
+
+    await expect(page.getByText('هنوز چیزی اندازه‌گیری نشده')).toBeVisible()
+  })
+
+  test('@critical logging a session moves a derived indicator, with no measurement recorded', async ({
+    page,
+  }) => {
+    /*
+     * ADR-0024's cycle, asserted end to end: Execution → Measurement → Prescription. The athlete
+     * records nothing about their body; they log the work they did, and an estimated one-rep max
+     * appears on the dashboard.
+     *
+     * This is what makes ADR-0006 observable rather than merely stated. There is no indicator
+     * table anywhere — the stub derives the series on every request, exactly as the contract
+     * says the backend must — so a value appearing here can only have been computed from the
+     * session that was just logged.
+     */
+    await signIn(page, phoneFor('222', test.info().project.name))
+
+    // Nothing yet.
+    await expect(page.getByText('هنوز چیزی اندازه‌گیری نشده')).toBeVisible()
+
+    await page.goto('/sessions')
+    await page.getByRole('button', { name: 'ثبت این جلسه' }).first().click()
+    await page.getByRole('button', { name: 'ثبت جلسه' }).click()
+    await expect(page.getByText('ثبت شد. به‌محض اتصال همگام می‌شود.')).toBeVisible()
+
+    await page.goto('/dashboard')
+
+    // The estimate exists, and it is attributed to the movement it came from — two series of
+    // the same kind are otherwise indistinguishable.
+    await expect(page.getByText('بیشینه‌ی تخمینی یک تکرار')).toBeVisible()
+    await expect(page.getByText('Back squat')).toBeVisible()
+
+    // One point is not a trend. Saying "0" here would read as "no progress" rather than "we
+    // cannot tell yet", which is the opposite of the truth.
+    await expect(page.getByText('هنوز داده‌ی کافی برای نمایش تغییر نیست')).toBeVisible()
   })
 })

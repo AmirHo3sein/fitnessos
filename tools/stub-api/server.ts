@@ -37,6 +37,9 @@ import {
   ProblemSchema,
   ProgramSchema,
   RequestCodeBodySchema,
+  IndicatorSeriesSchema,
+  ObservationSchema,
+  RecordObservationBodySchema,
   RequestCodeResultSchema,
   ReviseProgramBodySchema,
   VerifyCodeBodySchema,
@@ -116,6 +119,9 @@ const loggedPrescribed = new Map<string, Map<string, string>>()
  * makes a replayed revision return the stored programme instead of creating a second one.
  */
 const revisions = new Map<string, { current: unknown; versions: Map<string, unknown> }>()
+
+/** Recorded measurements, keyed by phone then by the CLIENT-supplied id (ADR-0010). */
+const observations = new Map<string, Map<string, unknown>>()
 
 /**
  * A phone whose last digit is 9 gets a programme; everyone else gets none.
@@ -479,6 +485,7 @@ const handlers: Record<string, (req: IncomingMessage, res: ServerResponse) => Pr
     performed.clear()
     loggedPrescribed.clear()
     revisions.clear()
+    observations.clear()
     res.writeHead(204).end()
     return Promise.resolve()
   },
@@ -576,6 +583,115 @@ const handlers: Record<string, (req: IncomingMessage, res: ServerResponse) => Pr
     state.current = revised
     revisions.set(phone, state)
     send(res, 201, ProgramSchema, revised)
+  },
+
+  'GET /api/v1/observations': async (req, res) => {
+    const phone = phoneFromToken(cookiesOf(req)['access_token'])
+    if (phone === null) {
+      problem(res, 401, 'unauthenticated', 'no valid session')
+      return
+    }
+    const list = [...(observations.get(phone) ?? new Map()).values()]
+    for (const record of list) {
+      const parsed = ObservationSchema.safeParse(record)
+      if (!parsed.success) {
+        problem(res, 500, 'bad_fixture', 'an observation fixture does not match the contract')
+        return
+      }
+    }
+    res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(list))
+  },
+
+  'POST /api/v1/observations': async (req, res) => {
+    const phone = phoneFromToken(cookiesOf(req)['access_token'])
+    if (phone === null) {
+      problem(res, 401, 'unauthenticated', 'no valid session')
+      return
+    }
+
+    const body = RecordObservationBodySchema.safeParse(await readBody(req))
+    if (!body.success) {
+      problem(res, 400, 'invalid_request', body.error.issues[0]?.message ?? 'invalid')
+      return
+    }
+
+    const mine = observations.get(phone) ?? new Map<string, unknown>()
+    const stored = mine.get(body.data.id)
+    if (stored !== undefined) {
+      // The same id replayed. 200 with the stored record, never a second one — a duplicate
+      // measurement can only be a retry, unlike a duplicate session log which may be a genuine
+      // second record from another device.
+      send(res, 200, ObservationSchema, stored)
+      return
+    }
+
+    const record = { ...body.data, athleteId: idsFor(phone).personId }
+    mine.set(body.data.id, record)
+    observations.set(phone, mine)
+    send(res, 201, ObservationSchema, record)
+  },
+
+  'GET /api/v1/indicators': async (req, res) => {
+    const phone = phoneFromToken(cookiesOf(req)['access_token'])
+    if (phone === null) {
+      problem(res, 401, 'unauthenticated', 'no valid session')
+      return
+    }
+
+    /*
+     * DERIVED here, on every request, from what is stored (ADR-0006). Nothing writes an
+     * indicator, and there is no indicator table — which is what makes the loop in ADR-0024
+     * observable end to end: log a session and the estimated 1RM moves without a measurement
+     * being recorded at all.
+     */
+    const series: unknown[] = []
+
+    const bodyweight = [...(observations.get(phone) ?? new Map()).values()]
+      .filter((o): o is { kind: string; observedOn: string; value: number; unit: string } =>
+        typeof o === 'object' && o !== null && (o as { kind?: unknown }).kind === 'bodyweight')
+    if (bodyweight.length > 0) {
+      series.push({
+        kind: 'bodyweight',
+        unit: bodyweight[0]!.unit,
+        points: bodyweight.map((o) => ({ on: o.observedOn, value: o.value })),
+      })
+    }
+
+    // Epley, matching `core/measurement/domain/oneRepMax.ts`. The client holds the same formula
+    // so it can show an estimate offline before this endpoint has seen the session.
+    const logs = [...(performed.get(phone) ?? new Map()).values()] as {
+      performedOn: string
+      sets: { reps: number; loadKg?: number }[]
+    }[]
+    const points = logs
+      .map((log) => {
+        let best = 0
+        for (const set of log.sets) {
+          if (set.loadKg === undefined || set.reps > 12) continue
+          const estimate = set.reps === 1 ? set.loadKg : set.loadKg * (1 + set.reps / 30)
+          if (estimate > best) best = estimate
+        }
+        return best > 0 ? { on: log.performedOn, value: Math.round(best * 10) / 10 } : null
+      })
+      .filter((p): p is { on: string; value: number } => p !== null)
+
+    if (points.length > 0) {
+      series.push({
+        kind: 'estimated-1rm',
+        unit: 'kg',
+        movementName: 'Back squat',
+        points,
+      })
+    }
+
+    for (const one of series) {
+      const parsed = IndicatorSeriesSchema.safeParse(one)
+      if (!parsed.success) {
+        problem(res, 500, 'bad_fixture', 'a derived series does not match the contract')
+        return
+      }
+    }
+    res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(series))
   },
 
   'GET /api/v1/athletes/me': async (req, res) => {

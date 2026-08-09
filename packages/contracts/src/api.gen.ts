@@ -196,6 +196,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/observations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The athlete's recorded measurements */
+        get: operations["listObservations"];
+        put?: never;
+        /**
+         * Record a measurement
+         * @description Idempotent by client-supplied id. A repeat of a stored id returns 200 with that record, never a second one -- a duplicate measurement can only be a retry, so it is indistinguishable from success. Contrast POST /sessions/performed, where a duplicate may be a genuine second record from another device and answers 409.
+         */
+        post: operations["recordObservation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/indicators": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Published derived indicators
+         * @description Computed on read from observations and performed sessions (ADR-0006). The response therefore changes when a session is logged, without any observation being recorded -- a client must invalidate this on a performed session as well as on a measurement.
+         */
+        get: operations["listIndicators"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -406,6 +447,60 @@ export interface components {
             blocks: components["schemas"]["Block"][];
             servesGoal?: components["schemas"]["ServesGoal"];
             authoringDecision: components["schemas"]["AuthoringDecision"];
+        };
+        /** @description How a measurement came to be known. CLOSED, unlike the indicator kind, because the variants differ in required structure (ADR-0016 / ADR-0020). Provenance is published as a coarse vocabulary rather than a confidence score (ADR-0023). */
+        Acquisition: {
+            /** @enum {string} */
+            kind: "self-reported" | "device" | "practitioner";
+            /** @description Required when kind=device. An opaque identifier such as `withings-scale`, never a display name -- names are catalogue data (ADR-0012). */
+            source?: string;
+            /** @description Required when kind=practitioner. */
+            recordedBy?: string;
+        };
+        Observation: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            athleteId: string;
+            /** @description OPEN vocabulary (ADR-0020): every variant has identical structure, so a kind this client has never seen is data, not an error. */
+            kind: string;
+            value: number;
+            /** @description Invariant N11: a measurement is never stored without its unit. */
+            unit: string;
+            /**
+             * Format: date
+             * @description The calendar day, not an instant. A bodyweight is a fact about a morning.
+             */
+            observedOn: string;
+            acquisition: components["schemas"]["Acquisition"];
+        };
+        RecordObservationBody: {
+            /**
+             * Format: uuid
+             * @description CLIENT-generated UUIDv7 (ADR-0010). The idempotency key: a repeat of a stored id MUST return 200 with the stored record rather than creating a second one. A duplicate measurement is not worth telling the athlete about -- unlike a duplicate session log, it can only be a retry.
+             */
+            id: string;
+            kind: string;
+            value: number;
+            unit: string;
+            /** Format: date */
+            observedOn: string;
+            acquisition: components["schemas"]["Acquisition"];
+        };
+        /** @description A computed answer, not a record -- hence no id. Giving a derived point an identity would invite something to reference it and then expect it to still exist (ADR-0006). */
+        IndicatorPoint: {
+            /** Format: date */
+            on: string;
+            value: number;
+        };
+        /** @description A published derived indicator (ADR-0013). DERIVED on read and never stored (ADR-0006): the server computes it from observations and performed sessions when asked. Prescription consumes this to resolve progression, which is why it is a published language rather than an internal shape. */
+        IndicatorSeries: {
+            kind: string;
+            /** @description On the SERIES, not the point. A series whose unit changed partway through is two series, and per-point units make that representable. */
+            unit: string;
+            /** @description For per-movement indicators such as an estimated 1RM. Absent for whole-body indicators. A name rather than an id until catalogue versioning exists (ADR-0012). */
+            movementName?: string;
+            points: components["schemas"]["IndicatorPoint"][];
         };
     };
     responses: {
@@ -774,6 +869,91 @@ export interface operations {
                     "application/json": components["schemas"]["Program"];
                 };
             };
+        };
+    };
+    listObservations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ok */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Observation"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    recordObservation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordObservationBody"];
+            };
+        };
+        responses: {
+            /** @description this id was already stored -- a replay */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Observation"];
+                };
+            };
+            /** @description recorded */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Observation"];
+                };
+            };
+            /** @description invalid */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    listIndicators: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ok */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IndicatorSeries"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
         };
     };
 }
