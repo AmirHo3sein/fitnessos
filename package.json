@@ -24,7 +24,8 @@
     "tokens:build": "node tools/color/emit.mjs",
     "tokens:check": "node tools/color/check-tokens.mjs",
     "color:contrast": "node tools/color/contrast-report.mjs",
-    "color:lint": "node tools/color/lint-usage.mjs"
+    "color:lint": "node tools/color/lint-usage.mjs",
+    "e2e:full": "pnpm --filter @fitnessos/web e2e:full"
   },
   "devDependencies": {
     "@types/node": "^22.9.0",

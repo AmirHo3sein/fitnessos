@@ -77,7 +77,7 @@ const signIn = async (page: Page, phone: string = PHONE) => {
 }
 
 test.describe('every page passes WCAG 2.1 AA', () => {
-  test('@critical the public page', async ({ page }) => {
+  test('the public page', async ({ page }) => {
     await page.goto('/')
     await expect(page.locator('html')).toHaveAttribute('dir', 'rtl')
     await expectNoViolations(page)
@@ -95,13 +95,13 @@ test.describe('every page passes WCAG 2.1 AA', () => {
     await expectNoViolations(page)
   })
 
-  test('@critical the dashboard', async ({ page }) => {
+  test('the dashboard', async ({ page }) => {
     await signIn(page)
     await expect(page).toHaveURL(/\/dashboard/)
     await expectNoViolations(page)
   })
 
-  test('@critical the programme, read and edit', async ({ page }) => {
+  test('the programme, read and edit', async ({ page }) => {
     // The builder is the thing the gate names. Scanned in both modes because they are different
     // trees — the editor is code-split and mounts controls the read view does not have.
     await signIn(page)
@@ -113,7 +113,7 @@ test.describe('every page passes WCAG 2.1 AA', () => {
     await expectNoViolations(page)
   })
 
-  test('@critical sessions, list and logger', async ({ page }) => {
+  test('sessions, list and logger', async ({ page }) => {
     await signIn(page)
     await page.goto('/sessions')
     await expectNoViolations(page)
@@ -123,7 +123,7 @@ test.describe('every page passes WCAG 2.1 AA', () => {
     await expectNoViolations(page)
   })
 
-  test('@critical the check-in form builder', async ({ page }) => {
+  test('the check-in form builder', async ({ page }) => {
     // The second editor, scanned in both its states: the empty one a coach lands on, and the
     // builder they create.
     await signIn(page, phoneFor('111', test.info().project.name))
@@ -135,7 +135,7 @@ test.describe('every page passes WCAG 2.1 AA', () => {
     await expectNoViolations(page)
   })
 
-  test('@critical the 404', async ({ page }) => {
+  test('the 404', async ({ page }) => {
     await page.goto('/nope-does-not-exist')
     await expectNoViolations(page)
   })
@@ -196,7 +196,7 @@ test.describe('what an automated scan cannot check', () => {
     expect(hasOutline || hasShadow).toBe(true)
   })
 
-  test('@critical the page has one h1 and a main landmark', async ({ page }) => {
+  test('the page has one h1 and a main landmark', async ({ page }) => {
     // Structure, which is how a screen-reader user navigates rather than reads. Axe checks some
     // of this only when a landmark is present at all, so its absence can pass silently.
     await signIn(page)

@@ -146,11 +146,16 @@ jobs:
       # Playwright's webServer config starts both the stub and the app, so there is no
       # separate step here — and no sleep-and-hope, since it waits on a real readiness
       # URL for each.
-      # Includes `a11y.spec.ts` — the Phase 6 gate, "AA on all builders". It runs here rather
-      # than in a later phase because the violations it found (no document title anywhere, a
-      # 2.14:1 hint colour on six screens, form inputs opting out of the focus ring) were all
-      # invisible in review and all cheap to fix at the moment they appeared. An audit deferred
-      # to a hardening phase is an audit against a codebase that has learned the habit.
+      # The CRITICAL tier only — flows whose failure makes the product unusable or unsafe. The
+      # rest, including most accessibility scans, run in `scheduled.yml` (stage 12). See the
+      # note in `playwright.config.ts` for what earns the tag; the split had collapsed to
+      # "everything is critical", which is the same as having no tiers.
+      #
+      # Accessibility keeps three here — one representative scan, keyboard operability, and the
+      # focus ring — because the violations that audit first found (no document title anywhere,
+      # a 2.14:1 hint colour on six screens, inputs opting out of the focus ring) were invisible
+      # in review, and an audit deferred to a hardening phase is an audit against a codebase
+      # that has learned the habit.
       - name: e2e:critical
         run: pnpm --filter @fitnessos/web e2e:critical
 

@@ -1,0 +1,50 @@
+name: scheduled
+
+# Stages 12 and onward from the handbook's CI table. The PR workflow runs the critical tier on
+# every change; this runs everything, on a cadence that does not sit in anyone's feedback loop.
+on:
+  schedule:
+    # 03:00 UTC daily. Not on every push: the full suite is four times the critical tier and
+    # growing, and a 2% tier that takes twenty minutes stops being run.
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+env:
+  TURBO_TELEMETRY_DISABLED: 1
+  NEXT_TELEMETRY_DISABLED: 1
+
+jobs:
+  e2e-full:
+    runs-on: ubuntu-latest
+    env:
+      STUB_API_URL: http://127.0.0.1:8791
+      INTERNAL_API_URL: http://127.0.0.1:8791/api/v1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: install
+        run: pnpm install --frozen-lockfile
+
+      - name: install browsers
+        run: pnpm --filter @fitnessos/web exec playwright install --with-deps chromium
+
+      - name: build
+        run: pnpm --filter @fitnessos/web build
+
+      # Stage 12 — every spec, both projects. Includes the accessibility scans that do not gate
+      # a PR: a contrast regression on a page a change did not touch should be caught the same
+      # day rather than blocking someone who did not cause it.
+      - name: e2e:full
+        run: pnpm --filter @fitnessos/web e2e:full
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: apps/web/playwright-report
+          retention-days: 7
