@@ -8,7 +8,8 @@
       "settings": "Settings",
       "checkIn": "Check-in",
       "report": "Report"
-    }
+    },
+    "description": "An operating system for physical development — programmes, sessions and the evidence that they worked."
   },
   "public": {
     "headline": "An operating system for physical development",

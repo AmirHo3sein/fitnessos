@@ -35,3 +35,6 @@ pnpm-debug.log*
 
 # visual capture output
 theme-*.png
+
+# Lighthouse reports. Regenerated on every run and never reviewed from a previous one.
+.lighthouseci/

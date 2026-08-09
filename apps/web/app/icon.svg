@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="FitnessOS">
+  <!--
+    A loading bar under load — the product's subject in one mark, and deliberately not a dumbbell
+    or a heart. Drawn rather than imported so there is no binary in the repo and no build step.
+
+    The teal is `--brand-600` from the palette, written literally because this file is outside
+    the CSS pipeline and cannot reach a token. It is the ONE place that is true.
+  -->
+  <rect width="32" height="32" rx="7" fill="#10232d" />
+  <rect x="7" y="14" width="18" height="4" rx="2" fill="#0d8b8a" />
+  <rect x="7" y="9" width="7" height="3" rx="1.5" fill="#0d8b8a" opacity="0.55" />
+  <rect x="18" y="20" width="7" height="3" rx="1.5" fill="#0d8b8a" opacity="0.55" />
+</svg>

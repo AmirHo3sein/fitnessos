@@ -53,3 +53,50 @@ jobs:
           name: playwright-report
           path: apps/web/playwright-report
           retention-days: 7
+
+  # Stage 15 — Lighthouse, on the routes reachable without a session. Separate job so a browser
+  # download and nine page loads do not sit in the e2e job's critical path.
+  #
+  # Scheduled rather than per-PR because a performance SCORE varies by several points between
+  # two runs of identical code — a gate that fails for reasons nobody caused is a gate that gets
+  # disabled. The score assertions are loose and the metric ones are tight; the config explains
+  # which and why.
+  lighthouse:
+    runs-on: ubuntu-latest
+    env:
+      STUB_API_URL: http://127.0.0.1:8791
+      INTERNAL_API_URL: http://127.0.0.1:8791/api/v1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: install
+        run: pnpm install --frozen-lockfile
+
+      - name: build
+        run: pnpm --filter @fitnessos/web build
+
+      # The stub is needed even for unauthenticated routes: sign-in posts to it the moment
+      # anyone interacts, and a page whose fetches 500 measures a different page.
+      - name: start the stub
+        run: pnpm --filter @fitnessos/stub-api start &
+
+      - name: start the app
+        run: pnpm --filter @fitnessos/web start &
+
+      - name: wait for the app
+        run: npx wait-on http://127.0.0.1:3000 --timeout 60000
+
+      - name: lighthouse
+        run: pnpm lighthouse
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lighthouse-reports
+          path: .lighthouseci
+          retention-days: 7
