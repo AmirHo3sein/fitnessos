@@ -227,8 +227,16 @@ const BuilderShell = ({
 
   return (
     <div className="space-y-4">
+      {/*
+        The heading is on its OWN row, not sharing a flex line with the controls.
+        
+        With `me-auto` pushing five buttons against a heading, a 412px screen wraps them into
+        overlapping lines — Playwright reported the toolbar intercepting pointer events on its own
+        button, which means a finger would miss it too. A phone-first product cannot have its
+        editor controls arranged for a desktop and wrapped for everything else.
+      */}
+      <h2 className="text-display text-xl">{labels.heading}</h2>
       <div className="flex flex-wrap items-center gap-2">
-        <h2 className="text-display me-auto text-xl">{labels.heading}</h2>
         <Button type="button" variant="secondary" size="sm" isDisabled={!history.canUndo} onPress={history.undo}>
           {labels.undo}
         </Button>
@@ -251,7 +259,24 @@ const BuilderShell = ({
         </p>
       )}
 
-      <div className="overflow-x-auto">
+      {/*
+        The scroll container is identified, because a test measuring the TRACK measures its full
+        width — 1344px for sixteen weeks — most of which is outside a phone's viewport. Pointer
+        coordinates derived from that land off-screen and get clamped by the browser, so a drag
+        appears to work while going somewhere nobody asked for.
+      */}
+      {/*
+        `min-w-0 max-w-full` alongside `overflow-x-auto`, and both are load-bearing.
+        
+        Without them the 1344px track propagated its width up through the layout and the PAGE
+        scrolled horizontally — measured at a scrollX of -91 on a phone. A body that scrolls
+        sideways is a defect in its own right: every other screen shifts under the reader, and
+        `position: sticky` and hit-testing both stop agreeing with what is on screen.
+        
+        `overflow-x-auto` alone does not clip, because a block inside a sized parent still takes
+        its content width unless it is told it may be narrower.
+      */}
+      <div data-testid="timeline-viewport" className="min-w-0 max-w-full overflow-x-auto">
         <div
           ref={track}
           data-testid="timeline-track"

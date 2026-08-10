@@ -81,14 +81,26 @@ export default async function AppLayout({
     { href: '/check-in', label: t('nav.checkIn') },
     { href: '/report', label: t('nav.report') },
     { href: '/layout', label: t('nav.layout') },
+    { href: '/plan', label: t('nav.plan') },
   ] as const
 
   return (
     <div className="min-h-dvh">
+      {/*
+        `h-14` is gone and the row may wrap.
+        
+        The nav reached seven links and a 412px screen could not hold them on one fixed-height
+        line: they overflowed a `sticky` header and covered the top of every page, which broke
+        clicks on content beneath — including in tests that had nothing to do with navigation. A
+        fixed height with growing content is a promise the layout cannot keep.
+        
+        `min-h-14` keeps the desktop proportions; `flex-wrap` and the nav's own wrapping let a
+        phone use two rows instead of overlapping one.
+      */}
       <header className="border-default bg-surface/80 sticky top-0 z-10 border-b backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-5xl items-center gap-6 px-6">
+        <div className="mx-auto flex min-h-14 max-w-5xl flex-wrap items-center gap-x-6 gap-y-2 px-6 py-2">
           <span className="text-display text-primary">{t('name')}</span>
-          <nav className="flex items-center gap-4 text-sm">
+          <nav className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
             {nav.map((item) => (
               <Link
                 key={item.href}

@@ -935,6 +935,89 @@
           }
         }
       }
+    },
+    "/plans/current": {
+      "get": {
+        "operationId": "getCurrentPlan",
+        "tags": [
+          "timeline"
+        ],
+        "summary": "The athlete's current plan",
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Plan"
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "no plan yet"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/plans/{planId}": {
+      "put": {
+        "operationId": "savePlan",
+        "tags": [
+          "timeline"
+        ],
+        "summary": "Create or replace a plan",
+        "description": "PUT, like a form, a report and a dashboard: a plan owns its own phases and nothing references one, so replacing it cannot make anything else unreadable. Submitting the same body twice leaves it in the same state.",
+        "parameters": [
+          {
+            "name": "planId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Plan"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Plan"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2189,6 +2272,78 @@
             "description": "Widgets MUST NOT overlap. Unlike a report's tiles, where list order is paint order, order carries nothing here \u2014 the layout is entirely in the coordinates."
           }
         }
+      },
+      "Phase": {
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "start",
+          "length"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The coach's own word for it -- 'accumulation', 'peak'. Not a fixed vocabulary."
+          },
+          "start": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Whole DAYS from the plan's epoch. Days rather than the milliseconds D-04 names for Timeline: a plan's smallest meaningful unit is a day and its natural unit is a week, and millisecond precision would force the arithmetic through Date -- which shifts a plain date by a day west of Greenwich."
+          },
+          "length": {
+            "type": "integer",
+            "minimum": 7,
+            "description": "Whole days, at least one week. Below a week there is no full rotation of whatever the phase prescribes."
+          },
+          "programId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The programme this phase intends to run. Absent when none. Opaque to Timeline, which never dereferences it (ADR-0019)."
+          },
+          "servesGoal": {
+            "type": "string",
+            "format": "uuid",
+            "description": "What the phase is for. NEVER an evaluation input (ADR-0008)."
+          }
+        }
+      },
+      "Plan": {
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "epoch",
+          "phases"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "epoch": {
+            "type": "string",
+            "format": "date",
+            "description": "Day zero. Every phase offset is relative to it, so the whole plan can be shifted by changing one field."
+          },
+          "phases": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Phase"
+            },
+            "description": "MUST NOT overlap: an athlete is in one phase at a time, and two overlapping phases make 'what am I doing this week' unanswerable. Order is not significant -- the client sorts by start."
+          }
+        },
+        "description": "A periodisation laid out on time. Distinct from a ProgramVersion, which says WHAT the training is with no dates; this says WHEN and nothing about content, so a taper can move without revising a block."
       }
     }
   }
