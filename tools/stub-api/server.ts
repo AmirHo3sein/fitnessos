@@ -167,6 +167,39 @@ const plans = new Map<string, unknown>()
  * every other piece of state in this file is.
  */
 type Fault = 'server-error' | 'malformed' | 'unauthorized' | 'rate-limited'
+
+/** Attached event streams. Not per phone: one athlete may have two tabs open. */
+const streams = new Set<{ res: ServerResponse; phone: string }>()
+
+/**
+ * Every event ever published, per phone, so a reconnect can replay from an id.
+ *
+ * Unbounded, which is fine for a stub and is NOT what a real server should do — the contract note
+ * says a real one may cap the replay window and answer 204 to a `Last-Event-ID` it can no longer
+ * satisfy, which the client has to treat as "refetch everything".
+ */
+const events = new Map<string, { id: number; kind: string }[]>()
+
+/**
+ * One frame. `id:` and `data:` only — deliberately NO `event:` name.
+ *
+ * The spike's sharpest finding. A named event is delivered to `addEventListener(name)` and **never**
+ * to `onmessage`, so a server that names its events makes a single-listener client deaf. The
+ * consequences are worse than inconvenience:
+ *
+ *   - the client would have to register a listener per kind, which means knowing every kind in
+ *     advance — the opposite of what a published vocabulary is for;
+ *   - an unknown kind would be UNHEARABLE. Not ignored: invisible. `invalidationMap` can only choose
+ *     to ignore an unrecognised kind if something delivered it in the first place.
+ *
+ * So the kind travels in the payload, one `onmessage` handles everything, and a newer server can add
+ * kinds without a client change. Recorded in BACKEND-CONTRACT 5.1 as a requirement, because a
+ * well-meaning backend will otherwise add `event:` names and silence the client.
+ */
+const writeEvent = (res: ServerResponse, event: { id: number; kind: string }): void => {
+  res.write(`id: ${String(event.id)}\n`)
+  res.write(`data: ${JSON.stringify({ kind: event.kind })}\n\n`)
+}
 const faults = new Map<string, Map<string, Fault>>()
 
 const faultFor = (phone: string | null, routeKey: string): Fault | null =>
@@ -586,6 +619,7 @@ const handlers: Record<string, (req: IncomingMessage, res: ServerResponse) => Pr
     plans.clear()
     nutritionPlans.clear()
     workflows.clear()
+    events.clear()
     faults.clear()
     res.writeHead(204).end()
     return Promise.resolve()
@@ -799,6 +833,123 @@ const handlers: Record<string, (req: IncomingMessage, res: ServerResponse) => Pr
    * Arm a fault. Test-only, and alongside `__reset` rather than under `/api/v1` so it can never
    * be mistaken for part of the contract.
    */
+  /**
+   * The event stream — D-12's spike surface.
+   *
+   * A real `text/event-stream`, not a mock: the whole question the spike asks is what the BROWSER's
+   * `EventSource` does, and that cannot be answered by a fake. So this holds the socket open, numbers
+   * every event, replays from `Last-Event-ID` on reconnect, and sends a keepalive comment.
+   *
+   * ## What the numbering is for
+   *
+   * `id:` on every event is the entire reconnect contract. The browser sends the last id it saw back
+   * as `Last-Event-ID`, and a server that ignores it turns every reconnect into a silent gap — the
+   * events between the drop and the reconnect are simply lost, and nothing on either side notices.
+   * Replaying from the id is what makes a dropped connection recoverable rather than merely survivable.
+   */
+  'GET /api/v1/events': async (req, res) => {
+    const phone = phoneFromToken(cookiesOf(req)['access_token'])
+    if (phone === null) {
+      problem(res, 401, 'unauthenticated', 'no valid session')
+      return
+    }
+
+    res.writeHead(200, {
+      'content-type': 'text/event-stream',
+      'cache-control': 'no-cache, no-transform',
+      connection: 'keep-alive',
+      // The header a reverse proxy needs in order NOT to buffer. Sent by the stub so the shape is
+      // right; whether an actual proxy honours it is the one row of D-12's matrix no local test can
+      // answer, and the spike report says so rather than implying otherwise.
+      'x-accel-buffering': 'no',
+    })
+
+    /*
+     * A comment, written IMMEDIATELY — and this was the spike's first real finding.
+     *
+     * `writeHead` alone did not reach the browser. With Next's `rewrites()` proxy in the path, the
+     * response headers were held until the first byte of BODY arrived, so `EventSource` sat in
+     * CONNECTING indefinitely: no `open`, no `error`, nothing to debug. `curl` against the stub
+     * directly worked the whole time, which is exactly how this kind of bug hides.
+     *
+     * A no-op comment as a prelude is the standard answer and the reason it is standard. Any real
+     * server behind any real proxy needs it; the contract note says so.
+     */
+    res.write(': open\n\n')
+
+    const stream = { res, phone }
+    streams.add(stream)
+
+    /*
+     * Resume. `Last-Event-ID` arrives as a header on reconnect; the browser sets it itself, which is
+     * why this is worth testing against a browser rather than a client we wrote.
+     */
+    const resumeFrom = Number(req.headers['last-event-id'] ?? 0)
+    const backlog = events.get(phone) ?? []
+    for (const event of backlog) {
+      if (event.id > resumeFrom) writeEvent(res, event)
+    }
+
+    // A comment every 15s. Without traffic, an idle stream is indistinguishable from a dead one to
+    // every intermediary between here and the browser.
+    const keepalive = setInterval(() => {
+      res.write(': keepalive\n\n')
+    }, 15_000)
+
+    req.on('close', () => {
+      clearInterval(keepalive)
+      streams.delete(stream)
+    })
+
+    // Never resolves while the client is attached — the point of a stream.
+    await new Promise<void>((resolve) => {
+      req.on('close', resolve)
+    })
+  },
+
+  /**
+   * Publish an event, and drop or hold streams — the spike's controls.
+   *
+   * `POST /__emit  { kind, drop?: true }`. Test-only, like `__fault`: a stream that can be severed on
+   * demand is the only way to observe what the browser does about a drop, and the alternative is
+   * waiting for a real network to misbehave.
+   */
+  'POST /api/v1/__emit': async (req, res) => {
+    const phone = phoneFromToken(cookiesOf(req)['access_token'])
+    if (phone === null) {
+      problem(res, 401, 'unauthenticated', 'no valid session')
+      return
+    }
+    const body = (await readBody(req)) as { kind?: string; drop?: boolean }
+
+    if (body.drop === true) {
+      // Sever every stream for this phone WITHOUT sending anything. The browser's own retry is then
+      // the thing under test.
+      for (const stream of [...streams]) {
+        if (stream.phone === phone) {
+          stream.res.end()
+          streams.delete(stream)
+        }
+      }
+      res.writeHead(204).end()
+      return
+    }
+
+    if (typeof body.kind !== 'string') {
+      problem(res, 400, 'invalid_request', 'kind is required')
+      return
+    }
+
+    const backlog = events.get(phone) ?? []
+    const event = { id: backlog.length + 1, kind: body.kind }
+    events.set(phone, [...backlog, event])
+
+    for (const stream of streams) {
+      if (stream.phone === phone) writeEvent(stream.res, event)
+    }
+    res.writeHead(204).end()
+  },
+
   'POST /__fault': async (req, res) => {
     const phone = phoneFromToken(cookiesOf(req)['access_token'])
     if (phone === null) {
