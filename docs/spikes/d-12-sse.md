@@ -81,6 +81,24 @@ delivered it.
 **Consequence:** frames carry `id:` and `data:` only, with the kind inside the payload. One
 `onmessage`; a newer server adds kinds without a client change.
 
+## Finding 5a — a client-initiated reopen carries no position, and the fix is a contract change
+
+Discovered while acting on finding 5, and it inverts a comfortable assumption from finding 2.
+
+`EventSource` sends `Last-Event-ID` only on **its own** automatic reconnect. A freshly constructed
+one sends nothing, and there is no API to set the header. So "closing the stream while the tab is
+hidden is lossless because the browser resends the id" — which is what finding 2 makes it tempting to
+believe — is false for any reopen WE initiate.
+
+Against a server that replays from the beginning, that is not a small bug: it is the entire backlog
+delivered again, every event of it invalidating queries, on every tab switch.
+
+**Consequence:** the client tracks the last id it saw and reopens with `?last-event-id=<id>`, and the
+server is required to honour the parameter as well as the header (BACKEND-CONTRACT 5.3). Two e2e tests
+hold both halves: one asserts a stream opened with a position receives only what follows it, and its
+counterfactual asserts that a stream with no position receives everything — so the first cannot pass
+for the wrong reason.
+
 ## Finding 5 — six streams per origin, so one stream per tab
 
 Confirmed by measurement rather than citation: opening eight streams, no more than six reach `OPEN`
@@ -89,8 +107,14 @@ requests queue behind them too.
 
 HTTP/2 raises the limit, but it is a deployment property the client cannot rely on.
 
-**Consequence:** **one stream per tab, shared by every context.** `invalidationMap` is what makes one
-stream sufficient — the stream says what happened, and the map decides which query keys go stale.
+**Consequence:** **one stream per tab, shared by every context**, and closed while that tab is
+hidden. `invalidationMap` is what makes one stream sufficient — the stream says what happened, and the
+map decides which query keys go stale — and finding 5a is what makes closing it safe.
+
+The hidden-tab behaviour is asserted end to end with a SIMULATED visibility change: headless Chromium
+reports a backgrounded page as `visible`, so bringing another page to the front proves nothing. The
+override exercises the app's reaction to the browser saying "hidden", which is the part this codebase
+owns; the client's own logic is covered without simulation through an injected visibility source.
 
 ---
 
