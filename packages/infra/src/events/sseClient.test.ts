@@ -19,6 +19,25 @@ class FakeSource {
   }
 }
 
+/** A controllable visibility source, since these tests run with no document. */
+const fakeVisibility = () => {
+  let hidden = false
+  const listeners = new Set<() => void>()
+  return {
+    port: {
+      isHidden: () => hidden,
+      onChange: (listener: () => void) => {
+        listeners.add(listener)
+        return () => listeners.delete(listener)
+      },
+    },
+    set: (next: boolean) => {
+      hidden = next
+      for (const listener of listeners) listener()
+    },
+  }
+}
+
 const harness = (overrides: Partial<Parameters<typeof openEventStream>[0]> = {}) => {
   const sources: FakeSource[] = []
   const events: { kind: string; id: string }[] = []
@@ -140,5 +159,105 @@ describe('the invalidation map', () => {
     for (const [kind, keys] of Object.entries(INVALIDATIONS)) {
       expect(keys.length, kind).toBeGreaterThan(0)
     }
+  })
+})
+
+describe('pausing while the tab is hidden', () => {
+  /**
+   * Six connections per origin on HTTP/1.1, measured in the spike, and a stream holds one for its
+   * whole life. Four open tabs consume four of them, and the tab someone is actually looking at
+   * queues its requests behind three nobody is.
+   */
+  it('opens nothing while hidden', () => {
+    const visibility = fakeVisibility()
+    visibility.set(true)
+    const { sources } = harness({ visibility: visibility.port })
+    expect(sources).toHaveLength(0)
+  })
+
+  it('closes the socket when the tab is hidden', () => {
+    const visibility = fakeVisibility()
+    const { sources } = harness({ visibility: visibility.port })
+    expect(sources).toHaveLength(1)
+
+    visibility.set(true)
+    expect(sources[0]!.closed).toBe(true)
+  })
+
+  it('reopens when the tab is shown again', () => {
+    const visibility = fakeVisibility()
+    const { sources } = harness({ visibility: visibility.port })
+    visibility.set(true)
+    visibility.set(false)
+    expect(sources).toHaveLength(2)
+    expect(sources[1]!.closed).toBe(false)
+  })
+
+  it('does not open a SECOND stream on a spurious visible event', () => {
+    // `visibilitychange` can fire without the state actually changing. Two streams means every event
+    // arrives twice, and the duplicate is invisible because it only doubles fetches.
+    const visibility = fakeVisibility()
+    const { sources } = harness({ visibility: visibility.port })
+    visibility.set(false)
+    visibility.set(false)
+    expect(sources).toHaveLength(1)
+  })
+
+  it('an explicit close WINS over a later tab switch', () => {
+    /**
+     * The listener outlives nothing: a handle torn down on unmount must not be resurrected when
+     * someone switches back to the tab. Without the `closed` guard the stream reopens with no owner,
+     * and its invalidations land on a query client that has been discarded.
+     */
+    const visibility = fakeVisibility()
+    const { handle, sources } = harness({ visibility: visibility.port })
+    handle.close()
+    visibility.set(true)
+    visibility.set(false)
+    expect(sources).toHaveLength(1)
+  })
+})
+
+describe('carrying the resume position across a reopen', () => {
+  it('a fresh stream asks to resume from the last id it saw', () => {
+    /**
+     * The platform sends `Last-Event-ID` only on `EventSource`'s OWN automatic reconnect. A newly
+     * constructed one sends nothing and offers no API to set the header — so without this, every
+     * deliberate reopen arrives with no position and a replaying server delivers the entire backlog
+     * again, every event of it invalidating queries.
+     */
+    const visibility = fakeVisibility()
+    const { sources, latest } = harness({ visibility: visibility.port })
+    latest().emit('session-logged', '42')
+
+    visibility.set(true)
+    visibility.set(false)
+
+    expect(sources[1]!.url).toBe('/api/v1/events?last-event-id=42')
+  })
+
+  it('asks for nothing when it has seen nothing', () => {
+    // A first open must not send `last-event-id=` empty or 0 — one is malformed and the other is a
+    // real position on a server that numbers from zero.
+    const visibility = fakeVisibility()
+    const { sources } = harness({ visibility: visibility.port })
+    visibility.set(true)
+    visibility.set(false)
+    expect(sources[1]!.url).toBe('/api/v1/events')
+  })
+
+  it('keeps the position across an auth-triggered reopen too', () => {
+    const { handle, sources, latest } = harness()
+    latest().emit('session-logged', '7')
+    handle.reopen()
+    expect(sources[1]!.url).toBe('/api/v1/events?last-event-id=7')
+  })
+
+  it('advances the position as events arrive', () => {
+    const { handle, sources, latest } = harness()
+    latest().emit('session-logged', '7')
+    latest().emit('observation-recorded', '9')
+    handle.reopen()
+    expect(sources[1]!.url).toContain('last-event-id=9')
   })
 })

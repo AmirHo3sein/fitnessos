@@ -404,11 +404,21 @@ no `open` event, no error, and `curl` against the origin server working perfectl
 
 Send `X-Accel-Buffering: no` as well, and `Cache-Control: no-cache, no-transform`.
 
-### 5.3 Every frame needs a monotonic `id:`, and `Last-Event-ID` must be honoured
+### 5.3 Every frame needs a monotonic `id:`, honoured from the header **and** the query string
 
 The browser sends the last id it saw back as `Last-Event-ID` on every reconnect, unprompted. A server
 that ignores it turns each reconnect into a **silent gap**: the events between the drop and the
 recovery are lost and nothing on either side notices.
+
+**It must also be accepted as `?last-event-id=<id>`, and this is not a convenience.** The browser
+sends the header only on `EventSource`'s OWN automatic reconnect of the same instance. Any reopen the
+client initiates constructs a new `EventSource`, which sends no header and offers no API to set one —
+and this client does initiate reopens: it closes the stream while the tab is hidden, because a browser
+allows six connections per origin and four idle tabs would consume four of them.
+
+Ignoring the parameter does not degrade gracefully. Every deliberate reopen would arrive with no
+position and be replayed the entire backlog, each event of it invalidating queries — on every tab
+switch. Both spellings, same replay semantics; the header wins if both are present.
 
 A capped replay window is fine. If a `Last-Event-ID` is older than the window, say so distinctly —
 close with a frame the client can recognise as "resume impossible" — so the client can refetch

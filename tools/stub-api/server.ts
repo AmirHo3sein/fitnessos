@@ -884,7 +884,19 @@ const handlers: Record<string, (req: IncomingMessage, res: ServerResponse) => Pr
      * Resume. `Last-Event-ID` arrives as a header on reconnect; the browser sets it itself, which is
      * why this is worth testing against a browser rather than a client we wrote.
      */
-    const resumeFrom = Number(req.headers['last-event-id'] ?? 0)
+    /*
+     * The header OR the query parameter, and the parameter is not a convenience.
+     *
+     * The browser sends `Last-Event-ID` only on `EventSource`'s own automatic reconnect. A client that
+     * closes a stream deliberately — this app closes while the tab is hidden, to stop four tabs
+     * consuming four of the six connections a browser allows per origin — constructs a NEW
+     * `EventSource`, which sends no such header and offers no API to set one.
+     *
+     * Without the parameter, every deliberate reopen would arrive with no position and be replayed the
+     * entire backlog. Required of the real server too: BACKEND-CONTRACT 5.3.
+     */
+    const fromQuery = new URL(req.url ?? '/', 'http://127.0.0.1').searchParams.get('last-event-id')
+    const resumeFrom = Number(req.headers['last-event-id'] ?? fromQuery ?? 0)
     const backlog = events.get(phone) ?? []
     for (const event of backlog) {
       if (event.id > resumeFrom) writeEvent(res, event)

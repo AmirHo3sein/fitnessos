@@ -246,6 +246,64 @@ test.describe('D-12 · row 4 — concurrent streams', () => {
   })
 })
 
+test.describe('resuming from a position the client supplies', () => {
+  test('@critical the server honours `last-event-id` as a QUERY parameter', async ({ page }) => {
+    /**
+     * The contract half of pausing a stream while its tab is hidden.
+     *
+     * The browser sends `Last-Event-ID` only on `EventSource`'s own automatic reconnect. Any reopen
+     * the CLIENT initiates — which is what happens when a tab becomes visible again — constructs a
+     * new `EventSource`, which sends no such header and offers no API to set one. So the position
+     * travels on the URL, and this asserts the server acts on it.
+     *
+     * Without it the reopen arrives with no position and the whole backlog is replayed: not a small
+     * bug, but every past event delivered again, each one invalidating queries.
+     */
+    await signIn(page, phoneFor('999', test.info().project.name))
+
+    // Three events exist before any stream is listening.
+    await emit(page, { kind: 'session-logged' })
+    await emit(page, { kind: 'observation-recorded' })
+    await emit(page, { kind: 'proposal-raised' })
+
+    const resumed = await page.evaluate(async () => {
+      const source = new EventSource('/api/v1/events?last-event-id=1')
+      const kinds: string[] = []
+      source.onmessage = (message: MessageEvent<string>) => {
+        kinds.push(String(JSON.parse(message.data).kind))
+      }
+      await new Promise((resolve) => setTimeout(resolve, 2_000))
+      source.close()
+      return kinds
+    })
+
+    // Everything AFTER id 1, and nothing before or including it.
+    expect(resumed).toEqual(['observation-recorded', 'proposal-raised'])
+  })
+
+  test('a stream with no position gets the whole backlog, which is why the position matters', async ({
+    page,
+  }) => {
+    // The counterfactual, asserted so the test above cannot pass for the wrong reason.
+    await signIn(page, phoneFor('101', test.info().project.name))
+    await emit(page, { kind: 'session-logged' })
+    await emit(page, { kind: 'observation-recorded' })
+
+    const all = await page.evaluate(async () => {
+      const source = new EventSource('/api/v1/events')
+      const kinds: string[] = []
+      source.onmessage = (message: MessageEvent<string>) => {
+        kinds.push(String(JSON.parse(message.data).kind))
+      }
+      await new Promise((resolve) => setTimeout(resolve, 2_000))
+      source.close()
+      return kinds
+    })
+
+    expect(all).toEqual(['session-logged', 'observation-recorded'])
+  })
+})
+
 test.describe('event-driven invalidation, wired', () => {
   test('@critical a published event refreshes an open screen with no reload', async ({ page }) => {
     /**
@@ -271,6 +329,55 @@ test.describe('event-driven invalidation, wired', () => {
       requestsBefore,
     )
     expect(page.url()).toContain('/sessions')
+  })
+
+  test('@critical a hidden tab stops listening, and catches up when shown', async ({ page }) => {
+    /**
+     * The mechanism through the product: the app's own stream, paused while the tab is hidden and
+     * resumed from the position it kept.
+     *
+     * ## The visibility change here is SIMULATED, and that is a limitation worth stating
+     *
+     * The first version backgrounded the page by bringing a second one to the front. In headless
+     * Chromium `document.visibilityState` stayed `visible` — a backgrounded page is not hidden there
+     * — so the test waited five seconds and failed without touching the behaviour it was about.
+     *
+     * So the state is overridden in the page and the event dispatched. What that proves is that the
+     * APP reacts correctly to the browser saying "hidden": the stream closes, and on becoming visible
+     * it reopens carrying its position. What it does not prove is that Chrome reports `hidden` when a
+     * tab is backgrounded — which is the platform's job, not this codebase's, and not something a
+     * test here could fix if it were wrong.
+     *
+     * The client's own logic is covered without simulation in `sseClient.test.ts`, through an injected
+     * visibility source.
+     */
+    await signIn(page, phoneFor('202', test.info().project.name))
+    await page.goto('/sessions')
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+    const before = await settledSessionRequests(page)
+
+    const setVisibility = async (state: 'hidden' | 'visible') => {
+      await page.evaluate((next) => {
+        Object.defineProperty(document, 'visibilityState', { value: next, configurable: true })
+        document.dispatchEvent(new Event('visibilitychange'))
+      }, state)
+    }
+
+    await setVisibility('hidden')
+    // Something happens while nobody is looking.
+    await emit(page, { kind: 'programme-revised' })
+
+    // Deliberately given time to be wrong in: if the stream had NOT closed, the refetch would land
+    // here and the assertion after the reveal would pass for the wrong reason.
+    await page.waitForTimeout(1_500)
+    expect(await countSessionRequests(page)).toBe(before)
+
+    await setVisibility('visible')
+
+    // The stream reopens, resumes from its last id, and the event that happened while hidden lands.
+    await expect
+      .poll(async () => countSessionRequests(page), { timeout: 15_000 })
+      .toBeGreaterThan(before)
   })
 
   test('an unknown kind changes nothing', async ({ page }) => {
