@@ -33,6 +33,13 @@ export { createTimelineAdapter } from './adapters/timelineAdapter'
 export { createNutritionAdapter } from './adapters/nutritionAdapter'
 export { createWorkflowAdapter } from './adapters/workflowAdapter'
 export {
+  openEventStream,
+  type SseHandle,
+  type SseOptions,
+  type StreamEvent,
+} from './events/sseClient'
+export { INVALIDATIONS, isKnownKind, keysFor } from './events/invalidationMap'
+export {
   createPrescriptionAdapter,
   createPrescriptionWriteAdapter,
 } from './adapters/prescriptionAdapter'

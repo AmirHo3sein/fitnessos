@@ -516,6 +516,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Server-sent events for cache invalidation
+         * @description A `text/event-stream` that never completes. Described here for discoverability; the wire format is NOT expressible in OpenAPI and the requirements are in BACKEND-CONTRACT section 5, which is written from measured browser behaviour. Four of them fail silently if missed: frames must not use `event:` names, a prelude byte must be written on connect, every frame needs a monotonic `id:` with `Last-Event-ID` honoured, and an unauthenticated stream must be refused rather than held open.
+         */
+        get: operations["streamEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1957,6 +1977,30 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Problem"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    streamEvents: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Sent by the browser itself on reconnect. Replay everything after it, or signal that resume is impossible -- never silently resume from the newest event. */
+                "Last-Event-ID"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description An open stream. Each frame is `id:` + `data:`, where data is `{"kind":"<event-kind>"}`. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": string;
                 };
             };
             401: components["responses"]["Unauthorized"];

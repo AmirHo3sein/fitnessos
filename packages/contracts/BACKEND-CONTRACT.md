@@ -372,6 +372,73 @@ obligations follow for the server:
 
 ---
 
+## 5 · The event stream (`GET /events`)
+
+Written from measurements, not from the specification: `apps/web/e2e/sse-spike.spec.ts` is the
+evidence and `docs/spikes/d-12-sse.md` the reasoning. Two of the four requirements below are things a
+well-meaning implementation gets wrong by default, and each one fails **silently** — no error on
+either side, just a client that never hears anything.
+
+### 5.1 Frames carry `id:` and `data:` only — never `event:`
+
+A frame with `event: foo` is delivered by the browser to `addEventListener('foo')` and **never** to
+`onmessage`. A server that names its events silences a client with one handler, and there is no error
+anywhere to explain it.
+
+Naming forces the client to register a listener per kind, which means knowing every kind in advance —
+the opposite of a published vocabulary — and makes an unknown kind *invisible* rather than ignored.
+
+So: **the kind goes in the payload.**
+
+```
+id: 1428
+data: {"kind":"programme-revised"}
+
+```
+
+### 5.2 Write a prelude byte immediately on connect
+
+`: open\n\n`, before anything else. Response headers are not flushed to the browser until the first
+byte of body arrives through a proxy, so without it `EventSource` sits in `CONNECTING` indefinitely —
+no `open` event, no error, and `curl` against the origin server working perfectly the whole time.
+
+Send `X-Accel-Buffering: no` as well, and `Cache-Control: no-cache, no-transform`.
+
+### 5.3 Every frame needs a monotonic `id:`, and `Last-Event-ID` must be honoured
+
+The browser sends the last id it saw back as `Last-Event-ID` on every reconnect, unprompted. A server
+that ignores it turns each reconnect into a **silent gap**: the events between the drop and the
+recovery are lost and nothing on either side notices.
+
+A capped replay window is fine. If a `Last-Event-ID` is older than the window, say so distinctly —
+close with a frame the client can recognise as "resume impossible" — so the client can refetch
+everything instead of assuming it is up to date. **Do not** silently resume from the newest event;
+that is the same silent gap with extra steps.
+
+### 5.4 A 401 on the stream must be a 401 on the stream
+
+The client cannot see a status code — `EventSource` reports every failure identically and retries
+forever, so an expired session becomes an endless reconnect loop from every open tab. The client
+detects this by inference and closes the stream itself, which works only if refusal is prompt and
+consistent. Do not hold an unauthenticated stream open, and do not accept it and then send nothing.
+
+### 5.5 Budget one stream per tab
+
+A browser allows six connections per origin on HTTP/1.1, and a stream holds one for its whole life;
+the seventh never opens and ordinary requests queue behind it. The client therefore opens **one**
+stream per tab regardless of how many contexts want events. Plan for concurrency on that basis: an
+athlete with three tabs open is three streams, not three per context.
+
+### 5.6 Events name what happened, and carry nothing else
+
+The client's response to any event is to invalidate a query key and refetch. Do not put entity state
+in a frame: it would be a second source of truth for everything it touched, and the first
+disagreement with the cache would be undebuggable. The vocabulary the client acts on is in
+`packages/infra/src/events/invalidationMap.ts`; an unrecognised kind is deliberately ignored rather
+than treated as "refetch everything", so adding a kind is safe and renaming one is not.
+
+---
+
 ## How to check
 
 The stub in `tools/stub-api` is the executable form of most of this document, and

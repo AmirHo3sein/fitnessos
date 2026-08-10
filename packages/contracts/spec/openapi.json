@@ -1184,6 +1184,42 @@
           }
         }
       }
+    },
+    "/events": {
+      "get": {
+        "operationId": "streamEvents",
+        "tags": [
+          "events"
+        ],
+        "summary": "Server-sent events for cache invalidation",
+        "description": "A `text/event-stream` that never completes. Described here for discoverability; the wire format is NOT expressible in OpenAPI and the requirements are in BACKEND-CONTRACT section 5, which is written from measured browser behaviour. Four of them fail silently if missed: frames must not use `event:` names, a prelude byte must be written on connect, every frame needs a monotonic `id:` with `Last-Event-ID` honoured, and an unauthenticated stream must be refused rather than held open.",
+        "parameters": [
+          {
+            "name": "Last-Event-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Sent by the browser itself on reconnect. Replay everything after it, or signal that resume is impossible -- never silently resume from the newest event."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "An open stream. Each frame is `id:` + `data:`, where data is `{\"kind\":\"<event-kind>\"}`.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
     }
   },
   "components": {
