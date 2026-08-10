@@ -122,39 +122,45 @@ jobs:
       - name: chrome is present
         run: google-chrome --version
 
-      # The stub is needed even for unauthenticated routes: sign-in posts to it the moment
-      # anyone interacts, and a page whose fetches 500 measures a different page.
+      # Started AND waited for in ONE step, with the logs printed inline on failure.
       #
-      # `nohup … &` with output redirected, not a bare `&`. Two reasons, both learned from reading
-      # this job rather than from running it: a step whose body is a single backgrounded job returns
-      # immediately, so a stub that crashed on startup was a GREEN step; and a background child
-      # holding the step's stdout open is the classic cause of a step that appears to hang.
-      - name: start the stub
-        run: nohup pnpm --filter @fitnessos/stub-api start > /tmp/stub.log 2>&1 &
-
-      - name: start the app
-        run: nohup pnpm --filter @fitnessos/web start > /tmp/app.log 2>&1 &
-
-      # BOTH, not just the app. Nothing waited for the stub, so a stub that was slow to bind
-      # surfaced minutes later as a console-error assertion failure on an unrelated audit.
-      # `/api/v1/athletes/me` answers 401 without a session, which the e2e config already treats as
-      # a valid readiness signal.
+      # Three findings from the first real run of this job, all of them mine:
       #
-      # `pnpm exec`, not `npx`: `wait-on` is now a declared devDependency, so it comes from the
-      # lockfile and sits inside the `pnpm audit` gate rather than being fetched unpinned at run
-      # time — in the very job that runs lhci, whose own dependency tree is why two of this repo's
-      # security overrides exist.
-      - name: wait for the stub and the app
+      # 1. The stub never became reachable — `wait-on` timed out after 60 s on
+      #    `/api/v1/athletes/me`, and lighthouse was skipped.
+      # 2. The diagnostic step meant to explain that FAILED: `tail -50 a b` is rejected as "option
+      #    used in invalid context" when given more than one file in this shell. The one step whose
+      #    whole job was to explain a failure was itself broken, which is the worst thing for a
+      #    diagnostic to be. It is `tail -n 50` now.
+      # 3. Splitting start from wait across two steps made "does a background process survive a step
+      #    boundary" a variable inside an already-unexplained failure. One step removes the question:
+      #    the servers and the thing waiting for them share a shell.
+      #
+      # `-v` on wait-on so the log says which URL it is still waiting for, and the failure branch
+      # prints both server logs plus what is actually listening — because the next failure should be
+      # explicable from the log alone.
+      - name: start the stub and the app, and wait for both
         run: |
-          pnpm exec wait-on http://127.0.0.1:8791/api/v1/athletes/me --timeout 60000
-          pnpm exec wait-on http://127.0.0.1:3000 --timeout 60000
+          nohup pnpm --filter @fitnessos/stub-api start > /tmp/stub.log 2>&1 &
+          nohup pnpm --filter @fitnessos/web start > /tmp/app.log 2>&1 &
+          pnpm exec wait-on -v \
+            http://127.0.0.1:8791/api/v1/athletes/me \
+            http://127.0.0.1:3000 \
+            --timeout 90000 || {
+              echo "=== stub.log ==="; tail -n 100 /tmp/stub.log || true
+              echo "=== app.log ===";  tail -n 100 /tmp/app.log  || true
+              echo "=== listening ==="; { ss -ltnp || netstat -ltn; } 2>&1 | head -20 || true
+              exit 1
+            }
 
       - name: lighthouse
         run: pnpm lighthouse
 
+      # `-n 50`, not `-50`: with more than one file the short form is rejected in this shell, which
+      # is how the first run's only diagnostic managed to fail.
       - name: server logs
         if: failure()
-        run: tail -50 /tmp/stub.log /tmp/app.log || true
+        run: tail -n 50 /tmp/stub.log /tmp/app.log || true
 
       # `include-hidden-files`, because `.lighthouseci` is a dot-directory and upload-artifact
       # excludes hidden paths by default — the artifact would have been silently empty, and this is
