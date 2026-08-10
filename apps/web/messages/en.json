@@ -8,7 +8,8 @@
       "settings": "Settings",
       "checkIn": "Check-in",
       "report": "Report",
-      "layout": "Layout"
+      "layout": "Layout",
+      "plan": "Plan"
     },
     "description": "An operating system for physical development — programmes, sessions and the evidence that they worked."
   },
@@ -300,6 +301,30 @@
         "upcoming-sessions": "Upcoming sessions",
         "unjudged-proposals": "Awaiting judgement"
       }
+    }
+  },
+  "plan": {
+    "heading": "Plan",
+    "title": "Training plan",
+    "none": "No plan yet",
+    "noneHint": "A plan lays out phases over time. It says WHEN, and nothing about what the training is.",
+    "create": "Create one",
+    "loading": "Loading the plan",
+    "saveFailed": "Your changes could not be saved. They are still here — try again.",
+    "newTitle": "This season",
+    "firstPhase": "Accumulation",
+    "builder": {
+      "heading": "Phases",
+      "addPhase": "Add phase",
+      "removePhase": "Remove",
+      "undo": "Undo",
+      "redo": "Redo",
+      "save": "Save",
+      "phaseLabel": "Phase",
+      "newPhaseLabel": "New phase",
+      "empty": "This plan has no phases yet.",
+      "weeks": "weeks",
+      "refused": "That would overlap another phase, so nothing moved."
     }
   }
 }

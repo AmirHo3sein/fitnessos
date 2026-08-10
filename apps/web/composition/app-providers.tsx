@@ -8,6 +8,7 @@ import { MeasurementPortsProvider } from '@fitnessos/ctx-measurement/presentatio
 import { LearningPortsProvider } from '@fitnessos/core/learning/presentation'
 import { ReportPortsProvider } from '@fitnessos/ctx-report/presentation'
 import { DashboardPortsProvider } from '@fitnessos/ctx-dashboard/presentation'
+import { TimelinePortsProvider } from '@fitnessos/ctx-timeline/presentation'
 import { useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useRef, type ReactNode } from 'react'
@@ -19,6 +20,7 @@ import { createMeasurementPorts } from './measurement'
 import { createLearningPorts } from './learning'
 import { createReportPorts } from './report'
 import { createDashboardPorts } from './dashboard'
+import { createTimelinePorts } from './timeline'
 import { createHttp } from './container'
 
 /**
@@ -94,6 +96,7 @@ export const AppProviders = ({ children }: { children: ReactNode }) => {
       learning: createLearningPorts(http, {}),
       report: createReportPorts(http, {}),
       dashboardLayout: createDashboardPorts(http, {}),
+      timeline: createTimelinePorts(http, {}),
       execution: createExecutionPorts(http, {}, () => {
         void queryClient.invalidateQueries({ queryKey: ['sync-issues'] })
       }),
@@ -108,7 +111,9 @@ export const AppProviders = ({ children }: { children: ReactNode }) => {
             <LearningPortsProvider value={ports.learning}>
               <ReportPortsProvider value={ports.report}>
                 <DashboardPortsProvider value={ports.dashboardLayout}>
-                  <ExecutionPortsProvider value={ports.execution}>{children}</ExecutionPortsProvider>
+                  <TimelinePortsProvider value={ports.timeline}>
+                    <ExecutionPortsProvider value={ports.execution}>{children}</ExecutionPortsProvider>
+                  </TimelinePortsProvider>
                 </DashboardPortsProvider>
               </ReportPortsProvider>
             </LearningPortsProvider>

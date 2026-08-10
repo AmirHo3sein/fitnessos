@@ -405,6 +405,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/plans/current": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The athlete's current plan */
+        get: operations["getCurrentPlan"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/plans/{planId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Create or replace a plan
+         * @description PUT, like a form, a report and a dashboard: a plan owns its own phases and nothing references one, so replacing it cannot make anything else unreadable. Submitting the same body twice leaves it in the same state.
+         */
+        put: operations["savePlan"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -826,6 +863,39 @@ export interface components {
             columns: number;
             /** @description Widgets MUST NOT overlap. Unlike a report's tiles, where list order is paint order, order carries nothing here — the layout is entirely in the coordinates. */
             widgets: components["schemas"]["Widget"][];
+        };
+        Phase: {
+            /** Format: uuid */
+            id: string;
+            /** @description The coach's own word for it -- 'accumulation', 'peak'. Not a fixed vocabulary. */
+            label: string;
+            /** @description Whole DAYS from the plan's epoch. Days rather than the milliseconds D-04 names for Timeline: a plan's smallest meaningful unit is a day and its natural unit is a week, and millisecond precision would force the arithmetic through Date -- which shifts a plain date by a day west of Greenwich. */
+            start: number;
+            /** @description Whole days, at least one week. Below a week there is no full rotation of whatever the phase prescribes. */
+            length: number;
+            /**
+             * Format: uuid
+             * @description The programme this phase intends to run. Absent when none. Opaque to Timeline, which never dereferences it (ADR-0019).
+             */
+            programId?: string;
+            /**
+             * Format: uuid
+             * @description What the phase is for. NEVER an evaluation input (ADR-0008).
+             */
+            servesGoal?: string;
+        };
+        /** @description A periodisation laid out on time. Distinct from a ProgramVersion, which says WHAT the training is with no dates; this says WHEN and nothing about content, so a taper can move without revising a block. */
+        Plan: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            /**
+             * Format: date
+             * @description Day zero. Every phase offset is relative to it, so the whole plan can be shifted by changing one field.
+             */
+            epoch: string;
+            /** @description MUST NOT overlap: an athlete is in one phase at a time, and two overlapping phases make 'what am I doing this week' unanswerable. Order is not significant -- the client sorts by start. */
+            phases: components["schemas"]["Phase"][];
         };
     };
     responses: {
@@ -1546,6 +1616,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Dashboard"];
+                };
+            };
+            /** @description invalid */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    getCurrentPlan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ok */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Plan"];
+                };
+            };
+            /** @description no plan yet */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    savePlan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                planId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Plan"];
+            };
+        };
+        responses: {
+            /** @description saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Plan"];
                 };
             };
             /** @description invalid */

@@ -57,6 +57,9 @@ importers:
       '@fitnessos/ctx-report':
         specifier: workspace:*
         version: link:../../packages/ctx-report
+      '@fitnessos/ctx-timeline':
+        specifier: workspace:*
+        version: link:../../packages/ctx-timeline
       '@fitnessos/infra':
         specifier: workspace:*
         version: link:../../packages/infra
@@ -609,6 +612,9 @@ importers:
       '@fitnessos/ctx-report':
         specifier: workspace:*
         version: link:../ctx-report
+      '@fitnessos/ctx-timeline':
+        specifier: workspace:*
+        version: link:../ctx-timeline
       '@fitnessos/editor-engine':
         specifier: workspace:^
         version: link:../editor-engine
