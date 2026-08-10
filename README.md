@@ -830,8 +830,8 @@ the app still works. A flag that has never been turned off is a branch nobody ha
 
 Phases 0–7 are done except what deployment decides (see the table): all seven editors, strict CSP, AA on every builder including keyboard
 operability, bundle budgets per route, Lighthouse on the public routes, offline logging, and live
-invalidation. `pnpm check` is the gate; `pnpm e2e:full` is 294 tests across a chromium and a mobile-RTL
-project — 293 passing and one skipped, described at the end of this section.
+invalidation. `pnpm check` is the gate; `pnpm e2e:full` is 298 tests across a chromium and a mobile-RTL
+project — 293 passing, 4 kill-switch specs skipped by design (they need the app started with the flag off, which `scheduled.yml` does in its own job), and one skipped for the reason at the end of this section.
 
 What is **not** done, and what each waits on:
 
@@ -846,6 +846,14 @@ The exception is session logging (ADR-0033), which sets the same value for the o
 not "fail fast so the author can retry" but "never consult the network — this writes to a durable
 queue". An authored artefact must fail while its author is looking at it; a session log must not.
 
+### Runbooks
+
+`docs/runbook.md` — symptom-to-cause for the failure modes this codebase has actually produced, what
+each CI job gates and what to check first when it fails, the five contract obligations the backend can
+break **silently**, and the one lever available without shipping a build. It deliberately has no
+deployment or rollout section: that infrastructure does not exist, and procedures written for it would
+read as authoritative and be fiction.
+
 | Open | Waits on |
 |---|---|
 | Persian copy across seven builders | A native speaker. None of it has been reviewed |
@@ -854,6 +862,7 @@ queue". An authored artefact must fail while its author is looking at it; a sess
 | D-12's proxy row | Staging, with the endpoint live. Whether the production proxy honours `X-Accel-Buffering: no` cannot be answered locally |
 | Authenticated Lighthouse metrics | A decision to take on `puppeteer`. See the note in `lighthouserc.cjs` — the header-based shortcut silently measures a redirect |
 | ADRs 0028, 0030 | The backend repository |
+| Rollout, scaling, incident escalation | A deployment target. Nothing here is written for infrastructure that does not exist |
 
 One e2e is skipped on `mobile-rtl`: Playwright refuses to click the timeline's undo button after a
 drag, reporting that the toolbar intercepts pointer events on its own child, while
