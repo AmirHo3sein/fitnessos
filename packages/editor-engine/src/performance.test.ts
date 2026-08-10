@@ -164,7 +164,15 @@ describe('D-01 · history costs O(1) per entry', () => {
 })
 
 describe('D-01 · undo does not get slower as history grows', () => {
-  it('undoing from a 200-entry history costs about what undoing from a 20-entry one does', () => {
+  /*
+   * 30 s, because this is a benchmark and vitest's default is 5 s.
+   *
+   * Interleaving five rounds to survive CPU contention multiplied the work by ten, and on a CI
+   * runner that tipped past the default — the test timed out rather than failing an assertion,
+   * which reports as a red build with nothing to read. The robustness fix created a new failure
+   * mode; the timeout is the other half of it.
+   */
+  it('undoing from a 200-entry history costs about what undoing from a 20-entry one does', { timeout: 30_000 }, () => {
     /*
      * A ratio of two measurements taken in the same process, seconds apart, so machine speed
      * cancels. A stored wall-clock baseline would not survive a CI runner and would be switched
@@ -249,7 +257,9 @@ describe('D-03 · the spatial index is O(1) for query', () => {
     expect(hits.length).toBeLessThan(10)
   })
 
-  it('costs the same in a 20,000-node index as in a 1,000-node one', () => {
+  // 30 s for the same reason as the undo benchmark above: five interleaved rounds against a
+  // 20,000-node index is more work than a 5 s default was ever meant to hold.
+  it('costs the same in a 20,000-node index as in a 1,000-node one', { timeout: 30_000 }, () => {
     /*
      * A timing, and the only one here that has to be.
      *

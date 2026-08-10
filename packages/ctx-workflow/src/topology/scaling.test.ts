@@ -57,7 +57,9 @@ const timePerCall = (workflow: Workflow, iterations: number): number => {
 }
 
 describe('problemsOf scales linearly', () => {
-  it('an eightfold graph does not cost dramatically more than eightfold time', () => {
+  // Explicit timeout for the same reason as `editor-engine`'s benchmarks: 2,000 iterations of the
+  // small case plus 200 of the large, five times over, is not a 5 s default's business.
+  it('an eightfold graph does not cost dramatically more than eightfold time', { timeout: 30_000 }, () => {
     const small = chain(50)
     const large = chain(400)
 

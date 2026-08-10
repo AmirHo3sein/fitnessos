@@ -445,9 +445,17 @@ test.describe('saving with no network at all', () => {
     await context.setOffline(true)
     await page.getByRole('button', { name: 'ارسال کد' }).click()
 
-    // Something on screen, within a bounded time — and NOT the code step, which would ask for a
-    // code that was never sent.
-    await expect(page.getByRole('alert')).toBeVisible({ timeout: 15_000 })
+    /*
+     * The specific message, not `getByRole('alert')`.
+     *
+     * The first version matched the role and hit a strict-mode violation on CI: two alerts resolve
+     * on this page, because the form renders one per field and the phone field's validation alert
+     * can be present alongside the submission failure. A locator that is ambiguous only sometimes is
+     * worse than one that is always wrong — it passes locally and fails where nobody is watching.
+     */
+    await expect(page.getByText('ارسال نشد. دوباره تلاش کنید.')).toBeVisible({ timeout: 15_000 })
+
+    // And NOT the code step, which would ask for a code that was never sent.
     await expect(page.getByLabel('کد تأیید')).toHaveCount(0)
 
     await context.setOffline(false)
