@@ -36,6 +36,7 @@ packages/core         un-graduated bounded contexts; each exposes `./{ctx}` and 
 packages/ctx-*        graduated bounded contexts
 packages/ui           shared React layer — primitives, patterns, DI factory
 packages/telemetry    observability seam — closed event vocabulary, no vendor (ADR-0032)
+packages/flags        feature flags — closed vocabulary, server-evaluated, no vendor
 packages/design-tokens  the colour system — generated, contrast-gated (see its README)
 packages/editor-engine  document · inverse-action history · spatial index · coordinate spaces
 packages/editor-react   React bindings — vanilla store, two channels, useSyncExternalStore
@@ -797,9 +798,37 @@ Measured, not assumed — `docs/spikes/d-12-sse.md` has the reasoning and
 The last one has no fix inside the platform: the client infers refusal from two immediate failures
 and closes the stream itself. That inference **is a guess**, marked as one in the code.
 
+## Feature flags
+
+A closed vocabulary, the same shape as the telemetry event vocabulary and for the same reason: an
+open `isEnabled(string)` cannot be reviewed, and a typo produces a flag that is silently off forever
+— which for a kill switch means the switch does nothing at the moment it is needed.
+
+Three properties worth knowing before adding one:
+
+- **Server-evaluated, passed down as booleans.** Read in the `(app)` layout and handed to
+  `AppProviders` as a prop, the way labels are. Deliberately NOT `NEXT_PUBLIC_`: a public env var is
+  inlined at build time, which makes a flag a property of the build rather than of the deployment —
+  and a kill switch that needs a rebuild is not a kill switch.
+- **Unrecognised values fall back to the declared default**, not to `false`. This is the opposite of
+  the `Boolean(value)` reflex and it is deliberate: `FLAG_X=disabled` or a typo must not silently
+  withdraw a shipped feature. Unrecognised means "nobody has decided"; the fallback is what somebody
+  already decided.
+- **Every flag records what turning it off does and when it gets deleted.** A test asserts both
+  strings are non-empty, because a flag nobody plans to remove is a permanent branch in the product
+  and two branches means each is exercised half as often.
+
+The only flag today is `live-invalidation`, a kill switch for the SSE stream — the newest subsystem,
+the only one holding a long-lived connection, and the one whose correctness depends on four server
+behaviours that fail silently (BACKEND-CONTRACT §5). Off degrades to the behaviour that existed
+before it: screens refresh on mount and after a save.
+
+`scheduled.yml` has a job that starts the app with the flag OFF and asserts no stream is opened and
+the app still works. A flag that has never been turned off is a branch nobody has visited.
+
 ## State of play
 
-Phases 0–6 are done: all seven editors, strict CSP, AA on every builder including keyboard
+Phases 0–7 are done except what deployment decides (see the table): all seven editors, strict CSP, AA on every builder including keyboard
 operability, bundle budgets per route, Lighthouse on the public routes, offline logging, and live
 invalidation. `pnpm check` is the gate; `pnpm e2e:full` is 294 tests across a chromium and a mobile-RTL
 project — 293 passing and one skipped, described at the end of this section.

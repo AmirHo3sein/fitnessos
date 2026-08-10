@@ -22,6 +22,7 @@
     "@fitnessos/ctx-report": "workspace:*",
     "@fitnessos/ctx-timeline": "workspace:*",
     "@fitnessos/ctx-workflow": "workspace:*",
+    "@fitnessos/flags": "workspace:*",
     "@fitnessos/infra": "workspace:*",
     "@fitnessos/kernel": "workspace:*",
     "@fitnessos/telemetry": "workspace:*",

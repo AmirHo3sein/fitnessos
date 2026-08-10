@@ -53,7 +53,19 @@ import { createHttp } from './container'
  * When `(auth)` needs an OTP port it gets its own provider module here, on the same
  * terms. There is deliberately no single god container in Context.
  */
-export const AppProviders = ({ children }: { children: ReactNode }) => {
+export interface AppProvidersProps {
+  readonly children: ReactNode
+  /**
+   * Flags, evaluated on the SERVER and handed down as plain booleans — the same way labels are.
+   *
+   * Not read in here: this is a client component, so reading `process.env` would either be
+   * undefined at runtime or require `NEXT_PUBLIC_`, which inlines the value at build time and turns
+   * a kill switch into a property of the build. See `composition/flags.ts`.
+   */
+  readonly liveInvalidation: boolean
+}
+
+export const AppProviders = ({ children, liveInvalidation }: AppProvidersProps) => {
   const router = useRouter()
   // Stable for the life of the provider above, so it can go in the memo's deps without rebuilding
   // the container — unlike `router`, whose identity changes on navigation.
@@ -131,6 +143,17 @@ export const AppProviders = ({ children }: { children: ReactNode }) => {
    * on every navigation — reconnecting constantly, and losing events during each gap.
    */
   useEffect(() => {
+    /*
+     * The kill switch. `live-invalidation` off means no stream is opened at all — not a stream that
+     * opens and ignores events, which would still hold one of the six connections a browser allows
+     * per origin and still reconnect on a schedule.
+     *
+     * Turning it off degrades to the behaviour that existed before the stream did: screens refresh on
+     * mount and after a save. That is the property that makes this switch safe to throw at 3 a.m.
+     * without shipping a build.
+     */
+    if (!liveInvalidation) return
+
     let probing = false
 
     const stream = openEventStream({
@@ -194,7 +217,7 @@ export const AppProviders = ({ children }: { children: ReactNode }) => {
     return () => {
       stream.close()
     }
-  }, [ports, queryClient])
+  }, [liveInvalidation, ports, queryClient])
 
   return (
     <AthletePortsProvider value={ports.athlete}>

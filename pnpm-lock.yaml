@@ -71,6 +71,9 @@ importers:
       '@fitnessos/ctx-workflow':
         specifier: workspace:*
         version: link:../../packages/ctx-workflow
+      '@fitnessos/flags':
+        specifier: workspace:*
+        version: link:../../packages/flags
       '@fitnessos/infra':
         specifier: workspace:*
         version: link:../../packages/infra
@@ -715,6 +718,18 @@ importers:
       vitest:
         specifier: ^3.2.6
         version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(jsdom@25.0.1)(msw@2.15.0(@types/node@22.20.1)(typescript@5.9.3))
+
+  packages/flags:
+    devDependencies:
+      '@fitnessos/config':
+        specifier: workspace:*
+        version: link:../config
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.6
+        version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(jsdom@28.1.0)(msw@2.15.0(@types/node@22.20.1)(typescript@5.9.3))
 
   packages/infra:
     dependencies:

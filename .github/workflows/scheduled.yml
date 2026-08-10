@@ -86,6 +86,47 @@ jobs:
           retention-days: 7
           if-no-files-found: warn
 
+  # The kill switch, thrown. A flag that has never been turned off is a branch nobody has visited —
+  # and the one time it matters, nobody wants to discover that the switch does nothing.
+  #
+  # Its own job because it needs the app running with a DIFFERENT environment: a flag is a property
+  # of the deployment, so the only honest way to test it off is to start a deployment with it off.
+  # The specs are skipped in every other run, by a guard on the same variable.
+  kill-switch:
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.62.1-noble
+      options: --ipc=host --user pwuser
+    env:
+      STUB_API_URL: http://127.0.0.1:8791
+      INTERNAL_API_URL: http://127.0.0.1:8791/api/v1
+      FLAG_LIVE_INVALIDATION: 'off'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: install
+        run: pnpm install --frozen-lockfile
+
+      - name: build
+        run: pnpm --filter @fitnessos/web build
+
+      # `FLAG_LIVE_INVALIDATION` is set at job level, so Playwright's own `webServer` starts the app
+      # with the flag off — no hand-rolled server lifecycle needed here, unlike the lighthouse job.
+      - name: the switch is off and the app still works
+        run: pnpm --filter @fitnessos/web exec playwright test --grep "kill switch"
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: kill-switch-report
+          path: apps/web/playwright-report
+          retention-days: 7
+
   # Stage 15 — Lighthouse, on the routes reachable without a session. Separate job so nine page
   # loads do not sit in the e2e job's critical path.
   #

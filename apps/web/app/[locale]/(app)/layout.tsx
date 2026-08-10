@@ -3,6 +3,7 @@ import { HydrationBoundary, dehydrate } from '@tanstack/react-query'
 import { getTranslations } from 'next-intl/server'
 import type { ReactNode } from 'react'
 import { AppProviders } from '../../../composition/app-providers'
+import { createFlags } from '../../../composition/flags'
 import { createQueryClient } from '../../../composition/query-client'
 import { createServerAthletePorts } from '../../../composition/server'
 import { Link } from '../../../src/i18n/navigation'
@@ -117,7 +118,14 @@ export default async function AppLayout({
       </header>
       <div className="mx-auto max-w-5xl px-6 py-8">
         <HydrationBoundary state={dehydrate(queryClient)}>
-          <AppProviders>{children}</AppProviders>
+          {/*
+            Flags resolved HERE, on the server, and passed down as a boolean. The layout is already
+            `force-dynamic` for the CSP nonce, so this costs nothing extra and is evaluated per
+            request — which is what lets an operator change a flag without a rebuild.
+          */}
+          <AppProviders liveInvalidation={createFlags().isEnabled('live-invalidation')}>
+            {children}
+          </AppProviders>
         </HydrationBoundary>
       </div>
     </div>

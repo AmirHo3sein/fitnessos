@@ -431,3 +431,58 @@ const countSessionRequests = (page: Page) =>
       .getEntriesByType('resource')
       .filter((entry) => entry.name.includes('/api/v1/sessions')).length,
   )
+
+test.describe('the live-invalidation kill switch', () => {
+  /**
+   * Proof that the switch does something — run against an app started with
+   * `FLAG_LIVE_INVALIDATION=off`.
+   *
+   * Skipped otherwise, and that is not a way of avoiding the assertion: the whole suite runs against
+   * one server, and a flag is a property of the deployment rather than of a test. `scheduled.yml`
+   * starts a second server with the flag off and runs exactly this file's describe, so the switch is
+   * exercised in CI rather than trusted.
+   *
+   * A flag that has never been thrown is not a kill switch. It is a branch nobody has visited.
+   */
+  test.skip(
+    process.env['FLAG_LIVE_INVALIDATION'] !== 'off',
+    'requires the app to be running with FLAG_LIVE_INVALIDATION=off',
+  )
+
+  test('@critical no stream is opened, and an event changes nothing', async ({ page }) => {
+    const streamRequests: string[] = []
+    page.on('request', (request) => {
+      if (request.url().includes('/api/v1/events')) streamRequests.push(request.url())
+    })
+
+    await signIn(page, phoneFor('303', test.info().project.name))
+    await page.goto('/sessions')
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+    const before = await settledSessionRequests(page)
+
+    // The event still happens server-side; the client simply is not listening.
+    await emit(page, { kind: 'programme-revised' })
+    await page.waitForTimeout(2_500)
+
+    // Nothing refetched...
+    expect(await countSessionRequests(page)).toBe(before)
+    // ...and no stream was ever opened. Asserted separately: a stream that opened and ignored
+    // events would still hold one of the six connections a browser allows per origin and would
+    // still reconnect on a schedule.
+    expect(streamRequests).toEqual([])
+  })
+
+  test('the app is otherwise unaffected', async ({ page }) => {
+    // Turning it off must degrade to the behaviour that existed before the stream did, not to a
+    // broken screen. This is the assertion that makes the switch safe to throw unattended.
+    await signIn(page, phoneFor('304', test.info().project.name))
+    await page.goto('/nutrition')
+    await page.getByRole('button', { name: 'ساختن برنامه‌ی تغذیه' }).click()
+    await expect(page.getByRole('button', { name: 'ذخیره' })).toBeVisible()
+
+    await page.getByLabel('نام وعده').first().fill('صبحانه‌ی دیر')
+    await page.getByRole('button', { name: 'ذخیره' }).click()
+    await page.reload()
+    await expect(page.getByLabel('نام وعده').first()).toHaveValue('صبحانه‌ی دیر')
+  })
+})
