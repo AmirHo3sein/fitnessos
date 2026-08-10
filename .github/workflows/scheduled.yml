@@ -138,13 +138,29 @@ jobs:
       #
       # `-v` on wait-on so the log says which URL it is still waiting for, and the failure branch
       # prints both server logs plus what is actually listening — because the next failure should be
-      # explicable from the log alone.
+      # explicable from the log alone. It was: see below.
+      #
+      # ## `tcp:` for the stub, and why the obvious URL was wrong
+      #
+      # The verbose log answered it immediately, and contradicted the guess in the previous commit
+      # ("the stub did not come up"). The stub was up the whole time, answering **501** — because
+      # `wait-on`'s `http://` scheme issues a **HEAD** request, and the stub implements GET only.
+      # Confirmed locally: `GET /api/v1/athletes/me` → 401, `HEAD` → 501.
+      #
+      # `http-get://` would fix the method and not the problem: `wait-on` treats any non-2xx as
+      # not-ready, and this endpoint answers 401 without a session — deliberately, since that is what
+      # makes it a readiness signal at all. Playwright's `webServer` accepts that 401 and is happy
+      # with the same URL, which is exactly why this looked like a safe thing to copy.
+      #
+      # So the stub is waited on at the TCP level, which is what "the server is up" actually means
+      # here, and carries no opinion about status codes. The app keeps its HTTP check because `/`
+      # genuinely answers 200.
       - name: start the stub and the app, and wait for both
         run: |
           nohup pnpm --filter @fitnessos/stub-api start > /tmp/stub.log 2>&1 &
           nohup pnpm --filter @fitnessos/web start > /tmp/app.log 2>&1 &
           pnpm exec wait-on -v \
-            http://127.0.0.1:8791/api/v1/athletes/me \
+            tcp:127.0.0.1:8791 \
             http://127.0.0.1:3000 \
             --timeout 90000 || {
               echo "=== stub.log ==="; tail -n 100 /tmp/stub.log || true
