@@ -6,7 +6,7 @@ import { buildCsp, newNonce } from './src/security/csp'
 const intl = createIntlMiddleware(routing)
 
 /** Route segments under `(app)` require a session. */
-const PROTECTED = ['/dashboard', '/onboarding', '/programme', '/sessions', '/check-in', '/report', '/layout', '/plan', '/settings']
+const PROTECTED = ['/dashboard', '/onboarding', '/programme', '/sessions', '/check-in', '/report', '/layout', '/plan', '/nutrition', '/settings']
 
 const stripLocale = (pathname: string): string => {
   for (const locale of routing.locales) {

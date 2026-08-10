@@ -9,7 +9,8 @@
       "checkIn": "Check-in",
       "report": "Report",
       "layout": "Layout",
-      "plan": "Plan"
+      "plan": "Plan",
+      "nutrition": "Nutrition"
     },
     "description": "An operating system for physical development — programmes, sessions and the evidence that they worked."
   },
@@ -325,6 +326,38 @@
       "empty": "This plan has no phases yet.",
       "weeks": "weeks",
       "refused": "That would overlap another phase, so nothing moved."
+    }
+  },
+  "nutrition": {
+    "heading": "Nutrition",
+    "title": "Nutrition plan",
+    "none": "No nutrition plan has been written yet.",
+    "noneHint": "Meals, and what is eaten in each of them, go here.",
+    "create": "Create a nutrition plan",
+    "loading": "Loading the nutrition plan",
+    "saveFailed": "Your changes were not saved. They are still here; try again.",
+    "newTitle": "Nutrition plan",
+    "firstMeal": "Breakfast",
+    "firstMealWhen": "on waking",
+    "builder": {
+      "heading": "Meals",
+      "addMeal": "Add meal",
+      "removeMeal": "Remove meal",
+      "addItem": "Add item",
+      "removeItem": "Remove item",
+      "undo": "Undo",
+      "redo": "Redo",
+      "save": "Save",
+      "mealName": "Meal name",
+      "mealWhen": "When",
+      "food": "Food",
+      "amount": "Amount",
+      "moveTo": "In meal",
+      "newMealName": "New meal",
+      "newFood": "New food",
+      "newAmount": "100 g",
+      "empty": "This plan has no meals yet.",
+      "noItems": "Nothing in this meal yet."
     }
   }
 }

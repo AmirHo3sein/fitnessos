@@ -30,6 +30,7 @@ export { createLearningAdapter } from './adapters/learningAdapter'
 export { createReportAdapter } from './adapters/reportAdapter'
 export { createDashboardAdapter } from './adapters/dashboardAdapter'
 export { createTimelineAdapter } from './adapters/timelineAdapter'
+export { createNutritionAdapter } from './adapters/nutritionAdapter'
 export {
   createPrescriptionAdapter,
   createPrescriptionWriteAdapter,

@@ -285,6 +285,32 @@ observation recorded**. That is ADR-0024's cycle — Execution feeds Measurement
 be correct until the first session was logged and silently stale thereafter, and the athlete
 would see their estimated one-rep max fail to move after the session that moved it.
 
+### 4.7 `NutritionPlan` nests, and both levels have rules
+
+The only nested document in the API, which makes three things worth stating explicitly rather
+than leaving to a reader's inference from the schema:
+
+**`MealItem.id` is unique across the whole plan, not within its meal.** These are node ids in the
+editor's flat document, so two items in different meals sharing an id would be one node with two
+parents. The editor cannot represent that, and a plan carrying it will fail to hydrate rather than
+render half of itself. If ids are generated server-side for any reason, generate them per plan.
+
+**`order` is zero-based within its own meal**, so two meals each holding two items both use `0, 1`.
+The same tolerance as §3.5 applies at both levels: the read path sorts and tolerates a gap, the
+write path refuses one. The builder derives `order` from position at both levels, so any save
+normalises the whole plan.
+
+**`amount` is free text and must stay that way for now.** `'200 g'`, `'1 cup'`, `'a handful'` are
+all legitimate. A `{ quantity, unit }` pair would be the better shape and it is not available yet:
+it presumes a unit vocabulary, which presumes the food catalogue, and ADR-0012 makes catalogue
+**versioning** a prerequisite because a plan authored today must not change meaning when a
+catalogue entry is corrected. Until that exists, this field holds the coach's words and the client
+computes no totals from it. A backend that starts parsing it into numbers will be the first thing
+to break when the catalogue lands, because the parse will disagree with the catalogue's units.
+
+`PUT /nutrition-plans/{planId}` is a replace, on the same reasoning as §4.5: nothing references a
+meal or an item, so replacing the plan cannot make anything else unreadable.
+
 ---
 
 ## How to check

@@ -197,6 +197,20 @@ test.describe('the editors', () => {
     await shot(page, 'report-builder')
   })
 
+  test('the nutrition plan, empty and with a meal open', async ({ page }) => {
+    // The only builder with a nested list, so it is the only one where a stylesheet or spacing
+    // regression can misalign one level against the other while both still read as present.
+    await signIn(page, phoneFor('777', test.info().project.name))
+    await page.goto('/nutrition')
+    await expect(page.getByText('هنوز برنامه‌ی تغذیه‌ای ساخته نشده است.')).toBeVisible()
+    await shot(page, 'nutrition-empty')
+
+    await page.getByRole('button', { name: 'ساختن برنامه‌ی تغذیه' }).click()
+    await page.getByRole('button', { name: 'افزودن خوراک' }).first().click()
+    await expect(page.getByLabel('خوراک', { exact: true })).toHaveCount(1)
+    await shot(page, 'nutrition-builder')
+  })
+
   test('the report canvas has real height', async ({ page }) => {
     /**
      * The regression that started this, pinned as a measurement rather than an image.

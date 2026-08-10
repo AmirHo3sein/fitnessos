@@ -135,6 +135,27 @@ test.describe('every page passes WCAG 2.1 AA', () => {
     await expectNoViolations(page)
   })
 
+  test('the nutrition builder, which nests one list inside another', async ({ page }) => {
+    /*
+     * Scanned because the nesting is new here. Every builder before this rendered one flat list;
+     * this one puts an `ol` of items inside an `li` of a meal, and the two things a scan can
+     * actually settle about that structure are whether the nested list is validly placed and
+     * whether each of the two levels' fields still has a label of its own.
+     */
+    await signIn(page, phoneFor('111', test.info().project.name))
+    await page.goto('/nutrition')
+    await expectNoViolations(page)
+
+    await page.getByRole('button', { name: 'ساختن برنامه‌ی تغذیه' }).click()
+    await expect(page.getByRole('button', { name: 'ذخیره' })).toBeVisible()
+    await expectNoViolations(page)
+
+    // With something in the nested level, since an empty meal renders no inner list at all.
+    await page.getByRole('button', { name: 'افزودن خوراک' }).first().click()
+    await expect(page.getByLabel('خوراک', { exact: true })).toHaveCount(1)
+    await expectNoViolations(page)
+  })
+
   test('the 404', async ({ page }) => {
     await page.goto('/nope-does-not-exist')
     await expectNoViolations(page)
