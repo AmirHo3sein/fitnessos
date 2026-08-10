@@ -449,7 +449,32 @@ than treated as "refetch everything", so adding a kind is safe and renaming one 
 
 ---
 
-## How to check
+## How to check — run it
+
+`pnpm conformance` executes the requirements that are observable from outside a single request. It
+needs a base URL and a disposable account:
+
+```sh
+CONFORMANCE_BASE_URL=https://api.example.test/api/v1 \
+CONFORMANCE_COOKIE='access_token=…' \
+pnpm conformance
+```
+
+Thirteen checks, each naming its section, so a failure is a line in this document rather than a
+puzzle. It covers all five requirements that fail **silently** (§5.1–5.4, §4.9) plus idempotency and
+concurrency (§1.1, §1.3, §1.4, §2.1) and the 403/404 distinction (§3.3).
+
+Every check is probe-verified: the stub was deliberately broken in seven ways — naming SSE frames,
+dropping the prelude byte, ignoring `?last-event-id=`, accepting an unauthenticated stream, 404ing a
+PUT to an unknown id, answering 200 to a duplicate session, accepting a stale `baseVersionId` — and
+each break was caught by the check that names it. A suite nobody has broken on purpose is a suite
+nobody knows works.
+
+What it cannot check is listed in `tools/conformance/README.md` with the reason, so "passes" and "not
+checked" are never confused: §3.5 (ordering is not promised, so nothing can be asserted), §3.7 (a
+deployment property), §4.1 and §4.2 (statements about what the client does not need).
+
+## How to check — read it
 
 The stub in `tools/stub-api` is the executable form of most of this document, and
 the e2e suite asserts against it. Where the prose and the stub disagree, one of

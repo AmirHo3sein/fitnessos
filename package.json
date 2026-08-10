@@ -11,6 +11,7 @@
     "check": "pnpm typecheck && pnpm lint && pnpm tokens:check && pnpm color:contrast && pnpm test:unit && pnpm test:integration && pnpm test:component",
     "color:contrast": "node tools/color/contrast-report.mjs",
     "color:lint": "node tools/color/lint-usage.mjs",
+    "conformance": "pnpm --filter @fitnessos/conformance test:conformance",
     "contracts:generate": "turbo run contracts:generate",
     "dev:api": "pnpm --filter @fitnessos/stub-api start",
     "e2e:critical": "pnpm --filter @fitnessos/web e2e:critical",

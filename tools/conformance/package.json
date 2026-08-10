@@ -1,0 +1,14 @@
+{
+  "name": "@fitnessos/conformance",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:conformance": "vitest run --config vitest.config.ts"
+  },
+  "devDependencies": {
+    "@fitnessos/config": "workspace:*",
+    "typescript": "^5.6.3",
+    "vitest": "^3.2.6"
+  }
+}

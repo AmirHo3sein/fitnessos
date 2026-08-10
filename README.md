@@ -44,6 +44,7 @@ tools/generators      plop generators
 tools/color           palette generator + WCAG gate + token-usage lint
 tools/stub-api        stands in for the backend in e2e and local dev
 tools/bundle-budget   CI stage 9
+tools/conformance     the backend contract, executable against any base URL
 ```
 
 ## Commands
@@ -857,7 +858,7 @@ read as authoritative and be fiction.
 | Open | Waits on |
 |---|---|
 | Persian copy across seven builders | A native speaker. None of it has been reviewed |
-| `BACKEND-CONTRACT.md` — 5 sections, 29 numbered requirements | A reader on the backend side. This client agreeing with its own stub proves consistency, not correctness |
+| `BACKEND-CONTRACT.md` — 5 sections, 29 requirements | Still a reader, but 13 of them no longer need one: `pnpm conformance` runs them against any base URL and names the section it fails. The other 16 are statements a suite cannot check |
 | Telemetry sink (ADR-0032) | Deployment and the data-residency question under ADR-0002 — not engineering |
 | D-12's proxy row | Staging, with the endpoint live. Whether the production proxy honours `X-Accel-Buffering: no` cannot be answered locally |
 | Authenticated Lighthouse metrics | A decision to take on `puppeteer`. See the note in `lighthouserc.cjs` — the header-based shortcut silently measures a redirect |

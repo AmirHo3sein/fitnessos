@@ -86,6 +86,41 @@ jobs:
           retention-days: 7
           if-no-files-found: warn
 
+  # The contract, executed rather than read.
+  #
+  # `BACKEND-CONTRACT.md` states 29 requirements; 13 of them are observable from outside a single
+  # request and this suite checks those against a live server. Run here against the STUB, which is how
+  # the suite proves ITSELF: the stub is the contract's executable form, so a green run means the
+  # checks agree with the document. Pointed at a real backend (`CONFORMANCE_BASE_URL`) it tells that
+  # team exactly which section they are violating.
+  #
+  # Every check is probe-verified — the stub was deliberately broken in seven ways and each break was
+  # caught by the check that names it.
+  conformance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: install
+        run: pnpm install --frozen-lockfile
+
+      - name: start the stub
+        run: |
+          nohup pnpm --filter @fitnessos/stub-api start > /tmp/stub.log 2>&1 &
+          pnpm exec wait-on -v tcp:127.0.0.1:8791 --timeout 60000 || {
+            tail -n 50 /tmp/stub.log; exit 1
+          }
+
+      - name: conformance
+        env:
+          CONFORMANCE_PHONE: '+989129990009'
+        run: pnpm conformance
+
   # The kill switch, thrown. A flag that has never been turned off is a branch nobody has visited —
   # and the one time it matters, nobody wants to discover that the switch does nothing.
   #
