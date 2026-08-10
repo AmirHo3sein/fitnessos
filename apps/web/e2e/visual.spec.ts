@@ -24,6 +24,20 @@ import { expect, test, type Page } from '@playwright/test'
  * a prompt to look, not proof of a defect, and blocking every PR on one is how a team learns to
  * pass `--update-snapshots` without reading the diff.
  *
+ * ## `--update-snapshots` did not always refresh a baseline, and that is recorded rather than explained
+ *
+ * While fixing a Workflow Builder layout bug, the canvas baseline stayed byte-identical across
+ * several `--update-snapshots` runs after a change that visibly moved both nodes — verified by hash
+ * and mtime, with the new code confirmed present in the built chunk and the new behaviour confirmed
+ * by a separate measurement-based assertion in `shell.spec.ts`. Deleting the PNG and regenerating
+ * produced the correct image immediately.
+ *
+ * No mechanism is offered here because none was established. `--update-snapshots` in the mode used
+ * only rewrites a baseline whose comparison FAILS, and the comparison should have failed at
+ * `maxDiffPixelRatio: 0.01` — roughly 3% of pixels changed. What follows practically: **if a
+ * baseline does not change after a layout change you can see, delete it rather than trusting the
+ * update flag**, and do not let a screenshot be the only guard on a layout fact worth keeping.
+ *
  * ## Determinism
  *
  * Two sources of churn are dealt with explicitly rather than by loosening the threshold, because
@@ -209,6 +223,38 @@ test.describe('the editors', () => {
     await page.getByRole('button', { name: 'افزودن خوراک' }).first().click()
     await expect(page.getByLabel('خوراک', { exact: true })).toHaveCount(1)
     await shot(page, 'nutrition-builder')
+  })
+
+  test('the workflow builder, empty and with a graph', async ({ page }) => {
+    await signIn(page, phoneFor('888', test.info().project.name))
+    await page.goto('/automation')
+    await expect(page.getByText('هنوز خودکارسازی‌ای ساخته نشده است.')).toBeVisible()
+    await shot(page, 'automation-empty')
+
+    await page.getByRole('button', { name: 'ساختن خودکارسازی' }).click()
+    await expect(page.getByTestId('workflow-canvas')).toBeVisible()
+    await page.getByRole('button', { name: 'افزودن کنش' }).click()
+    await expect(page.locator('.react-flow__node')).toHaveCount(2)
+    await shot(page, 'automation-builder')
+  })
+
+  test('the workflow canvas has real height', async ({ page }) => {
+    /**
+     * The same crude measurement the report canvas gets, for the same reason and with one more:
+     * React Flow MEASURES its container. A canvas whose height collapsed would not merely look
+     * wrong, it would render nodes at zero size and make every handle unhittable — so this
+     * assertion is closer to a functional test than it looks.
+     */
+    await signIn(page, phoneFor('999', test.info().project.name))
+    await page.goto('/automation')
+    await page.getByRole('button', { name: 'ساختن خودکارسازی' }).click()
+
+    const box = await page.getByTestId('workflow-canvas').boundingBox()
+    expect(box?.height).toBeGreaterThan(400)
+
+    // And a node inside it has real size, which the container's height alone does not guarantee.
+    const node = await page.locator('.react-flow__node').first().boundingBox()
+    expect(node?.height).toBeGreaterThan(20)
   })
 
   test('the report canvas has real height', async ({ page }) => {

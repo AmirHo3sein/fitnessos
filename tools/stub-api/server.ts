@@ -41,6 +41,7 @@ import {
   DashboardSchema,
   DecisionOutcomeSchema,
   NutritionPlanSchema,
+  WorkflowSchema,
   PlanSchema,
   ReportSchema,
   IndicatorSeriesSchema,
@@ -139,6 +140,9 @@ const reports = new Map<string, unknown>()
 
 /** Dashboards, one per phone. Replaced wholesale, like the form and the report. */
 const dashboards = new Map<string, unknown>()
+
+/** Workflows, one per phone. Same wholesale replace -- but see the enabled check below. */
+const workflows = new Map<string, unknown>()
 
 /** Nutrition plans, one per phone. Same wholesale replace. */
 const nutritionPlans = new Map<string, unknown>()
@@ -581,6 +585,7 @@ const handlers: Record<string, (req: IncomingMessage, res: ServerResponse) => Pr
     dashboards.clear()
     plans.clear()
     nutritionPlans.clear()
+    workflows.clear()
     faults.clear()
     res.writeHead(204).end()
     return Promise.resolve()
@@ -965,6 +970,51 @@ const handlers: Record<string, (req: IncomingMessage, res: ServerResponse) => Pr
     send(res, 200, NutritionPlanSchema, body.data)
   },
 
+  'GET /api/v1/workflows/current': async (req, res) => {
+    const phone = phoneFromToken(cookiesOf(req)['access_token'])
+    if (phone === null) {
+      problem(res, 401, 'unauthenticated', 'no valid session')
+      return
+    }
+    const stored = workflows.get(phone)
+    if (stored === undefined) {
+      res.writeHead(204).end()
+      return
+    }
+    send(res, 200, WorkflowSchema, stored)
+  },
+
+  'PUT /api/v1/workflows/:workflowId': async (req, res) => {
+    const phone = phoneFromToken(cookiesOf(req)['access_token'])
+    if (phone === null) {
+      problem(res, 401, 'unauthenticated', 'no valid session')
+      return
+    }
+    const body = WorkflowSchema.safeParse(await readBody(req))
+    if (!body.success) {
+      problem(res, 400, 'invalid_request', body.error.issues[0]?.message ?? 'invalid')
+      return
+    }
+
+    /*
+     * The one place this stub enforces something the schema cannot, because BACKEND-CONTRACT 4.8
+     * requires it of the real server and a stub that accepted it would let the client's own guard
+     * rot unnoticed: an ENABLED workflow must be runnable.
+     *
+     * Deliberately a shallow check rather than a second implementation of `topology/graph` — a stub
+     * that reimplemented the rules would agree with the client by construction and prove nothing.
+     * It checks the two things a server can check cheaply: there is a trigger, and every node is
+     * reachable from one.
+     */
+    if (body.data.enabled && !runnable(body.data)) {
+      problem(res, 400, 'invalid_request', 'an enabled workflow must be runnable')
+      return
+    }
+
+    workflows.set(phone, body.data)
+    send(res, 200, WorkflowSchema, body.data)
+  },
+
   'GET /api/v1/proposals': async (req, res) => {
     const phone = phoneFromToken(cookiesOf(req)['access_token'])
     if (phone === null) {
@@ -1062,6 +1112,7 @@ createServer((req, res) => {
       /^\/api\/v1\/nutrition-plans\/(?!current$)[^/]+$/,
       '/api/v1/nutrition-plans/:planId',
     )
+    .replace(/^\/api\/v1\/workflows\/(?!current$)[^/]+$/, '/api/v1/workflows/:workflowId')
   const routeKey = `${req.method ?? 'GET'} ${path}`
   const handler = handlers[routeKey]
 
@@ -1116,3 +1167,30 @@ createServer((req, res) => {
   console.log('  state is keyed by phone — each number is a distinct athlete')
   console.log('  a phone ending in 9 has a programme; others have none')
 })
+
+/**
+ * Whether every node in a workflow is reachable from a trigger.
+ *
+ * Here rather than imported from `ctx-workflow`, and that is the point: importing the client's own
+ * rule would make the check agree with the client by construction, which is exactly the failure a
+ * stub is supposed to expose. This is the shallow version a server can afford — a trigger exists,
+ * and nothing is orphaned.
+ */
+const runnable = (workflow: {
+  nodes: readonly { id: string; kind: string }[]
+  edges: readonly { from: string; to: string }[]
+}): boolean => {
+  const triggers = workflow.nodes.filter((node) => node.kind === 'trigger')
+  if (triggers.length === 0) return false
+
+  const seen = new Set<string>()
+  const queue = triggers.map((node) => node.id)
+  while (queue.length > 0) {
+    const id = queue.shift()
+    if (id === undefined) break
+    if (seen.has(id)) continue
+    seen.add(id)
+    for (const edge of workflow.edges) if (edge.from === id) queue.push(edge.to)
+  }
+  return workflow.nodes.every((node) => seen.has(node.id))
+}

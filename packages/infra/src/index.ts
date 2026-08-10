@@ -31,6 +31,7 @@ export { createReportAdapter } from './adapters/reportAdapter'
 export { createDashboardAdapter } from './adapters/dashboardAdapter'
 export { createTimelineAdapter } from './adapters/timelineAdapter'
 export { createNutritionAdapter } from './adapters/nutritionAdapter'
+export { createWorkflowAdapter } from './adapters/workflowAdapter'
 export {
   createPrescriptionAdapter,
   createPrescriptionWriteAdapter,

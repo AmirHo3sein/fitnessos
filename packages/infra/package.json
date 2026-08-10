@@ -24,6 +24,7 @@
     "@fitnessos/ctx-prescription": "workspace:*",
     "@fitnessos/ctx-report": "workspace:*",
     "@fitnessos/ctx-timeline": "workspace:*",
+    "@fitnessos/ctx-workflow": "workspace:*",
     "@fitnessos/editor-engine": "workspace:^",
     "@fitnessos/kernel": "workspace:*",
     "zod": "^3.23.8"

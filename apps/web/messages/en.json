@@ -10,7 +10,8 @@
       "report": "Report",
       "layout": "Layout",
       "plan": "Plan",
-      "nutrition": "Nutrition"
+      "nutrition": "Nutrition",
+      "automation": "Automation"
     },
     "description": "An operating system for physical development — programmes, sessions and the evidence that they worked."
   },
@@ -358,6 +359,59 @@
       "newAmount": "100 g",
       "empty": "This plan has no meals yet.",
       "noItems": "Nothing in this meal yet."
+    }
+  },
+  "automation": {
+    "heading": "Automation",
+    "title": "Automation",
+    "none": "No automation has been written yet.",
+    "noneHint": "You can say what should happen when something happens.",
+    "create": "Create an automation",
+    "loading": "Loading the automation",
+    "saveFailed": "Your changes were not saved. They are still here; try again.",
+    "newTitle": "Automation",
+    "firstTrigger": "check-in submitted",
+    "builder": {
+      "heading": "Steps and connections",
+      "addTrigger": "Add trigger",
+      "addCondition": "Add condition",
+      "addAction": "Add action",
+      "removeStep": "Remove step",
+      "undo": "Undo",
+      "redo": "Redo",
+      "save": "Save",
+      "detail": "Detail",
+      "connectFrom": "From branch",
+      "connectTo": "To step",
+      "connect": "Connect",
+      "disconnect": "Disconnect",
+      "empty": "No steps yet.",
+      "newTrigger": "When…",
+      "newCondition": "If…",
+      "newAction": "Then…",
+      "steps": "Steps",
+      "canvas": "Automation canvas",
+      "enable": "Turn on",
+      "disable": "Turn off",
+      "notRunnable": "Nothing reaches some steps, so they will never run.",
+      "noTrigger": "This automation has no trigger.",
+      "node": {
+        "trigger": "Trigger",
+        "condition": "Condition",
+        "action": "Action",
+        "branchTrue": "true",
+        "branchFalse": "false",
+        "unreachable": "never runs"
+      },
+      "refusal": {
+        "missing-node": "That step is no longer there.",
+        "unknown-port": "This step has no such branch.",
+        "trigger-input": "Nothing can lead into a trigger; a trigger is where a run starts.",
+        "self-loop": "A step cannot follow itself.",
+        "cycle": "That would create a loop, and an automation has none.",
+        "port-taken": "That branch already leads somewhere.",
+        "duplicate": "Those two are already connected."
+      }
     }
   }
 }

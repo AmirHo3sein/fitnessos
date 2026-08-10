@@ -156,6 +156,33 @@ test.describe('every page passes WCAG 2.1 AA', () => {
     await expectNoViolations(page)
   })
 
+  test('the workflow builder, canvas and all', async ({ page }) => {
+    /*
+     * The hardest scan in this file, and the reason it is here rather than assumed: a node-graph
+     * canvas is exactly the kind of widget that fails an audit. React Flow renders a pane full of
+     * absolutely-positioned divs with drag handles, and the connection gesture is pointer-only.
+     *
+     * Two things are being checked. First, that the canvas as shipped introduces no violations —
+     * it is marked `role="application"` with a name, which is the honest description of a
+     * direct-manipulation surface. Second, and more important, that the STEP LIST beside it is
+     * fully labelled: that list is how the workflow is authored without a pointer, and a scan
+     * finding it unlabelled would mean the accessible route does not exist in practice.
+     */
+    await signIn(page, phoneFor('111', test.info().project.name))
+    await page.goto('/automation')
+    await expectNoViolations(page)
+
+    await page.getByRole('button', { name: 'ساختن خودکارسازی' }).click()
+    await expect(page.getByTestId('workflow-canvas')).toBeVisible()
+    await expectNoViolations(page)
+
+    // With a second step and a connection control on screen, since an unconnected single node
+    // renders neither a select nor an edge.
+    await page.getByRole('button', { name: 'افزودن کنش' }).click()
+    await expect(page.getByLabel('به گام').first()).toBeVisible()
+    await expectNoViolations(page)
+  })
+
   test('the 404', async ({ page }) => {
     await page.goto('/nope-does-not-exist')
     await expectNoViolations(page)

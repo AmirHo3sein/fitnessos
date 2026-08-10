@@ -311,6 +311,44 @@ to break when the catalogue lands, because the parse will disagree with the cata
 `PUT /nutrition-plans/{planId}` is a replace, on the same reasoning as §4.5: nothing references a
 meal or an item, so replacing the plan cannot make anything else unreadable.
 
+### 4.8 `Workflow` — an enabled automation must be runnable, and the server has to check
+
+The only stored artefact whose contents change what the SERVER does. A nutrition plan that is
+half-written is a half-written document; a workflow that is half-written and `enabled` is something
+the runner will act on.
+
+**Required check on `PUT /workflows/{workflowId}`:** if `enabled` is true, refuse with 400 unless
+
+  - at least one node has `kind: "trigger"`, and
+  - every node is reachable from some trigger by following edges.
+
+The client refuses this too, in `ctx-workflow`'s `topology/graph`, and that is not a reason to skip
+it. A client-side guard protects a coach from a mistake; a server-side one protects the runner from a
+client — including an older client, a replayed request, or a bug in the enable button. The stub in
+`tools/stub-api` implements exactly these two conditions, deliberately in its own code rather than by
+importing the client's rule, because a check that agrees with the client by construction proves
+nothing.
+
+**What the server does NOT need to enforce**, because the graph cannot be authored otherwise and a
+stored violation is a data problem rather than a request to reject:
+
+  - acyclicity. `canConnect` refuses an edge that would close a loop, one edge at a time, and a
+    property test asserts that no sequence of individually-legal edges can produce a cyclic graph.
+  - one edge per output port. Same argument.
+  - no edge into a trigger. The UI renders no target handle on one at all.
+
+If the server wants a second opinion on any of these, a topological sort answers all three at once.
+
+**`detail` is the runner's vocabulary, not the client's.** The client stores whatever string it is
+given and renders it verbatim, deliberately: duplicating the list of trigger events and action kinds
+here would create a second copy to keep in step, and a workflow authored against a newer server would
+render blanks instead of words. The consequence for the server: **`detail` values must be stable**.
+Renaming one silently changes what a stored workflow says it does.
+
+**Coordinates are layout, not semantics.** `x`/`y` may be any finite number, including negative — a
+canvas has no origin corner. Two workflows differing only in coordinates behave identically, so
+nothing may be derived from them.
+
 ---
 
 ## How to check
