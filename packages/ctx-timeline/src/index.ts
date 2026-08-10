@@ -19,3 +19,4 @@
  */
 export * from './topology/temporal'
 export * from './domain/Plan'
+export * from './editor/schema'
