@@ -8,7 +8,9 @@
  */
 
 export class ApiError extends Error {
-  override readonly name = 'ApiError'
+  // Typed `string` rather than the literal, so a subclass can narrow the name. The literal reads
+  // better in isolation and makes `ConflictError` below impossible to declare.
+  override readonly name: string = 'ApiError'
 
   constructor(
     readonly status: number,
@@ -25,6 +27,29 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * A 409 whose body was read.
+ *
+ * `ApiError` deliberately keeps only the code, because `request` discards the body of any non-ok
+ * response. For a session-log conflict the body IS the point: it is the record the server already
+ * holds, and without it the athlete can be told that something collided but not with what.
+ *
+ * A subclass rather than a separate type, so every existing `status === 409` check keeps working
+ * and only the code that wants the record has to know this exists.
+ */
+export class ConflictError extends ApiError {
+  override readonly name = 'ConflictError'
+
+  constructor(
+    /** The server's record. Unvalidated — mapping it is the caller's business. */
+    readonly existing: unknown,
+    code: string | null,
+    message: string,
+  ) {
+    super(409, code, message)
+  }
+}
+
 export class NetworkError extends Error {
   override readonly name = 'NetworkError'
 
@@ -36,6 +61,16 @@ export class NetworkError extends Error {
 export interface ContractIssue {
   /** Dotted path to the offending field, e.g. `availability.daysPerWeek`. */
   readonly path: string
+  /**
+   * The validator's issue code — `invalid_type`, `too_big`, `invalid_enum_value`.
+   *
+   * Carried separately from `message` because this is the field that may leave the device.
+   * Messages are mostly value-free, but `invalid_enum_value` renders the received value
+   * verbatim, so a field holding user input would ship that input to an observability
+   * vendor. Codes are a closed vocabulary and cannot.
+   */
+  readonly code: string
+  /** Human-readable, for a developer reading a stack trace. Never sent anywhere. */
   readonly message: string
 }
 

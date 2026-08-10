@@ -18,7 +18,7 @@ export interface CardProps {
 export const Card = ({ children, className }: CardProps) => (
   <div
     className={cn(
-      'bg-surface border border-line rounded-xl p-5',
+      'bg-surface border border-default rounded-xl p-5',
       'shadow-[0_1px_2px_rgb(0_0_0/0.04)]',
       className,
     )}
@@ -28,7 +28,7 @@ export const Card = ({ children, className }: CardProps) => (
 )
 
 export const CardTitle = ({ children, className }: CardProps) => (
-  <h2 className={cn('text-display text-lg text-fg mb-1', className)}>{children}</h2>
+  <h2 className={cn('text-display text-lg text-primary mb-1', className)}>{children}</h2>
 )
 
 export const CardDescription = ({ children, className }: CardProps) => (

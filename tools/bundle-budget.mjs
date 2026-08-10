@@ -47,6 +47,30 @@ const SHARED_BUDGET_KB = 110
 const MIDDLEWARE_BUDGET_KB = 50
 
 /**
+ * What a cold visitor to any single URL may download.
+ *
+ * Deliberately one number for every route rather than a table: this is a statement about the
+ * slowest connection in the product, and it does not get more generous because a page is
+ * complicated. Measured worst case today is the sign-in screen.
+ */
+const FIRST_LOAD_BUDGET_KB = 175
+
+/**
+ * Routes allowed a higher first load, with the reason attached to each.
+ *
+ * A per-route exception rather than a raised global, on the same argument as the exclusive budgets:
+ * the global number is what protects the twelve routes that have no business being heavy.
+ */
+const FIRST_LOAD_EXCEPTIONS_KB = [
+  // The Workflow Builder — see the note in ROUTE_BUDGETS_KB. 197.5 kB measured; the canvas is
+  // deferred, so a cold visitor is interactive well before this number is reached.
+  [/^\/\[locale\]\/\(app\)\/automation\//, 205],
+]
+
+const firstLoadBudgetFor = (route) =>
+  FIRST_LOAD_EXCEPTIONS_KB.find(([pattern]) => pattern.test(route))?.[1] ?? FIRST_LOAD_BUDGET_KB
+
+/**
  * Per-route budgets, first match wins.
  *
  * Deliberately not one number for every route. A marketing page and an authenticated
@@ -62,17 +86,67 @@ const MIDDLEWARE_BUDGET_KB = 50
  * the container was constructed there, so every visitor to the landing page downloaded
  * a validator for an endpoint they would never call. The fix was to move port
  * providers into the route group that uses them; the budget is what surfaced it.
+ *
+ * ## These numbers were re-baselined once the accounting was fixed
+ *
+ * They used to be four to nine times larger, because a chunk shared by every authenticated
+ * route was billed to each of them in full — React Aria alone was counted six times. Three
+ * routes appeared to be one kilobyte from their ceiling and were not, and the appearance nearly
+ * bought a restructuring of the contracts package to fix an arithmetic mistake.
+ *
+ * The budgets below are against EXCLUSIVE size — code no other route uses. They are set close
+ * to the measured values on purpose: a budget nothing can hit is decoration, and the two real
+ * leaks this file has caught (an aggregate barrel, and packages missing `sideEffects: false`)
+ * would both have shown up here as well as in first load.
  */
 const ROUTE_BUDGETS_KB = [
-  // The authenticated shell: container, infra, generated validators, React Aria,
-  // next-intl's client runtime. Loaded once and navigated within. Measured 59.6 kB.
-  [/^\/\[locale\]\/\(app\)\/layout$/, 65],
-  // Everything a visitor sees before signing in. No infrastructure belongs here.
-  [/^\/\[locale\]\/\((public|auth)\)\//, 30],
-  // The root layout — QueryClient boundary only, no container. Measured 15.2 kB.
-  [/^\/\[locale\]\/layout$/, 25],
-  // Individual pages inside the authenticated area.
-  [/./, 45],
+  /*
+   * The Workflow Builder. Measured 59 kB exclusive, of which ~53 kB is React Flow.
+   *
+   * The only route in this app with a budget in a different order of magnitude, and the reasons are
+   * written here rather than implied by the number:
+   *
+   * **The library is sanctioned.** Handbook D-11 names React Flow for this editor specifically.
+   * `react-grid-layout` was evaluated for the Dashboard and rejected; the Timeline's dragging is
+   * hand-rolled. This is the one place a library legitimately owns interaction, because edge
+   * routing, viewport transform, handle hit-testing and connection preview are a large amount of
+   * geometry with no product opinion in them.
+   *
+   * **The weight IS deferred, and this tool cannot see it.** The canvas is behind a `lazy`
+   * boundary, so it is not on the path to interactivity — the step list authors a workflow
+   * completely without it. But `app-build-manifest.json` lists a page's async chunks alongside its
+   * initial ones and does not distinguish them, so the number above counts bytes the browser
+   * fetches after first paint. Teaching this tool the difference means reading webpack stats
+   * instead of the manifests, which is a real change and not one to make while landing an editor.
+   *
+   * **Why not raise the general 15 kB.** Twelve other routes sit between 0.1 and 6.9 kB. A budget
+   * loose enough to admit React Flow everywhere would stop catching the two things this file has
+   * actually caught, both of which were an order of magnitude smaller than this.
+   *
+   * So: one route, one number, and a regression here still fails.
+   */
+  [/^\/\[locale\]\/\(app\)\/automation\//, 65],
+
+  // The authenticated shell. Measured 9.6 kB exclusive.
+  [/^\/\[locale\]\/\(app\)\/layout$/, 20],
+
+  // Marketing and other unauthenticated content. Measured 1.3 kB exclusive — it is a link and
+  // some text, and it should stay in that region. The tightest budget here for the same reason
+  // as before: it is where accidental weight is least likely to be noticed by anyone working on
+  // the app itself.
+  [/^\/\[locale\]\/\(public\)\//, 5],
+
+  // Sign-in. Measured 4.9 kB exclusive — the client stack it pays for (Zod, React Aria, TanStack
+  // Query) is shared with every subsequent screen, which is exactly what the old accounting
+  // could not see.
+  [/^\/\[locale\]\/\(auth\)\//, 12],
+
+  // The root layout — QueryClient boundary only, no ports. Measured 13.5 kB exclusive.
+  [/^\/\[locale\]\/layout$/, 20],
+
+  // Individual pages inside the authenticated area. Measured 0.2–6.6 kB exclusive, so 15 leaves
+  // room for a genuinely heavier page while still catching an order-of-magnitude regression.
+  [/./, 15],
 ]
 
 const budgetFor = (route) => ROUTE_BUDGETS_KB.find(([pattern]) => pattern.test(route))?.[1] ?? 45
@@ -124,17 +198,56 @@ if (sharedKb > SHARED_BUDGET_KB) {
 }
 
 // --- per route ---------------------------------------------------------------
+/*
+ * Two numbers per route, because one of them was lying.
+ *
+ * `shared` above is only `rootMainFiles` — the framework runtime. A chunk used by every
+ * authenticated route but not by the marketing page is in none of the route's "shared" sets, so
+ * the original accounting billed it to each route in full. React Aria (18.1 kB gz) was being
+ * counted six times, which is how sign-in came to report 54.5 kB "of its own JS" when 18 of
+ * those are downloaded once and reused everywhere.
+ *
+ * That is not a cosmetic error. It made three routes look one kilobyte from their ceiling and
+ * nearly bought a restructuring of the contracts package to solve a problem that was an
+ * arithmetic mistake. So:
+ *
+ *   exclusive  files this route uses and NO other route does. The true marginal cost of the
+ *              route existing, and what a budget should gate on.
+ *   first load what a cold visitor to this URL downloads: framework + everything the route
+ *              needs, shared or not. The number that matters to a person, gated more loosely
+ *              because most of it is amortised across the session.
+ */
+const usage = new Map()
+for (const files of Object.values(appManifest.pages ?? {})) {
+  for (const file of new Set(files)) usage.set(file, (usage.get(file) ?? 0) + 1)
+}
+
 for (const [route, files] of Object.entries(appManifest.pages ?? {})) {
-  const own = files.filter((f) => !shared.has(f))
-  const routeKb = kb(sizeOf(own))
+  const exclusive = files.filter((f) => !shared.has(f) && usage.get(f) === 1)
+  const exclusiveKb = kb(sizeOf(exclusive))
+  const firstLoadKb = kb(sizeOf(new Set([...shared, ...files])))
+
   const budget = budgetFor(route)
-  console.log(label(route, routeKb, budget))
-  if (routeKb > budget) {
+  console.log(
+    `${exclusiveKb <= budget ? '✔' : '✖'} ${route.padEnd(32)} ${String(exclusiveKb).padStart(6)} kB gz exclusive  ` +
+      `(budget ${budget})   ${String(firstLoadKb).padStart(6)} kB first load`,
+  )
+
+  if (exclusiveKb > budget) {
     fail(
-      `route ${route} ships ${routeKb} kB of its own JS, over its ${budget} kB budget. ` +
-        'If this is a public or auth route, infrastructure has probably leaked across a ' +
-        'composition boundary — check which providers the route group mounts before ' +
-        'reaching for the budget number.',
+      `route ${route} ships ${exclusiveKb} kB of JS NO other route uses, over its ${budget} kB ` +
+        'budget. This is code only this page needs, so a dynamic import is usually the answer. ' +
+        'If it is a public or auth route, check whether infrastructure has leaked across a ' +
+        'composition boundary before reaching for the budget number.',
+    )
+  }
+
+  const firstLoadBudget = firstLoadBudgetFor(route)
+  if (firstLoadKb > firstLoadBudget) {
+    fail(
+      `route ${route} costs a cold visitor ${firstLoadKb} kB, over the ${firstLoadBudget} kB ` +
+        'first-load budget. Most of this is shared, so the fix is usually in what the route ' +
+        'GROUP mounts rather than in the page itself.',
     )
   }
 }

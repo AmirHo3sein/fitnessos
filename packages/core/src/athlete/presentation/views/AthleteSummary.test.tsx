@@ -45,6 +45,18 @@ const snapshot = (over: Partial<AthleteSnapshot> = {}): AthleteSnapshot => ({
   ...over,
 })
 
+/**
+ * `AthletePorts` carries the write side too, so a read-only test still has to supply it.
+ * Rejecting rather than resolving: nothing in this component should ever call it, and a
+ * resolving stub would let a future regression write silently instead of failing.
+ */
+const readOnly = (getMine: AthletePorts['athlete']['getMine']): AthletePorts => ({
+  athlete: {
+    getMine,
+    completeOnboarding: () => Promise.reject(new Error('AthleteSummary must not write')),
+  },
+})
+
 const renderWith = (ports: AthletePorts) => {
   // retry: false, or a rejecting port makes the error-state test wait for backoff.
   const queryClient = new QueryClient({
@@ -61,7 +73,7 @@ const renderWith = (ports: AthletePorts) => {
 
 describe('AthleteSummary', () => {
   it('renders the athlete supplied by the injected port', async () => {
-    renderWith({ athlete: { getMine: () => Promise.resolve(snapshot()) } })
+    renderWith(readOnly(() => Promise.resolve(snapshot())))
 
     expect(await screen.findByText('Intermediate')).toBeInTheDocument()
     expect(screen.getByText('4')).toBeInTheDocument()
@@ -70,7 +82,7 @@ describe('AthleteSummary', () => {
   })
 
   it('announces the loading state instead of rendering an unlabelled placeholder', () => {
-    renderWith({ athlete: { getMine: () => new Promise(() => {}) } })
+    renderWith(readOnly(() => new Promise(() => {})))
 
     // A busy region with no accessible name announces nothing, which is worse for a
     // screen-reader user than the shimmer a sighted user gets.
@@ -79,23 +91,22 @@ describe('AthleteSummary', () => {
   })
 
   it('shows a failure message rather than an empty card when the port rejects', async () => {
-    renderWith({ athlete: { getMine: () => Promise.reject(new Error('boom')) } })
+    renderWith(readOnly(() => Promise.reject(new Error('boom'))))
 
     expect(await screen.findByText(LABELS.failed)).toBeInTheDocument()
   })
 
   it('distinguishes "no ceiling" from a ceiling of zero', async () => {
     // Zero would read as "cannot train", which is a different claim entirely.
-    renderWith({
-      athlete: {
-        getMine: () =>
-          Promise.resolve(
-            snapshot({
-              availability: { daysPerWeek: 3, sessionCeiling: null, equipmentAccess: [] },
-            }),
-          ),
-      },
-    })
+    renderWith(
+      readOnly(() =>
+        Promise.resolve(
+          snapshot({
+            availability: { daysPerWeek: 3, sessionCeiling: null, equipmentAccess: [] },
+          }),
+        ),
+      ),
+    )
 
     expect(await screen.findByText('No ceiling')).toBeInTheDocument()
     expect(screen.queryByText('0')).toBeNull()
@@ -105,20 +116,19 @@ describe('AthleteSummary', () => {
     // Labels arrive as a prop from the app, so they can fall out of sync with the
     // domain's enum. Rendering a blank cell would hide the drift; rendering the raw
     // value makes it visible without breaking the page.
-    renderWith({
-      athlete: {
-        getMine: () =>
-          Promise.resolve(
-            snapshot({
-              trainingIdentity: {
-                experienceLevel: 'advanced',
-                trainingAgeMonths: null,
-                disciplines: [],
-              },
-            }),
-          ),
-      },
-    })
+    renderWith(
+      readOnly(() =>
+        Promise.resolve(
+          snapshot({
+            trainingIdentity: {
+              experienceLevel: 'advanced',
+              trainingAgeMonths: null,
+              disciplines: [],
+            },
+          }),
+        ),
+      ),
+    )
 
     expect(await screen.findByText('Advanced')).toBeInTheDocument()
   })

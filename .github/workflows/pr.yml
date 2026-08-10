@@ -30,11 +30,38 @@ jobs:
       - name: install
         run: pnpm install --frozen-lockfile
 
+      # Stage 1b — known vulnerabilities in the dependency tree.
+      #
+      # Added after an audit that had never been run found 12 advisories, two of them critical,
+      # in a codebase whose every other gate was green. All were build- and dev-time rather than
+      # shipped to a browser, which is why nothing else noticed — and a compromised build
+      # toolchain is a supply-chain risk regardless of what reaches production.
+      #
+      # Two invocations on purpose. The first REPORTS everything without failing, so a moderate
+      # advisory in a dev dependency is visible without turning CI red for something the PR did
+      # not cause. The second GATES on high and critical, which are the ones that need action
+      # now. A single strict gate would be switched off within a month; a single lenient one
+      # would never be read.
+      - name: dependency advisories (informational)
+        run: pnpm audit || true
+
+      - name: dependency advisories (high and critical block)
+        run: pnpm audit --audit-level=high
+
       # Stage 2 — ADR-0026 contract drift.
       # Running against the committed stopgap spec today; the only change when
       # @fitnessos/api-spec is published is where the spec is read from.
       - name: contract drift
         run: pnpm --filter @fitnessos/contracts contracts:check
+
+      # Stage 2b — the colour system. Tokens must match their generator, and every
+      # documented contrast pair must meet its WCAG threshold. Accessibility is checked,
+      # not asserted: "designed for AA" is not a property a codebase has.
+      - name: design tokens are current
+        run: pnpm tokens:check
+
+      - name: WCAG contrast
+        run: pnpm color:contrast
 
       # Stage 3
       - name: typecheck
@@ -46,6 +73,18 @@ jobs:
 
       # Stage 5 — includes the generator tests (stage 11), which assert that
       # generated output renders cleanly and honours the boundary conventions.
+      #
+      # It also covers stage 13, the Phase 2 benchmark gate, and deliberately not as a
+      # timing. The handbook asks for "fail on >10% regression"; measured as wall clock
+      # against a stored baseline that gate does not survive a shared runner, which
+      # varies by more than 10% between two runs of identical code. So it either fires
+      # constantly and gets disabled, or is loosened until it catches nothing.
+      #
+      # The claims are not about milliseconds — O(1) memory per history entry, one node
+      # cloned per edit, O(1) spatial query — and each is testable exactly:
+      # `editor-engine/src/performance.test.ts` asserts reference identity, byte counts,
+      # and same-process ratios. That runs on every PR rather than only on main, cannot
+      # flake, and fails naming the claim it broke.
       - name: test:unit
         run: pnpm test:unit
 
@@ -90,6 +129,17 @@ jobs:
   # worse than no test because it still reads as coverage.
   e2e:
     runs-on: ubuntu-latest
+    env:
+      # The stub API (tools/stub-api) stands in for the backend, which lives in another
+      # repository (ADR-0026). It is a separate process, never part of the app build.
+      #
+      # STUB_API_URL does two things: it enables the `/api/v1` rewrite in next.config,
+      # which stands in for the production reverse proxy (ADR-0025) so browser-side
+      # requests resolve; and it tells Playwright where to start and reach the stub.
+      # INTERNAL_API_URL is the server-side path the RSC prefetch uses. Both point at
+      # the same process, so the whole request path is exercised rather than half of it.
+      STUB_API_URL: http://127.0.0.1:8791
+      INTERNAL_API_URL: http://127.0.0.1:8791/api/v1
     steps:
       - uses: actions/checkout@v4
 
@@ -97,6 +147,8 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
+          # 22 minimum for `--experimental-strip-types`, which is how the stub runs its
+          # TypeScript with no build step and no transform dependency.
           node-version: 22
           cache: pnpm
 
@@ -108,13 +160,22 @@ jobs:
 
       - name: build
         run: pnpm --filter @fitnessos/web build
-        env:
-          INTERNAL_API_URL: http://127.0.0.1:8000/api/v1
 
+      # Playwright's webServer config starts both the stub and the app, so there is no
+      # separate step here — and no sleep-and-hope, since it waits on a real readiness
+      # URL for each.
+      # The CRITICAL tier only — flows whose failure makes the product unusable or unsafe. The
+      # rest, including most accessibility scans, run in `scheduled.yml` (stage 12). See the
+      # note in `playwright.config.ts` for what earns the tag; the split had collapsed to
+      # "everything is critical", which is the same as having no tiers.
+      #
+      # Accessibility keeps three here — one representative scan, keyboard operability, and the
+      # focus ring — because the violations that audit first found (no document title anywhere,
+      # a 2.14:1 hint colour on six screens, inputs opting out of the focus ring) were invisible
+      # in review, and an audit deferred to a hardening phase is an audit against a codebase
+      # that has learned the habit.
       - name: e2e:critical
         run: pnpm --filter @fitnessos/web e2e:critical
-        env:
-          INTERNAL_API_URL: http://127.0.0.1:8000/api/v1
 
       - uses: actions/upload-artifact@v4
         if: failure()

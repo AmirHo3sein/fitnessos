@@ -1,18 +1,60 @@
+import type { Metadata } from 'next'
 import { getTranslations } from 'next-intl/server'
-import { Card, CardDescription, CardTitle } from '@fitnessos/ui'
-import { routing } from '../../../../src/i18n/routing'
+import { Suspense } from 'react'
+import { Card, CardDescription, CardTitle, Skeleton } from '@fitnessos/ui'
 import { enableStaticRendering } from '../../../../src/i18n/static'
+import { SignInClient } from './sign-in-client'
 
 /**
- * Sign-in shell.
+ * Sign-in. A server component wrapping a client leaf.
  *
- * The OTP form itself is a client leaf and arrives with the auth context; this
- * page is the server-rendered frame around it. Placed in the `(auth)` group
- * rather than `(app)` because it must be reachable without a session — the
- * middleware guard covers `(app)` paths only.
+ * The `(auth)` group rather than `(app)`: this must be reachable without a session,
+ * and the middleware guard covers `(app)` paths only.
+ *
+ * `<Suspense>` around the client leaf is required, not decorative: `SignInClient` reads
+ * `useSearchParams()` for the post-sign-in redirect target, and without a boundary that read
+ * suspends the whole page.
+ *
+ * Labels are resolved here, on the server, and passed down as plain strings. The Auth
+ * context therefore needs no dependency on the app's i18n runtime, and `SignInForm`
+ * can be rendered in a component test without standing that runtime up.
  */
-/** Public and cacheable — prerender both locales. See the note in `[locale]/layout.tsx`. */
-export const generateStaticParams = () => routing.locales.map((locale) => ({ locale }))
+/*
+ * Rendered per request, NOT prerendered — and the reason is the CSP nonce.
+ *
+ * A nonce is generated per request in middleware and stamped onto every script tag Next emits.
+ * A page prerendered at build time has no nonce in its HTML, so under `script-src 'nonce-…'
+ * 'strict-dynamic'` every one of its own scripts is refused and the page is inert.
+ *
+ * Three ways out, and only one is defensible:
+ *
+ *   drop the nonce                    the header stops meaning anything
+ *   nonce-free policy for this route  weakens exactly the page where an injected script is worth
+ *                                     the most to an attacker
+ *   render per request                costs a render of a page that fetches nothing
+ *
+ * So: per request. The previous `generateStaticParams` here is gone, and with it the reason for
+ * the note about `useSearchParams` opting the route out of prerendering — there is no longer a
+ * prerender to opt out of. The `<Suspense>` boundary stays, because it is still what keeps the
+ * search-param read from suspending the whole page.
+ */
+export const dynamic = 'force-dynamic'
+
+/**
+ * Fills the `%s` in the root layout's title template.
+ *
+ * Localised through the same catalogue as the page's own heading, so the tab and the h1 cannot
+ * drift apart into two different names for one screen.
+ */
+export const generateMetadata = async ({
+  params,
+}: {
+  params: Promise<{ locale: string }>
+}): Promise<Metadata> => {
+  const { locale } = await params
+  const t = await getTranslations({ locale, namespace: 'auth' })
+  return { title: t('signIn.title') }
+}
 
 export default async function SignInPage({
   params,
@@ -28,11 +70,28 @@ export default async function SignInPage({
       <Card>
         <CardTitle>{t('title')}</CardTitle>
         <CardDescription>{t('subtitle')}</CardDescription>
-        {/*
-          The phone/OTP form lands here with the Auth context. It is deliberately
-          absent rather than stubbed: a placeholder form that posts nowhere is
-          indistinguishable from a broken one during review.
-        */}
+        <div className="mt-6">
+          <Suspense fallback={<Skeleton className="h-40 w-full" label={t('loading')} />}>
+            <SignInClient
+              labels={{
+                phoneLabel: t('phone'),
+                phonePlaceholder: t('phonePlaceholder'),
+                phoneHint: t('phoneHint'),
+                sendCode: t('submit'),
+                codeLabel: t('code'),
+                codeSentTo: t('codeSentTo'),
+                verify: t('verify'),
+                changeNumber: t('changeNumber'),
+                errors: {
+                  emptyPhone: t('errors.emptyPhone'),
+                  badPhone: t('errors.badPhone'),
+                  badCode: t('errors.badCode'),
+                  generic: t('errors.generic'),
+                },
+              }}
+            />
+          </Suspense>
+        </div>
       </Card>
     </main>
   )

@@ -4,8 +4,12 @@ import type {
   AvailabilitySnapshot,
   ExperienceLevel,
   TrainingIdentitySnapshot,
-} from '@fitnessos/core'
-import { AthleteSchema, type components } from '@fitnessos/contracts'
+} from '@fitnessos/core/athlete'
+import {
+  AthleteSchema,
+  CompleteOnboardingBodySchema,
+  type components,
+} from '@fitnessos/contracts'
 import { idFrom, isOk, type Quantity, seconds } from '@fitnessos/kernel'
 import type { z } from 'zod'
 import { parseContract, type FieldsAgree } from './parse'
@@ -165,3 +169,74 @@ const _availabilityFieldsAgree: FieldsAgree<ContractAvailability, ValidatedAvail
 void _athleteFieldsAgree
 void _identityFieldsAgree
 void _availabilityFieldsAgree
+
+// --- outbound: domain → wire ------------------------------------------------
+//
+// The first mapping in this direction, and it validates too (ADR-0031 named request
+// bodies as a follow-up). Validating what we SEND catches a mapper bug at the boundary
+// rather than as a 400 from the server, where the diagnostic is a status code and a
+// message written for an operator.
+//
+// The resource name carries the direction, so a telemetry entry reads
+// "CompleteOnboardingBody (request)" rather than being indistinguishable from a bad
+// response. A violation here is our defect; a violation on a response is the server's.
+
+type ContractOnboardingBody = components['schemas']['CompleteOnboardingBody']
+
+/**
+ * The body as the VALIDATOR types it. Same optional-property divergence as the read
+ * side: `z.number().optional()` infers `number | undefined`, openapi-typescript emits
+ * `number` on an optional key, and under `exactOptionalPropertyTypes` those are not
+ * mutually assignable. Unobservable for JSON, since JSON has no `undefined`.
+ *
+ * Returning the validated type rather than the openapi one keeps this honest — the
+ * function returns what it actually produced. The openapi type stays as the thing being
+ * checked against, below.
+ */
+type ValidatedOnboardingBody = z.infer<typeof CompleteOnboardingBodySchema>
+
+export interface OnboardingRequest {
+  readonly trainingIdentity: {
+    readonly experienceLevel: string
+    readonly trainingAgeMonths: number | null
+    readonly disciplines: readonly string[]
+  }
+  readonly availability: {
+    readonly daysPerWeek: number
+    readonly sessionCeilingSeconds: number | null
+    readonly equipmentAccess: readonly string[]
+  }
+}
+
+export const onboardingBodyFrom = (input: OnboardingRequest): ValidatedOnboardingBody => {
+  const body = {
+    trainingIdentity: {
+      experienceLevel: input.trainingIdentity.experienceLevel,
+      // `null` becomes an ABSENT key, not `null` on the wire. The contract marks this
+      // optional rather than nullable, and JSON has no undefined — so sending
+      // `trainingAgeMonths: null` would fail schema validation on a field the athlete
+      // simply left blank.
+      ...(input.trainingIdentity.trainingAgeMonths === null
+        ? {}
+        : { trainingAgeMonths: input.trainingIdentity.trainingAgeMonths }),
+      disciplines: [...input.trainingIdentity.disciplines],
+    },
+    availability: {
+      daysPerWeek: input.availability.daysPerWeek,
+      ...(input.availability.sessionCeilingSeconds === null
+        ? {}
+        : { sessionCeilingSeconds: input.availability.sessionCeilingSeconds }),
+      equipmentAccess: [...input.availability.equipmentAccess],
+    },
+  }
+
+  return parseContract(CompleteOnboardingBodySchema, body, 'CompleteOnboardingBody (request)')
+}
+
+export const ONBOARDING_BODY_COVERAGE: Record<keyof ContractOnboardingBody, true> = {
+  trainingIdentity: true,
+  availability: true,
+}
+
+const _onboardingFieldsAgree: FieldsAgree<ContractOnboardingBody, ValidatedOnboardingBody> = true
+void _onboardingFieldsAgree

@@ -97,7 +97,21 @@ module.exports = {
         // barrel because re-exporting it there would pull React into the
         // dependency graph of every framework-free consumer, transitively — and
         // `no-react-in-logic` would then fire on code that never mentioned React.
-        pathNot: '^packages/([^/]+)/src/(presentation/)?index\\.ts$',
+        pathNot:
+          // A graduated ctx-* package: `.` and `./presentation`.
+          '^packages/([^/]+)/src/(presentation/)?index\\.ts$|' +
+          // packages/core hosts several un-graduated contexts, so its public surface
+          // is per-context: `./auth`, `./auth/presentation`, and so on. These are the
+          // same two barrels a graduated package exposes, one level deeper — which
+          // means graduation is a move plus a package rename, and no import shape
+          // changes.
+          //
+          // The aggregate `core/presentation` barrel that used to exist was removed
+          // rather than kept alongside these. It re-exported every context's client
+          // components, so importing one dragged in all of them: the sign-in page
+          // shipped the athlete mapper and its validator. A barrel over `'use client'`
+          // modules is not tree-shaken, because each is a bundler entry point.
+          '^packages/core/src/[^/]+/(presentation/)?index\\.ts$',
         dependencyTypes: ['npm'],
       },
     },
@@ -113,6 +127,22 @@ module.exports = {
         path:
           '^(openai|@anthropic-ai/[^/]+|@google/gener\\w*ai|@mistralai/[^/]+|' +
           'cohere-ai|replicate|langchain|@langchain/[^/]+|ai)($|/)',
+      },
+    },
+    {
+      name: 'no-telemetry-vendor-sdk',
+      comment:
+        'ADR-0032. Observability vendors are reached only through the TelemetryPort, and ' +
+        'the sink is built in apps/web/composition. A vendor SDK imported anywhere else ' +
+        'bypasses the closed event vocabulary — and these SDKs capture messages, stacks, ' +
+        'breadcrumbs and request bodies by DEFAULT, which is the opposite of the ' +
+        'guarantee the seam exists to provide.',
+      severity: 'error',
+      from: { pathNot: '^apps/web/composition/' },
+      to: {
+        path:
+          '^(@sentry/[^/]+|@datadog/[^/]+|dd-trace|@opentelemetry/[^/]+|' +
+          'posthog-js|mixpanel-browser|@amplitude/[^/]+|logrocket|@bugsnag/[^/]+)($|/)',
       },
     },
     {
@@ -151,6 +181,13 @@ module.exports = {
           '^apps/web/middleware\\.ts$',
           '^apps/web/instrumentation(-client)?\\.ts$',
           '^apps/web/app/.*/(page|layout|template|loading|error|global-error|' +
+            'not-found|route|default|sitemap|robots|opengraph-image|icon)\\.tsx?$',
+          // The same names directly in `app/`, as a SECOND pattern rather than making the one
+          // above optional-directory. `(.*/)?` is a nested quantifier and dependency-cruiser
+          // refuses it as ReDoS-prone — correctly, since these patterns run over every path in
+          // the repo. The original matched only nested files, so `global-error.tsx` warned on
+          // every run, and a warning that is always there is a warning nobody reads.
+          '^apps/web/app/(page|layout|template|loading|error|global-error|' +
             'not-found|route|default|sitemap|robots|opengraph-image|icon)\\.tsx?$',
         ],
       },

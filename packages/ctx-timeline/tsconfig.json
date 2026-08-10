@@ -1,0 +1,4 @@
+{
+  "extends": "@fitnessos/config/tsconfig.react.json",
+  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.d.ts"]
+}

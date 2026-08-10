@@ -5,39 +5,1219 @@
     "version": "0.1.0",
     "description": "STOPGAP per ADR-0026. This file is hand-authored and committed here until the backend publishes @fitnessos/api-spec as a versioned package. Spec-first: the specification is the contract; the Rust handlers conform to it."
   },
-  "servers": [{ "url": "/api/v1", "description": "Same-origin per ADR-0025" }],
+  "servers": [
+    {
+      "url": "/api/v1",
+      "description": "Same-origin per ADR-0025"
+    }
+  ],
   "tags": [
-    { "name": "athlete", "description": "Athlete ownership root" },
-    { "name": "auth", "description": "Session lifecycle" }
+    {
+      "name": "athlete",
+      "description": "Athlete ownership root"
+    },
+    {
+      "name": "auth",
+      "description": "Session lifecycle"
+    }
   ],
   "paths": {
     "/athletes/me": {
       "get": {
         "operationId": "getMyAthlete",
-        "tags": ["athlete"],
+        "tags": [
+          "athlete"
+        ],
         "summary": "The calling person's athlete record",
         "responses": {
           "200": {
             "description": "ok",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Athlete" }
+                "schema": {
+                  "$ref": "#/components/schemas/Athlete"
+                }
               }
             }
           },
-          "401": { "$ref": "#/components/responses/Unauthorized" }
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
         }
       }
     },
     "/auth/refresh": {
       "post": {
         "operationId": "refreshSession",
-        "tags": ["auth"],
+        "tags": [
+          "auth"
+        ],
         "summary": "Rotate the refresh token and reissue the access cookie",
         "description": "Strict rotation: the presented token is revoked. Concurrent callers MUST be serialised client-side or they will revoke each other's freshly issued session.",
         "responses": {
-          "204": { "description": "cookies reissued" },
-          "401": { "$ref": "#/components/responses/Unauthorized" }
+          "204": {
+            "description": "cookies reissued"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/auth/request-code": {
+      "post": {
+        "operationId": "requestCode",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Send a one-time code by SMS",
+        "description": "Rate limited per IP and per phone. Returns the same shape whether or not the phone is registered \u2014 a differing response would make this an account-enumeration oracle.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestCodeBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "code dispatched",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestCodeResult"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/verify-code": {
+      "post": {
+        "operationId": "verifyCode",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Exchange a one-time code for a session",
+        "description": "On success sets the access and refresh cookies (httpOnly, SameSite=Lax). No token is ever returned in the body \u2014 a token readable from JS is a token exfiltrable by XSS.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyCodeBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "session established",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerifyCodeResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "code incorrect or expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "too many attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/athletes/me/onboarding": {
+      "put": {
+        "operationId": "completeOnboarding",
+        "tags": [
+          "athlete"
+        ],
+        "summary": "Record the athlete's training identity and availability",
+        "description": "PUT rather than POST: submitting the same body twice must leave the athlete in the same state. Onboarding is a form a user will resubmit after a network hiccup, and an idempotent verb is what makes that safe without a client-generated request id.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompleteOnboardingBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "recorded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Athlete"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/goals": {
+      "get": {
+        "operationId": "listMyGoals",
+        "tags": [
+          "goal"
+        ],
+        "summary": "The calling athlete's goals",
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Goal"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "operationId": "declareGoal",
+        "tags": [
+          "goal"
+        ],
+        "summary": "Declare a goal",
+        "description": "POST rather than PUT: declaring a goal creates a new one each time, and two goals with the same wording are legitimately different goals declared at different moments.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeclareGoalBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "declared",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Goal"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/programs/current": {
+      "get": {
+        "operationId": "getCurrentProgram",
+        "tags": [
+          "prescription"
+        ],
+        "summary": "The athlete's current programme and its current version",
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Program"
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "no programme yet"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/sessions/upcoming": {
+      "get": {
+        "operationId": "listUpcomingSessions",
+        "tags": [
+          "execution"
+        ],
+        "summary": "Prescribed sessions not yet performed",
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PrescribedSession"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/sessions/performed": {
+      "post": {
+        "operationId": "logSession",
+        "tags": [
+          "execution"
+        ],
+        "summary": "Record what the athlete actually did",
+        "description": "Idempotent by client-supplied id. A repeat of an id already stored MUST return 409 with the stored record, never a second row -- offline replay is at-least-once. 409 also occurs when another device logged this prescribed session first; the client preserves its own copy and surfaces the difference (ADR-0033).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LogSessionBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "recorded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PerformedSession"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "already logged",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PerformedSession"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/programs/{programId}/versions": {
+      "post": {
+        "operationId": "reviseProgram",
+        "tags": [
+          "prescription"
+        ],
+        "summary": "Create the next version of a programme",
+        "description": "Idempotent by client-supplied version id; concurrency-checked by baseVersionId. A repeat of a stored id returns 200 with that version. A stale baseVersionId returns 409 with the CURRENT program, so the client can show the author what changed instead of silently discarding one of the two edits (ADR-0033).",
+        "parameters": [
+          {
+            "name": "programId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviseProgramBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "revised",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Program"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "this revision was already stored -- the same id replayed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Program"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "the base version is no longer current; body is the programme as it stands now",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Program"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/observations": {
+      "get": {
+        "operationId": "listObservations",
+        "tags": [
+          "measurement"
+        ],
+        "summary": "The athlete's recorded measurements",
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Observation"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "operationId": "recordObservation",
+        "tags": [
+          "measurement"
+        ],
+        "summary": "Record a measurement",
+        "description": "Idempotent by client-supplied id. A repeat of a stored id returns 200 with that record, never a second one -- a duplicate measurement can only be a retry, so it is indistinguishable from success. Contrast POST /sessions/performed, where a duplicate may be a genuine second record from another device and answers 409.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordObservationBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "recorded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Observation"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "this id was already stored -- a replay",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Observation"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/indicators": {
+      "get": {
+        "operationId": "listIndicators",
+        "tags": [
+          "measurement"
+        ],
+        "summary": "Published derived indicators",
+        "description": "Computed on read from observations and performed sessions (ADR-0006). The response therefore changes when a session is logged, without any observation being recorded -- a client must invalidate this on a performed session as well as on a measurement.",
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/IndicatorSeries"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/proposals": {
+      "get": {
+        "operationId": "listProposals",
+        "tags": [
+          "learning"
+        ],
+        "summary": "Proposals made for this athlete, decided and undecided",
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Proposal"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/outcomes": {
+      "get": {
+        "operationId": "listOutcomes",
+        "tags": [
+          "learning"
+        ],
+        "summary": "Rendered verdicts, INCLUDING superseded ones",
+        "description": "Superseded outcomes are returned deliberately. A corrected verdict that vanished would make the correction invisible, which is the opposite of what the supersede rule is for (ADR-0007). Which of them a reader sees is a presentation decision.",
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DecisionOutcome"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/proposals/{proposalId}/outcome": {
+      "post": {
+        "operationId": "renderVerdict",
+        "tags": [
+          "learning"
+        ],
+        "summary": "Record whether the proposal's hypothesis held",
+        "description": "NOT 'accept a proposal'. Accepting is the moment of change and belongs to the changing context: it produces a new ProgramVersion whose authoringDecision records proposedBy=assistant and decidedBy=<the human> (ADR-0010). This records the later verdict on whether the claim turned out to be true.\\n\\nIdempotent by client-supplied id, 200 on replay. A correction supplies `supersedes` and creates a NEW outcome; the superseded one must remain readable.",
+        "parameters": [
+          {
+            "name": "proposalId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenderVerdictBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "recorded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecisionOutcome"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "this id was already stored -- a replay",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecisionOutcome"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/check-in-forms/current": {
+      "get": {
+        "operationId": "getCurrentCheckInForm",
+        "tags": [
+          "measurement"
+        ],
+        "summary": "The athlete's current check-in form",
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckInForm"
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "no form yet -- the normal state before a coach authors one, not an error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/check-in-forms/{formId}": {
+      "put": {
+        "operationId": "saveCheckInForm",
+        "tags": [
+          "measurement"
+        ],
+        "summary": "Create or replace a check-in form",
+        "description": "PUT, not POST. A form is not versioned -- observations reference an indicator kind, not a field id, so editing one cannot make an existing observation unreadable. Submitting the same body twice must therefore leave the form in the same state, which is what makes a retry safe here without a client-generated request id (contrast POST /programs/{id}/versions, where every save is a new immutable version).",
+        "parameters": [
+          {
+            "name": "formId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckInForm"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckInForm"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/reports/current": {
+      "get": {
+        "operationId": "getCurrentReport",
+        "tags": [
+          "report"
+        ],
+        "summary": "The athlete's current report",
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Report"
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "no report yet"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/reports/{reportId}": {
+      "put": {
+        "operationId": "saveReport",
+        "tags": [
+          "report"
+        ],
+        "summary": "Create or replace a report",
+        "description": "PUT for the same reason as a check-in form: a report is not versioned. It owns only a layout, and nothing references a tile, so replacing one cannot make anything else unreadable. Submitting the same body twice leaves it in the same state, which is what makes a retry safe with no client-generated request id.",
+        "parameters": [
+          {
+            "name": "reportId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Report"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Report"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/dashboards/current": {
+      "get": {
+        "operationId": "getCurrentDashboard",
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "The athlete's current dashboard",
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Dashboard"
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "no dashboard yet"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/dashboards/{dashboardId}": {
+      "put": {
+        "operationId": "saveDashboard",
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "Create or replace a dashboard",
+        "description": "PUT, for the same reason as a check-in form and a report: a dashboard owns only a layout and nothing references a widget, so replacing one cannot make anything else unreadable. Submitting the same body twice leaves it in the same state.",
+        "parameters": [
+          {
+            "name": "dashboardId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Dashboard"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Dashboard"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/plans/current": {
+      "get": {
+        "operationId": "getCurrentPlan",
+        "tags": [
+          "timeline"
+        ],
+        "summary": "The athlete's current plan",
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Plan"
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "no plan yet"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/plans/{planId}": {
+      "put": {
+        "operationId": "savePlan",
+        "tags": [
+          "timeline"
+        ],
+        "summary": "Create or replace a plan",
+        "description": "PUT, like a form, a report and a dashboard: a plan owns its own phases and nothing references one, so replacing it cannot make anything else unreadable. Submitting the same body twice leaves it in the same state.",
+        "parameters": [
+          {
+            "name": "planId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Plan"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Plan"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/nutrition-plans/current": {
+      "get": {
+        "operationId": "getCurrentNutritionPlan",
+        "tags": [
+          "nutrition"
+        ],
+        "summary": "The athlete's current nutrition plan",
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NutritionPlan"
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "no plan yet"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/nutrition-plans/{planId}": {
+      "put": {
+        "operationId": "saveNutritionPlan",
+        "tags": [
+          "nutrition"
+        ],
+        "summary": "Create or replace a nutrition plan",
+        "description": "PUT, like the other authored artefacts: nothing references a meal or an item, so replacing the plan cannot make anything else unreadable.",
+        "parameters": [
+          {
+            "name": "planId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NutritionPlan"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NutritionPlan"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/workflows/current": {
+      "get": {
+        "operationId": "getCurrentWorkflow",
+        "tags": [
+          "workflow"
+        ],
+        "summary": "The coach's current automation",
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Workflow"
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "none authored yet"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/workflows/{workflowId}": {
+      "put": {
+        "operationId": "saveWorkflow",
+        "tags": [
+          "workflow"
+        ],
+        "summary": "Create or replace an automation",
+        "description": "PUT, like the other authored artefacts. Unlike them, the stored value CHANGES BEHAVIOUR: an enabled workflow is acted on by the runner, so a 400 on a non-runnable graph with enabled=true is a required check rather than a courtesy.",
+        "parameters": [
+          {
+            "name": "workflowId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Workflow"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Workflow"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid, or enabled with a graph that cannot run",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/events": {
+      "get": {
+        "operationId": "streamEvents",
+        "tags": [
+          "events"
+        ],
+        "summary": "Server-sent events for cache invalidation",
+        "description": "A `text/event-stream` that never completes. Described here for discoverability; the wire format is NOT expressible in OpenAPI and the requirements are in BACKEND-CONTRACT section 5, which is written from measured browser behaviour. Four of them fail silently if missed: frames must not use `event:` names, a prelude byte must be written on connect, every frame needs a monotonic `id:` with `Last-Event-ID` honoured, and an unauthenticated stream must be refused rather than held open.",
+        "parameters": [
+          {
+            "name": "Last-Event-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Sent by the browser itself on reconnect. Replay everything after it, or signal that resume is impossible -- never silently resume from the newest event."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "An open stream. Each frame is `id:` + `data:`, where data is `{\"kind\":\"<event-kind>\"}`.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
         }
       }
     }
@@ -48,7 +1228,9 @@
         "description": "no valid session",
         "content": {
           "application/json": {
-            "schema": { "$ref": "#/components/schemas/Problem" }
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
           }
         }
       }
@@ -56,47 +1238,1510 @@
     "schemas": {
       "Problem": {
         "type": "object",
-        "required": ["code", "detail"],
+        "required": [
+          "code",
+          "detail"
+        ],
         "properties": {
-          "code": { "type": "string", "description": "stable machine-readable code" },
-          "detail": { "type": "string" }
+          "code": {
+            "type": "string",
+            "description": "stable machine-readable code"
+          },
+          "detail": {
+            "type": "string"
+          }
         }
       },
       "Athlete": {
         "type": "object",
-        "required": ["id", "personId", "status", "trainingIdentity", "availability"],
+        "required": [
+          "id",
+          "personId",
+          "status",
+          "trainingIdentity",
+          "availability"
+        ],
         "properties": {
-          "id": { "type": "string", "format": "uuid" },
-          "personId": { "type": "string", "format": "uuid" },
-          "status": { "type": "string", "enum": ["active", "dormant", "archived"] },
-          "trainingIdentity": { "$ref": "#/components/schemas/TrainingIdentity" },
-          "availability": { "$ref": "#/components/schemas/Availability" }
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "personId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "dormant",
+              "archived"
+            ]
+          },
+          "trainingIdentity": {
+            "$ref": "#/components/schemas/TrainingIdentity"
+          },
+          "availability": {
+            "$ref": "#/components/schemas/Availability"
+          }
         }
       },
       "TrainingIdentity": {
         "type": "object",
-        "required": ["experienceLevel", "disciplines"],
+        "required": [
+          "experienceLevel",
+          "disciplines"
+        ],
         "properties": {
-          "trainingAgeMonths": { "type": "integer", "minimum": 0 },
+          "trainingAgeMonths": {
+            "type": "integer",
+            "minimum": 0
+          },
           "experienceLevel": {
             "type": "string",
-            "enum": ["beginner", "intermediate", "advanced"]
+            "enum": [
+              "beginner",
+              "intermediate",
+              "advanced"
+            ]
           },
-          "disciplines": { "type": "array", "items": { "type": "string" } }
+          "disciplines": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
         }
       },
       "Availability": {
         "type": "object",
-        "required": ["daysPerWeek", "equipmentAccess"],
+        "required": [
+          "daysPerWeek",
+          "equipmentAccess"
+        ],
         "properties": {
-          "daysPerWeek": { "type": "integer", "minimum": 1, "maximum": 7 },
+          "daysPerWeek": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 7
+          },
           "sessionCeilingSeconds": {
             "type": "integer",
             "minimum": 600,
             "description": "Duration in seconds. Unit is explicit in the name because N11 forbids an ambiguous magnitude."
           },
-          "equipmentAccess": { "type": "array", "items": { "type": "string" } }
+          "equipmentAccess": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
         }
+      },
+      "RequestCodeBody": {
+        "type": "object",
+        "required": [
+          "phone"
+        ],
+        "properties": {
+          "phone": {
+            "type": "string",
+            "pattern": "^\\+989[0-9]{9}$",
+            "description": "E.164. The client normalises Persian/Arabic-Indic digits and local prefixes before sending; the server receives one canonical form only."
+          }
+        }
+      },
+      "RequestCodeResult": {
+        "type": "object",
+        "required": [
+          "retryAfterSeconds",
+          "codeLength"
+        ],
+        "properties": {
+          "retryAfterSeconds": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Seconds until another code may be requested. Unit is explicit in the name because N11 forbids an ambiguous magnitude. Server-authoritative: the client must not compute its own cooldown."
+          },
+          "codeLength": {
+            "type": "integer",
+            "minimum": 4,
+            "maximum": 8,
+            "description": "So the client does not hardcode a length the server can change."
+          }
+        }
+      },
+      "VerifyCodeBody": {
+        "type": "object",
+        "required": [
+          "phone",
+          "code"
+        ],
+        "properties": {
+          "phone": {
+            "type": "string",
+            "pattern": "^\\+989[0-9]{9}$"
+          },
+          "code": {
+            "type": "string",
+            "pattern": "^[0-9]{4,8}$"
+          }
+        }
+      },
+      "VerifyCodeResult": {
+        "type": "object",
+        "required": [
+          "personId",
+          "isNewPerson"
+        ],
+        "properties": {
+          "personId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "isNewPerson": {
+            "type": "boolean",
+            "description": "True when this verification created the person. The client routes to onboarding rather than the dashboard."
+          }
+        }
+      },
+      "CompleteOnboardingBody": {
+        "type": "object",
+        "required": [
+          "trainingIdentity",
+          "availability"
+        ],
+        "properties": {
+          "trainingIdentity": {
+            "$ref": "#/components/schemas/TrainingIdentity"
+          },
+          "availability": {
+            "$ref": "#/components/schemas/Availability"
+          }
+        }
+      },
+      "Goal": {
+        "type": "object",
+        "required": [
+          "id",
+          "athleteId",
+          "intent",
+          "declaredOn",
+          "cadenceDays"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "athleteId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "intent": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "The athlete's own words, verbatim. Never a normalised or translated form -- losing the phrasing is not recoverable."
+          },
+          "declaredOn": {
+            "type": "string",
+            "format": "date",
+            "description": "ISO date, no time. The declaration is a calendar fact in the athlete's zone."
+          },
+          "horizon": {
+            "type": "string",
+            "format": "date",
+            "description": "Absent means open-ended, which is a valid answer."
+          },
+          "cadenceDays": {
+            "type": "integer",
+            "minimum": 7,
+            "maximum": 365,
+            "description": "Evaluation cadence. NOT a status: staleness and expiry are derived from this plus a date (ADR-0006), never stored."
+          }
+        }
+      },
+      "DeclareGoalBody": {
+        "type": "object",
+        "required": [
+          "intent",
+          "cadenceDays"
+        ],
+        "properties": {
+          "intent": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "horizon": {
+            "type": "string",
+            "format": "date"
+          },
+          "cadenceDays": {
+            "type": "integer",
+            "minimum": 7,
+            "maximum": 365
+          }
+        }
+      },
+      "ProgressionIntent": {
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "fixed",
+              "linear",
+              "autoregulated"
+            ]
+          },
+          "ratePercent": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 20,
+            "description": "Percent per cycle. Present only for kind=linear. Percent rather than absolute because the same increment is trivial for one athlete and impossible for another."
+          }
+        }
+      },
+      "Block": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "order",
+          "progressionIntent"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "order": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Zero-based. Orders across a version must be exactly 0..n-1, each once."
+          },
+          "progressionIntent": {
+            "$ref": "#/components/schemas/ProgressionIntent"
+          }
+        }
+      },
+      "ServesGoal": {
+        "type": "object",
+        "required": [
+          "goalId"
+        ],
+        "properties": {
+          "goalId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "rationale": {
+            "type": "string"
+          }
+        },
+        "description": "States current purpose. NEVER an input to outcome evaluation (ADR-0008)."
+      },
+      "AuthoringDecision": {
+        "type": "object",
+        "required": [
+          "decidedBy",
+          "proposedBy"
+        ],
+        "properties": {
+          "decidedBy": {
+            "type": "string"
+          },
+          "proposedBy": {
+            "type": "string",
+            "enum": [
+              "human",
+              "assistant"
+            ],
+            "description": "Separate from decidedBy: an AI-proposed programme accepted by a coach was DECIDED by the coach. Collapsing them loses the fact that makes ADR-0003 auditable."
+          },
+          "rationale": {
+            "type": "string"
+          }
+        }
+      },
+      "ProgramVersion": {
+        "type": "object",
+        "required": [
+          "id",
+          "programId",
+          "versionNumber",
+          "blocks",
+          "authoringDecision"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "programId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "versionNumber": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "blocks": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/components/schemas/Block"
+            }
+          },
+          "servesGoal": {
+            "$ref": "#/components/schemas/ServesGoal"
+          },
+          "authoringDecision": {
+            "$ref": "#/components/schemas/AuthoringDecision"
+          }
+        }
+      },
+      "Program": {
+        "type": "object",
+        "required": [
+          "id",
+          "athleteId",
+          "title",
+          "currentVersion"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "athleteId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "currentVersion": {
+            "$ref": "#/components/schemas/ProgramVersion"
+          }
+        },
+        "description": "The LINEAGE plus its current structure. Program and ProgramVersion are separate aggregates (ADR-0008); this envelope is a read projection, not a merge."
+      },
+      "ScreeningVerdict": {
+        "type": "object",
+        "required": [
+          "level",
+          "basisWithheld"
+        ],
+        "properties": {
+          "level": {
+            "type": "string",
+            "enum": [
+              "clear",
+              "modified",
+              "blocked"
+            ]
+          },
+          "basis": {
+            "type": "string",
+            "description": "Why. Absent when consent-gated (ADR-0002/0014), which is NOT the same as absent because there is no reason -- see basisWithheld."
+          },
+          "basisWithheld": {
+            "type": "boolean",
+            "description": "True when a basis exists but this viewer may not see it. Distinguishes the two reasons basis can be absent."
+          }
+        }
+      },
+      "PrescribedItem": {
+        "type": "object",
+        "required": [
+          "id",
+          "movementName",
+          "order",
+          "sets",
+          "reps"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "movementName": {
+            "type": "string",
+            "minLength": 1
+          },
+          "order": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "sets": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "reps": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "loadKg": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "Resolved load in kilograms. ABSENT for bodyweight or time-based work -- never 0, which is what an unresolved progression writes."
+          }
+        }
+      },
+      "PrescribedSession": {
+        "type": "object",
+        "required": [
+          "id",
+          "programVersionId",
+          "scheduledFor",
+          "items",
+          "screening"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "programVersionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "scheduledFor": {
+            "type": "string",
+            "format": "date"
+          },
+          "items": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/components/schemas/PrescribedItem"
+            }
+          },
+          "screening": {
+            "$ref": "#/components/schemas/ScreeningVerdict"
+          }
+        },
+        "description": "Required screening is ADR-0021: a PrescribedSession cannot exist without a verdict covering its final RESOLVED dose. Screening an intent is worthless -- an intent has no numbers to screen."
+      },
+      "PerformedSet": {
+        "type": "object",
+        "required": [
+          "id",
+          "prescribedItemId",
+          "setNumber",
+          "reps"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "prescribedItemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "setNumber": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "reps": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "loadKg": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "Absent for bodyweight. Never 0."
+          },
+          "rpe": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 10,
+            "multipleOf": 0.5
+          }
+        }
+      },
+      "LogSessionBody": {
+        "type": "object",
+        "required": [
+          "id",
+          "prescribedSessionId",
+          "performedOn",
+          "sets"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "CLIENT-generated UUIDv7 (D-10). The idempotency key: a queued log replayed after a lost response arrives with the same id, and the server MUST answer 409 rather than creating a second record. Offline replay is at-least-once and this is what makes it safe."
+          },
+          "prescribedSessionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "performedOn": {
+            "type": "string",
+            "format": "date",
+            "description": "Independent of the prescription's scheduledFor. Monday's session may be performed on Tuesday."
+          },
+          "sets": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/components/schemas/PerformedSet"
+            }
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 500
+          }
+        }
+      },
+      "PerformedSession": {
+        "type": "object",
+        "required": [
+          "id",
+          "prescribedSessionId",
+          "performedOn",
+          "sets"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "prescribedSessionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "performedOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "sets": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/components/schemas/PerformedSet"
+            }
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      },
+      "ReviseProgramBody": {
+        "type": "object",
+        "required": [
+          "id",
+          "baseVersionId",
+          "blocks",
+          "authoringDecision"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "CLIENT-generated id for the NEW version (D-10). The idempotency key: a revision replayed after a lost response arrives with the same id, and the server MUST return the stored version with 200 rather than creating a second one. Without it, a coach who loses the response and retries silently creates two versions and the athlete's programme jumps two numbers."
+          },
+          "baseVersionId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The version this revision was edited FROM. If it is no longer current, another author revised in the meantime and the server MUST answer 409 with the version that is current now -- overwriting would discard their work with no trace. Optimistic concurrency rather than locking, because a coach with a builder open for an hour must not hold a lock for an hour."
+          },
+          "blocks": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/components/schemas/Block"
+            }
+          },
+          "servesGoal": {
+            "$ref": "#/components/schemas/ServesGoal"
+          },
+          "authoringDecision": {
+            "$ref": "#/components/schemas/AuthoringDecision"
+          }
+        },
+        "description": "A revision creates a NEW version and leaves the old one untouched (ADR-0008): a structure an athlete has already followed cannot be edited without making every PerformedSession against it unreadable. versionNumber is assigned by the server, not sent -- it is derived from the lineage and a client that guessed it would race another author."
+      },
+      "Acquisition": {
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "self-reported",
+              "device",
+              "practitioner"
+            ]
+          },
+          "source": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Required when kind=device. An opaque identifier such as `withings-scale`, never a display name -- names are catalogue data (ADR-0012)."
+          },
+          "recordedBy": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Required when kind=practitioner."
+          }
+        },
+        "description": "How a measurement came to be known. CLOSED, unlike the indicator kind, because the variants differ in required structure (ADR-0016 / ADR-0020). Provenance is published as a coarse vocabulary rather than a confidence score (ADR-0023)."
+      },
+      "Observation": {
+        "type": "object",
+        "required": [
+          "id",
+          "athleteId",
+          "kind",
+          "value",
+          "unit",
+          "observedOn",
+          "acquisition"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "athleteId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "type": "string",
+            "minLength": 1,
+            "description": "OPEN vocabulary (ADR-0020): every variant has identical structure, so a kind this client has never seen is data, not an error."
+          },
+          "value": {
+            "type": "number",
+            "minimum": 0
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Invariant N11: a measurement is never stored without its unit."
+          },
+          "observedOn": {
+            "type": "string",
+            "format": "date",
+            "description": "The calendar day, not an instant. A bodyweight is a fact about a morning."
+          },
+          "acquisition": {
+            "$ref": "#/components/schemas/Acquisition"
+          }
+        }
+      },
+      "RecordObservationBody": {
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "value",
+          "unit",
+          "observedOn",
+          "acquisition"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "CLIENT-generated UUIDv7 (ADR-0010). The idempotency key: a repeat of a stored id MUST return 200 with the stored record rather than creating a second one. A duplicate measurement is not worth telling the athlete about -- unlike a duplicate session log, it can only be a retry."
+          },
+          "kind": {
+            "type": "string",
+            "minLength": 1
+          },
+          "value": {
+            "type": "number",
+            "minimum": 0
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "observedOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "acquisition": {
+            "$ref": "#/components/schemas/Acquisition"
+          }
+        }
+      },
+      "IndicatorPoint": {
+        "type": "object",
+        "required": [
+          "on",
+          "value"
+        ],
+        "properties": {
+          "on": {
+            "type": "string",
+            "format": "date"
+          },
+          "value": {
+            "type": "number"
+          }
+        },
+        "description": "A computed answer, not a record -- hence no id. Giving a derived point an identity would invite something to reference it and then expect it to still exist (ADR-0006)."
+      },
+      "IndicatorSeries": {
+        "type": "object",
+        "required": [
+          "kind",
+          "unit",
+          "points"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "minLength": 1
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1,
+            "description": "On the SERIES, not the point. A series whose unit changed partway through is two series, and per-point units make that representable."
+          },
+          "movementName": {
+            "type": "string",
+            "description": "For per-movement indicators such as an estimated 1RM. Absent for whole-body indicators. A name rather than an id until catalogue versioning exists (ADR-0012)."
+          },
+          "points": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IndicatorPoint"
+            }
+          }
+        },
+        "description": "A published derived indicator (ADR-0013). DERIVED on read and never stored (ADR-0006): the server computes it from observations and performed sessions when asked. Prescription consumes this to resolve progression, which is why it is a published language rather than an internal shape."
+      },
+      "Hypothesis": {
+        "type": "object",
+        "required": [
+          "indicatorKind",
+          "claim",
+          "horizon"
+        ],
+        "properties": {
+          "indicatorKind": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An indicator kind Measurement publishes. Open vocabulary (ADR-0020)."
+          },
+          "claim": {
+            "type": "string",
+            "minLength": 1,
+            "description": "What is expected to happen. Falsifiable, or the record of WHY (ADR-0003) degrades into a record of clicks."
+          },
+          "horizon": {
+            "type": "string",
+            "format": "date",
+            "description": "When the claim becomes answerable. Must be after proposedOn -- a claim already due at the moment of proposing arrives in the unjudged list before the change has had any chance to act."
+          }
+        },
+        "description": "The obligation to find out whether a change worked (ADR-0007). A value object on the proposal, never an aggregate."
+      },
+      "Proposal": {
+        "type": "object",
+        "required": [
+          "id",
+          "targetKind",
+          "targetId",
+          "summary",
+          "rationale",
+          "hypothesis",
+          "proposedOn"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "targetKind": {
+            "type": "string",
+            "enum": [
+              "program",
+              "goal",
+              "session"
+            ],
+            "description": "A coarse published vocabulary (ADR-0023). Deliberately not 'which aggregate' -- that would put another context's model inside Learning, which ADR-0019 forbids."
+          },
+          "targetId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque to Learning. The screen that shows the proposal dereferences it; Learning never does."
+          },
+          "summary": {
+            "type": "string",
+            "minLength": 1
+          },
+          "rationale": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Why. Required, not optional: a suggestion with no stated reason carries authority while being unreviewable."
+          },
+          "hypothesis": {
+            "$ref": "#/components/schemas/Hypothesis"
+          },
+          "proposedOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "decidedOn": {
+            "type": "string",
+            "format": "date",
+            "description": "Absent while undecided. The moment of change is recorded in the CHANGING context (ADR-0010); this is reported back only so the client can stop offering a decision already made."
+          },
+          "accepted": {
+            "type": "boolean",
+            "description": "Absent while undecided."
+          }
+        }
+      },
+      "DecisionOutcome": {
+        "type": "object",
+        "required": [
+          "id",
+          "proposalId",
+          "verdict",
+          "rationale",
+          "decidedBy",
+          "decidedOn"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "proposalId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "verdict": {
+            "type": "string",
+            "enum": [
+              "held",
+              "did-not-hold"
+            ],
+            "description": "Two members. A third meaning 'not yet' is already represented by there being no DecisionOutcome at all, and adding it would give one state two spellings."
+          },
+          "rationale": {
+            "type": "string",
+            "minLength": 1
+          },
+          "decidedBy": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A human. An assistant may propose; it may not conclude (ADR-0003)."
+          },
+          "decidedOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "supersedes": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Set when this corrects an earlier verdict. The earlier one is PRESERVED and still returned by GET /outcomes -- a correction that hid what it replaced would make the correction invisible (ADR-0007)."
+          }
+        }
+      },
+      "RenderVerdictBody": {
+        "type": "object",
+        "required": [
+          "id",
+          "verdict",
+          "rationale"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "CLIENT-generated UUIDv7 (ADR-0010). A repeat of a stored id MUST return 200 with that outcome, never a second one."
+          },
+          "verdict": {
+            "type": "string",
+            "enum": [
+              "held",
+              "did-not-hold"
+            ]
+          },
+          "rationale": {
+            "type": "string",
+            "minLength": 1
+          },
+          "supersedes": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Present when correcting. The superseded outcome MUST NOT be deleted or mutated."
+          }
+        }
+      },
+      "AnswerShape": {
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "number",
+              "scale",
+              "choice"
+            ]
+          },
+          "min": {
+            "type": "number",
+            "description": "Required when kind=scale. Must be below max."
+          },
+          "max": {
+            "type": "number",
+            "description": "Required when kind=scale."
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Required and non-empty when kind=choice."
+          }
+        },
+        "description": "How the athlete answers. CLOSED, because the variants differ in required structure (ADR-0020's exception). Flattened rather than a oneOf so a single field of a variant can be addressed by one SetProperty in the editor -- see the note in ctx-measurement/src/editor/schema.ts."
+      },
+      "FormField": {
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "records",
+          "unit",
+          "answer",
+          "order"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1
+          },
+          "records": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The IndicatorKind the answer becomes. Every field must record something: a question that produces no observation is a survey question, and this product needs measurements. Open vocabulary (ADR-0020)."
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Invariant N11: an answer is never recorded without its unit."
+          },
+          "answer": {
+            "$ref": "#/components/schemas/AnswerShape"
+          },
+          "order": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Zero-based. Orders across a form must be exactly 0..n-1, each once."
+          }
+        }
+      },
+      "CheckInForm": {
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "fields"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "fields": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/components/schemas/FormField"
+            }
+          }
+        },
+        "description": "The instrument by which a self-reported measurement is acquired. NOT versioned, unlike ProgramVersion: observations reference an indicator kind rather than a field id, so editing a form cannot make an existing observation unreadable. That is why this is a PUT and a programme revision is a POST."
+      },
+      "TileContent": {
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "indicator",
+              "note"
+            ]
+          },
+          "indicatorKind": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Required when kind=indicator. The published series to chart -- a D-08 reference, resolved at render time."
+          },
+          "fallbackLabel": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Required when kind=indicator. The only renderable content when the reference cannot be resolved (D-08)."
+          },
+          "text": {
+            "type": "string",
+            "description": "Present when kind=note."
+          }
+        }
+      },
+      "ReportTile": {
+        "type": "object",
+        "required": [
+          "id",
+          "x",
+          "y",
+          "width",
+          "height",
+          "content"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "x": {
+            "type": "number",
+            "description": "Document PIXELS (D-04: px for Report, grid cells for Dashboard, ms for Timeline)."
+          },
+          "y": {
+            "type": "number"
+          },
+          "width": {
+            "type": "number",
+            "minimum": 40
+          },
+          "height": {
+            "type": "number",
+            "minimum": 40
+          },
+          "content": {
+            "$ref": "#/components/schemas/TileContent"
+          }
+        }
+      },
+      "Report": {
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "tiles"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "tiles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportTile"
+            },
+            "description": "Array ORDER IS PAINT ORDER -- which tile draws on top when two overlap. It must be preserved verbatim; sorting it changes the arrangement the coach made."
+          }
+        },
+        "description": "A coach-authored arrangement of published views. Owns a LAYOUT and nothing else: every tile points at another context's published language and is resolved at render time, so a deleted indicator breaks one tile rather than the report."
+      },
+      "WidgetContent": {
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "indicator",
+              "upcoming-sessions",
+              "unjudged-proposals"
+            ]
+          },
+          "indicatorKind": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Required when kind=indicator. A D-08 reference, resolved at render time."
+          },
+          "fallbackLabel": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Required when kind=indicator."
+          }
+        }
+      },
+      "Widget": {
+        "type": "object",
+        "required": [
+          "id",
+          "x",
+          "y",
+          "width",
+          "height",
+          "content"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "x": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Grid CELLS, not pixels (D-04: cells for Dashboard). Column 0 is where the reader starts, which is the right-hand edge in a right-to-left locale."
+          },
+          "y": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "width": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "height": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "content": {
+            "$ref": "#/components/schemas/WidgetContent"
+          }
+        }
+      },
+      "Dashboard": {
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "columns",
+          "widgets"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "columns": {
+            "type": "integer",
+            "minimum": 4,
+            "maximum": 24,
+            "description": "On the DOCUMENT, not the renderer: a widget four columns wide means nothing without knowing four of how many. A renderer that assumed twelve would halve every layout authored against six."
+          },
+          "widgets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Widget"
+            },
+            "description": "Widgets MUST NOT overlap. Unlike a report's tiles, where list order is paint order, order carries nothing here \u2014 the layout is entirely in the coordinates."
+          }
+        }
+      },
+      "Phase": {
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "start",
+          "length"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The coach's own word for it -- 'accumulation', 'peak'. Not a fixed vocabulary."
+          },
+          "start": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Whole DAYS from the plan's epoch. Days rather than the milliseconds D-04 names for Timeline: a plan's smallest meaningful unit is a day and its natural unit is a week, and millisecond precision would force the arithmetic through Date -- which shifts a plain date by a day west of Greenwich."
+          },
+          "length": {
+            "type": "integer",
+            "minimum": 7,
+            "description": "Whole days, at least one week. Below a week there is no full rotation of whatever the phase prescribes."
+          },
+          "programId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The programme this phase intends to run. Absent when none. Opaque to Timeline, which never dereferences it (ADR-0019)."
+          },
+          "servesGoal": {
+            "type": "string",
+            "format": "uuid",
+            "description": "What the phase is for. NEVER an evaluation input (ADR-0008)."
+          }
+        }
+      },
+      "Plan": {
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "epoch",
+          "phases"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "epoch": {
+            "type": "string",
+            "format": "date",
+            "description": "Day zero. Every phase offset is relative to it, so the whole plan can be shifted by changing one field."
+          },
+          "phases": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Phase"
+            },
+            "description": "MUST NOT overlap: an athlete is in one phase at a time, and two overlapping phases make 'what am I doing this week' unanswerable. Order is not significant -- the client sorts by start."
+          }
+        },
+        "description": "A periodisation laid out on time. Distinct from a ProgramVersion, which says WHAT the training is with no dates; this says WHEN and nothing about content, so a taper can move without revising a block."
+      },
+      "MealItem": {
+        "type": "object",
+        "required": [
+          "id",
+          "food",
+          "amount",
+          "order"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique across the whole PLAN, not per meal: these are node ids in the editor's flat document, so two items sharing one would be a single node with two parents."
+          },
+          "food": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The coach's words. NOT a catalogue reference -- ADR-0012 makes catalogue versioning a prerequisite for historical display fidelity and it is still pending."
+          },
+          "amount": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Free text: '200 g', '1 cup', 'a handful'. Constraining it to a catalogue's units would be pretending the catalogue exists."
+          },
+          "order": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Zero-based WITHIN its meal. Exactly 0..n-1, each once."
+          }
+        }
+      },
+      "Meal": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "when",
+          "items",
+          "order"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "when": {
+            "type": "string",
+            "description": "Free text -- 'post-training', 'before bed'. Not a clock reading: neither of those is one, and a time field would force one into the other's shape."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MealItem"
+            }
+          },
+          "order": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "NutritionPlan": {
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "meals"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "meals": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/components/schemas/Meal"
+            }
+          }
+        },
+        "description": "Meals and what is in them -- the only NESTED document in this API. No nutrient totals: computing them needs a versioned food catalogue (ADR-0012, pending), and without one a plan would silently change meaning whenever a catalogue entry was corrected."
+      },
+      "WorkflowStep": {
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "detail",
+          "x",
+          "y"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "trigger",
+              "condition",
+              "action"
+            ],
+            "description": "A trigger accepts no incoming edge and offers one output; a condition offers 'true' and 'false'; an action accepts input and offers one output. The client enforces all of it (see BACKEND-CONTRACT 4.8)."
+          },
+          "detail": {
+            "type": "string",
+            "description": "Which event, comparison or effect, in the vocabulary the RUNNER owns. Free text on the wire on purpose: the client does not duplicate that vocabulary, so a workflow authored against a newer server still renders."
+          },
+          "x": {
+            "type": "number",
+            "description": "Canvas coordinate. Layout, not semantics -- two workflows differing only in coordinates behave identically."
+          },
+          "y": {
+            "type": "number"
+          }
+        }
+      },
+      "WorkflowEdge": {
+        "type": "object",
+        "required": [
+          "id",
+          "from",
+          "port",
+          "to"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "from": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "port": {
+            "type": "string",
+            "enum": [
+              "out",
+              "true",
+              "false"
+            ],
+            "description": "WHICH output the edge leaves from -- this is what makes a condition a branch. 'out' for a trigger or an action; 'true'/'false' for a condition."
+          },
+          "to": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "Workflow": {
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "nodes",
+          "edges",
+          "enabled"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "nodes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkflowStep"
+            }
+          },
+          "edges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkflowEdge"
+            }
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether the runner should act on it. A workflow that is not runnable MUST NOT be stored with this true -- see BACKEND-CONTRACT 4.8."
+          }
+        },
+        "description": "A coaching automation: a directed acyclic graph of triggers, conditions and actions. The only GRAPH-shaped document in this API -- every other authored artefact is a list or a list of lists. Nodes carry no order because a graph has none; execution order is derived from the edges."
       }
     }
   }

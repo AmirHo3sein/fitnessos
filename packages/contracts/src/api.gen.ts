@@ -41,6 +41,501 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/request-code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send a one-time code by SMS
+         * @description Rate limited per IP and per phone. Returns the same shape whether or not the phone is registered — a differing response would make this an account-enumeration oracle.
+         */
+        post: operations["requestCode"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/verify-code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Exchange a one-time code for a session
+         * @description On success sets the access and refresh cookies (httpOnly, SameSite=Lax). No token is ever returned in the body — a token readable from JS is a token exfiltrable by XSS.
+         */
+        post: operations["verifyCode"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/athletes/me/onboarding": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Record the athlete's training identity and availability
+         * @description PUT rather than POST: submitting the same body twice must leave the athlete in the same state. Onboarding is a form a user will resubmit after a network hiccup, and an idempotent verb is what makes that safe without a client-generated request id.
+         */
+        put: operations["completeOnboarding"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/goals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The calling athlete's goals */
+        get: operations["listMyGoals"];
+        put?: never;
+        /**
+         * Declare a goal
+         * @description POST rather than PUT: declaring a goal creates a new one each time, and two goals with the same wording are legitimately different goals declared at different moments.
+         */
+        post: operations["declareGoal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/programs/current": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The athlete's current programme and its current version */
+        get: operations["getCurrentProgram"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/upcoming": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Prescribed sessions not yet performed */
+        get: operations["listUpcomingSessions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/performed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record what the athlete actually did
+         * @description Idempotent by client-supplied id. A repeat of an id already stored MUST return 409 with the stored record, never a second row -- offline replay is at-least-once. 409 also occurs when another device logged this prescribed session first; the client preserves its own copy and surfaces the difference (ADR-0033).
+         */
+        post: operations["logSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/programs/{programId}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create the next version of a programme
+         * @description Idempotent by client-supplied version id; concurrency-checked by baseVersionId. A repeat of a stored id returns 200 with that version. A stale baseVersionId returns 409 with the CURRENT program, so the client can show the author what changed instead of silently discarding one of the two edits (ADR-0033).
+         */
+        post: operations["reviseProgram"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/observations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The athlete's recorded measurements */
+        get: operations["listObservations"];
+        put?: never;
+        /**
+         * Record a measurement
+         * @description Idempotent by client-supplied id. A repeat of a stored id returns 200 with that record, never a second one -- a duplicate measurement can only be a retry, so it is indistinguishable from success. Contrast POST /sessions/performed, where a duplicate may be a genuine second record from another device and answers 409.
+         */
+        post: operations["recordObservation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/indicators": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Published derived indicators
+         * @description Computed on read from observations and performed sessions (ADR-0006). The response therefore changes when a session is logged, without any observation being recorded -- a client must invalidate this on a performed session as well as on a measurement.
+         */
+        get: operations["listIndicators"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/proposals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Proposals made for this athlete, decided and undecided */
+        get: operations["listProposals"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/outcomes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Rendered verdicts, INCLUDING superseded ones
+         * @description Superseded outcomes are returned deliberately. A corrected verdict that vanished would make the correction invisible, which is the opposite of what the supersede rule is for (ADR-0007). Which of them a reader sees is a presentation decision.
+         */
+        get: operations["listOutcomes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/proposals/{proposalId}/outcome": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record whether the proposal's hypothesis held
+         * @description NOT 'accept a proposal'. Accepting is the moment of change and belongs to the changing context: it produces a new ProgramVersion whose authoringDecision records proposedBy=assistant and decidedBy=<the human> (ADR-0010). This records the later verdict on whether the claim turned out to be true.\n\nIdempotent by client-supplied id, 200 on replay. A correction supplies `supersedes` and creates a NEW outcome; the superseded one must remain readable.
+         */
+        post: operations["renderVerdict"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/check-in-forms/current": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The athlete's current check-in form */
+        get: operations["getCurrentCheckInForm"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/check-in-forms/{formId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Create or replace a check-in form
+         * @description PUT, not POST. A form is not versioned -- observations reference an indicator kind, not a field id, so editing one cannot make an existing observation unreadable. Submitting the same body twice must therefore leave the form in the same state, which is what makes a retry safe here without a client-generated request id (contrast POST /programs/{id}/versions, where every save is a new immutable version).
+         */
+        put: operations["saveCheckInForm"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/current": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The athlete's current report */
+        get: operations["getCurrentReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/{reportId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Create or replace a report
+         * @description PUT for the same reason as a check-in form: a report is not versioned. It owns only a layout, and nothing references a tile, so replacing one cannot make anything else unreadable. Submitting the same body twice leaves it in the same state, which is what makes a retry safe with no client-generated request id.
+         */
+        put: operations["saveReport"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dashboards/current": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The athlete's current dashboard */
+        get: operations["getCurrentDashboard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dashboards/{dashboardId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Create or replace a dashboard
+         * @description PUT, for the same reason as a check-in form and a report: a dashboard owns only a layout and nothing references a widget, so replacing one cannot make anything else unreadable. Submitting the same body twice leaves it in the same state.
+         */
+        put: operations["saveDashboard"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/plans/current": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The athlete's current plan */
+        get: operations["getCurrentPlan"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/plans/{planId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Create or replace a plan
+         * @description PUT, like a form, a report and a dashboard: a plan owns its own phases and nothing references one, so replacing it cannot make anything else unreadable. Submitting the same body twice leaves it in the same state.
+         */
+        put: operations["savePlan"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/nutrition-plans/current": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The athlete's current nutrition plan */
+        get: operations["getCurrentNutritionPlan"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/nutrition-plans/{planId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Create or replace a nutrition plan
+         * @description PUT, like the other authored artefacts: nothing references a meal or an item, so replacing the plan cannot make anything else unreadable.
+         */
+        put: operations["saveNutritionPlan"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workflows/current": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The coach's current automation */
+        get: operations["getCurrentWorkflow"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workflows/{workflowId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Create or replace an automation
+         * @description PUT, like the other authored artefacts. Unlike them, the stored value CHANGES BEHAVIOUR: an enabled workflow is acted on by the runner, so a 400 on a non-runnable graph with enabled=true is a required check rather than a courtesy.
+         */
+        put: operations["saveWorkflow"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Server-sent events for cache invalidation
+         * @description A `text/event-stream` that never completes. Described here for discoverability; the wire format is NOT expressible in OpenAPI and the requirements are in BACKEND-CONTRACT section 5, which is written from measured browser behaviour. Four of them fail silently if missed: frames must not use `event:` names, a prelude byte must be written on connect, every frame needs a monotonic `id:` with `Last-Event-ID` honoured, and an unauthenticated stream must be refused rather than held open.
+         */
+        get: operations["streamEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -71,6 +566,496 @@ export interface components {
             /** @description Duration in seconds. Unit is explicit in the name because N11 forbids an ambiguous magnitude. */
             sessionCeilingSeconds?: number;
             equipmentAccess: string[];
+        };
+        RequestCodeBody: {
+            /** @description E.164. The client normalises Persian/Arabic-Indic digits and local prefixes before sending; the server receives one canonical form only. */
+            phone: string;
+        };
+        RequestCodeResult: {
+            /** @description Seconds until another code may be requested. Unit is explicit in the name because N11 forbids an ambiguous magnitude. Server-authoritative: the client must not compute its own cooldown. */
+            retryAfterSeconds: number;
+            /** @description So the client does not hardcode a length the server can change. */
+            codeLength: number;
+        };
+        VerifyCodeBody: {
+            phone: string;
+            code: string;
+        };
+        VerifyCodeResult: {
+            /** Format: uuid */
+            personId: string;
+            /** @description True when this verification created the person. The client routes to onboarding rather than the dashboard. */
+            isNewPerson: boolean;
+        };
+        CompleteOnboardingBody: {
+            trainingIdentity: components["schemas"]["TrainingIdentity"];
+            availability: components["schemas"]["Availability"];
+        };
+        Goal: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            athleteId: string;
+            /** @description The athlete's own words, verbatim. Never a normalised or translated form -- losing the phrasing is not recoverable. */
+            intent: string;
+            /**
+             * Format: date
+             * @description ISO date, no time. The declaration is a calendar fact in the athlete's zone.
+             */
+            declaredOn: string;
+            /**
+             * Format: date
+             * @description Absent means open-ended, which is a valid answer.
+             */
+            horizon?: string;
+            /** @description Evaluation cadence. NOT a status: staleness and expiry are derived from this plus a date (ADR-0006), never stored. */
+            cadenceDays: number;
+        };
+        DeclareGoalBody: {
+            intent: string;
+            /** Format: date */
+            horizon?: string;
+            cadenceDays: number;
+        };
+        ProgressionIntent: {
+            /** @enum {string} */
+            kind: "fixed" | "linear" | "autoregulated";
+            /** @description Percent per cycle. Present only for kind=linear. Percent rather than absolute because the same increment is trivial for one athlete and impossible for another. */
+            ratePercent?: number;
+        };
+        Block: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** @description Zero-based. Orders across a version must be exactly 0..n-1, each once. */
+            order: number;
+            progressionIntent: components["schemas"]["ProgressionIntent"];
+        };
+        /** @description States current purpose. NEVER an input to outcome evaluation (ADR-0008). */
+        ServesGoal: {
+            /** Format: uuid */
+            goalId: string;
+            rationale?: string;
+        };
+        AuthoringDecision: {
+            decidedBy: string;
+            /**
+             * @description Separate from decidedBy: an AI-proposed programme accepted by a coach was DECIDED by the coach. Collapsing them loses the fact that makes ADR-0003 auditable.
+             * @enum {string}
+             */
+            proposedBy: "human" | "assistant";
+            rationale?: string;
+        };
+        ProgramVersion: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            programId: string;
+            versionNumber: number;
+            blocks: components["schemas"]["Block"][];
+            servesGoal?: components["schemas"]["ServesGoal"];
+            authoringDecision: components["schemas"]["AuthoringDecision"];
+        };
+        /** @description The LINEAGE plus its current structure. Program and ProgramVersion are separate aggregates (ADR-0008); this envelope is a read projection, not a merge. */
+        Program: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            athleteId: string;
+            title: string;
+            currentVersion: components["schemas"]["ProgramVersion"];
+        };
+        ScreeningVerdict: {
+            /** @enum {string} */
+            level: "clear" | "modified" | "blocked";
+            /** @description Why. Absent when consent-gated (ADR-0002/0014), which is NOT the same as absent because there is no reason -- see basisWithheld. */
+            basis?: string;
+            /** @description True when a basis exists but this viewer may not see it. Distinguishes the two reasons basis can be absent. */
+            basisWithheld: boolean;
+        };
+        PrescribedItem: {
+            /** Format: uuid */
+            id: string;
+            movementName: string;
+            order: number;
+            sets: number;
+            reps: number;
+            /** @description Resolved load in kilograms. ABSENT for bodyweight or time-based work -- never 0, which is what an unresolved progression writes. */
+            loadKg?: number;
+        };
+        /** @description Required screening is ADR-0021: a PrescribedSession cannot exist without a verdict covering its final RESOLVED dose. Screening an intent is worthless -- an intent has no numbers to screen. */
+        PrescribedSession: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            programVersionId: string;
+            /** Format: date */
+            scheduledFor: string;
+            items: components["schemas"]["PrescribedItem"][];
+            screening: components["schemas"]["ScreeningVerdict"];
+        };
+        PerformedSet: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            prescribedItemId: string;
+            setNumber: number;
+            reps: number;
+            /** @description Absent for bodyweight. Never 0. */
+            loadKg?: number;
+            rpe?: number;
+        };
+        LogSessionBody: {
+            /**
+             * Format: uuid
+             * @description CLIENT-generated UUIDv7 (D-10). The idempotency key: a queued log replayed after a lost response arrives with the same id, and the server MUST answer 409 rather than creating a second record. Offline replay is at-least-once and this is what makes it safe.
+             */
+            id: string;
+            /** Format: uuid */
+            prescribedSessionId: string;
+            /**
+             * Format: date
+             * @description Independent of the prescription's scheduledFor. Monday's session may be performed on Tuesday.
+             */
+            performedOn: string;
+            sets: components["schemas"]["PerformedSet"][];
+            note?: string;
+        };
+        PerformedSession: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            prescribedSessionId: string;
+            /** Format: date */
+            performedOn: string;
+            sets: components["schemas"]["PerformedSet"][];
+            note?: string;
+        };
+        /** @description A revision creates a NEW version and leaves the old one untouched (ADR-0008): a structure an athlete has already followed cannot be edited without making every PerformedSession against it unreadable. versionNumber is assigned by the server, not sent -- it is derived from the lineage and a client that guessed it would race another author. */
+        ReviseProgramBody: {
+            /**
+             * Format: uuid
+             * @description CLIENT-generated id for the NEW version (D-10). The idempotency key: a revision replayed after a lost response arrives with the same id, and the server MUST return the stored version with 200 rather than creating a second one. Without it, a coach who loses the response and retries silently creates two versions and the athlete's programme jumps two numbers.
+             */
+            id: string;
+            /**
+             * Format: uuid
+             * @description The version this revision was edited FROM. If it is no longer current, another author revised in the meantime and the server MUST answer 409 with the version that is current now -- overwriting would discard their work with no trace. Optimistic concurrency rather than locking, because a coach with a builder open for an hour must not hold a lock for an hour.
+             */
+            baseVersionId: string;
+            blocks: components["schemas"]["Block"][];
+            servesGoal?: components["schemas"]["ServesGoal"];
+            authoringDecision: components["schemas"]["AuthoringDecision"];
+        };
+        /** @description How a measurement came to be known. CLOSED, unlike the indicator kind, because the variants differ in required structure (ADR-0016 / ADR-0020). Provenance is published as a coarse vocabulary rather than a confidence score (ADR-0023). */
+        Acquisition: {
+            /** @enum {string} */
+            kind: "self-reported" | "device" | "practitioner";
+            /** @description Required when kind=device. An opaque identifier such as `withings-scale`, never a display name -- names are catalogue data (ADR-0012). */
+            source?: string;
+            /** @description Required when kind=practitioner. */
+            recordedBy?: string;
+        };
+        Observation: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            athleteId: string;
+            /** @description OPEN vocabulary (ADR-0020): every variant has identical structure, so a kind this client has never seen is data, not an error. */
+            kind: string;
+            value: number;
+            /** @description Invariant N11: a measurement is never stored without its unit. */
+            unit: string;
+            /**
+             * Format: date
+             * @description The calendar day, not an instant. A bodyweight is a fact about a morning.
+             */
+            observedOn: string;
+            acquisition: components["schemas"]["Acquisition"];
+        };
+        RecordObservationBody: {
+            /**
+             * Format: uuid
+             * @description CLIENT-generated UUIDv7 (ADR-0010). The idempotency key: a repeat of a stored id MUST return 200 with the stored record rather than creating a second one. A duplicate measurement is not worth telling the athlete about -- unlike a duplicate session log, it can only be a retry.
+             */
+            id: string;
+            kind: string;
+            value: number;
+            unit: string;
+            /** Format: date */
+            observedOn: string;
+            acquisition: components["schemas"]["Acquisition"];
+        };
+        /** @description A computed answer, not a record -- hence no id. Giving a derived point an identity would invite something to reference it and then expect it to still exist (ADR-0006). */
+        IndicatorPoint: {
+            /** Format: date */
+            on: string;
+            value: number;
+        };
+        /** @description A published derived indicator (ADR-0013). DERIVED on read and never stored (ADR-0006): the server computes it from observations and performed sessions when asked. Prescription consumes this to resolve progression, which is why it is a published language rather than an internal shape. */
+        IndicatorSeries: {
+            kind: string;
+            /** @description On the SERIES, not the point. A series whose unit changed partway through is two series, and per-point units make that representable. */
+            unit: string;
+            /** @description For per-movement indicators such as an estimated 1RM. Absent for whole-body indicators. A name rather than an id until catalogue versioning exists (ADR-0012). */
+            movementName?: string;
+            points: components["schemas"]["IndicatorPoint"][];
+        };
+        /** @description The obligation to find out whether a change worked (ADR-0007). A value object on the proposal, never an aggregate. */
+        Hypothesis: {
+            /** @description An indicator kind Measurement publishes. Open vocabulary (ADR-0020). */
+            indicatorKind: string;
+            /** @description What is expected to happen. Falsifiable, or the record of WHY (ADR-0003) degrades into a record of clicks. */
+            claim: string;
+            /**
+             * Format: date
+             * @description When the claim becomes answerable. Must be after proposedOn -- a claim already due at the moment of proposing arrives in the unjudged list before the change has had any chance to act.
+             */
+            horizon: string;
+        };
+        Proposal: {
+            /** Format: uuid */
+            id: string;
+            /**
+             * @description A coarse published vocabulary (ADR-0023). Deliberately not 'which aggregate' -- that would put another context's model inside Learning, which ADR-0019 forbids.
+             * @enum {string}
+             */
+            targetKind: "program" | "goal" | "session";
+            /** @description Opaque to Learning. The screen that shows the proposal dereferences it; Learning never does. */
+            targetId: string;
+            summary: string;
+            /** @description Why. Required, not optional: a suggestion with no stated reason carries authority while being unreviewable. */
+            rationale: string;
+            hypothesis: components["schemas"]["Hypothesis"];
+            /** Format: date */
+            proposedOn: string;
+            /**
+             * Format: date
+             * @description Absent while undecided. The moment of change is recorded in the CHANGING context (ADR-0010); this is reported back only so the client can stop offering a decision already made.
+             */
+            decidedOn?: string;
+            /** @description Absent while undecided. */
+            accepted?: boolean;
+        };
+        DecisionOutcome: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            proposalId: string;
+            /**
+             * @description Two members. A third meaning 'not yet' is already represented by there being no DecisionOutcome at all, and adding it would give one state two spellings.
+             * @enum {string}
+             */
+            verdict: "held" | "did-not-hold";
+            rationale: string;
+            /** @description A human. An assistant may propose; it may not conclude (ADR-0003). */
+            decidedBy: string;
+            /** Format: date */
+            decidedOn: string;
+            /**
+             * Format: uuid
+             * @description Set when this corrects an earlier verdict. The earlier one is PRESERVED and still returned by GET /outcomes -- a correction that hid what it replaced would make the correction invisible (ADR-0007).
+             */
+            supersedes?: string;
+        };
+        RenderVerdictBody: {
+            /**
+             * Format: uuid
+             * @description CLIENT-generated UUIDv7 (ADR-0010). A repeat of a stored id MUST return 200 with that outcome, never a second one.
+             */
+            id: string;
+            /** @enum {string} */
+            verdict: "held" | "did-not-hold";
+            rationale: string;
+            /**
+             * Format: uuid
+             * @description Present when correcting. The superseded outcome MUST NOT be deleted or mutated.
+             */
+            supersedes?: string;
+        };
+        /** @description How the athlete answers. CLOSED, because the variants differ in required structure (ADR-0020's exception). Flattened rather than a oneOf so a single field of a variant can be addressed by one SetProperty in the editor -- see the note in ctx-measurement/src/editor/schema.ts. */
+        AnswerShape: {
+            /** @enum {string} */
+            kind: "number" | "scale" | "choice";
+            /** @description Required when kind=scale. Must be below max. */
+            min?: number;
+            /** @description Required when kind=scale. */
+            max?: number;
+            /** @description Required and non-empty when kind=choice. */
+            options?: string[];
+        };
+        FormField: {
+            /** Format: uuid */
+            id: string;
+            label: string;
+            /** @description The IndicatorKind the answer becomes. Every field must record something: a question that produces no observation is a survey question, and this product needs measurements. Open vocabulary (ADR-0020). */
+            records: string;
+            /** @description Invariant N11: an answer is never recorded without its unit. */
+            unit: string;
+            answer: components["schemas"]["AnswerShape"];
+            /** @description Zero-based. Orders across a form must be exactly 0..n-1, each once. */
+            order: number;
+        };
+        /** @description The instrument by which a self-reported measurement is acquired. NOT versioned, unlike ProgramVersion: observations reference an indicator kind rather than a field id, so editing a form cannot make an existing observation unreadable. That is why this is a PUT and a programme revision is a POST. */
+        CheckInForm: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            fields: components["schemas"]["FormField"][];
+        };
+        TileContent: {
+            /** @enum {string} */
+            kind: "indicator" | "note";
+            /** @description Required when kind=indicator. The published series to chart -- a D-08 reference, resolved at render time. */
+            indicatorKind?: string;
+            /** @description Required when kind=indicator. The only renderable content when the reference cannot be resolved (D-08). */
+            fallbackLabel?: string;
+            /** @description Present when kind=note. */
+            text?: string;
+        };
+        ReportTile: {
+            /** Format: uuid */
+            id: string;
+            /** @description Document PIXELS (D-04: px for Report, grid cells for Dashboard, ms for Timeline). */
+            x: number;
+            y: number;
+            width: number;
+            height: number;
+            content: components["schemas"]["TileContent"];
+        };
+        /** @description A coach-authored arrangement of published views. Owns a LAYOUT and nothing else: every tile points at another context's published language and is resolved at render time, so a deleted indicator breaks one tile rather than the report. */
+        Report: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            /** @description Array ORDER IS PAINT ORDER -- which tile draws on top when two overlap. It must be preserved verbatim; sorting it changes the arrangement the coach made. */
+            tiles: components["schemas"]["ReportTile"][];
+        };
+        WidgetContent: {
+            /** @enum {string} */
+            kind: "indicator" | "upcoming-sessions" | "unjudged-proposals";
+            /** @description Required when kind=indicator. A D-08 reference, resolved at render time. */
+            indicatorKind?: string;
+            /** @description Required when kind=indicator. */
+            fallbackLabel?: string;
+        };
+        Widget: {
+            /** Format: uuid */
+            id: string;
+            /** @description Grid CELLS, not pixels (D-04: cells for Dashboard). Column 0 is where the reader starts, which is the right-hand edge in a right-to-left locale. */
+            x: number;
+            y: number;
+            width: number;
+            height: number;
+            content: components["schemas"]["WidgetContent"];
+        };
+        Dashboard: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            /** @description On the DOCUMENT, not the renderer: a widget four columns wide means nothing without knowing four of how many. A renderer that assumed twelve would halve every layout authored against six. */
+            columns: number;
+            /** @description Widgets MUST NOT overlap. Unlike a report's tiles, where list order is paint order, order carries nothing here — the layout is entirely in the coordinates. */
+            widgets: components["schemas"]["Widget"][];
+        };
+        Phase: {
+            /** Format: uuid */
+            id: string;
+            /** @description The coach's own word for it -- 'accumulation', 'peak'. Not a fixed vocabulary. */
+            label: string;
+            /** @description Whole DAYS from the plan's epoch. Days rather than the milliseconds D-04 names for Timeline: a plan's smallest meaningful unit is a day and its natural unit is a week, and millisecond precision would force the arithmetic through Date -- which shifts a plain date by a day west of Greenwich. */
+            start: number;
+            /** @description Whole days, at least one week. Below a week there is no full rotation of whatever the phase prescribes. */
+            length: number;
+            /**
+             * Format: uuid
+             * @description The programme this phase intends to run. Absent when none. Opaque to Timeline, which never dereferences it (ADR-0019).
+             */
+            programId?: string;
+            /**
+             * Format: uuid
+             * @description What the phase is for. NEVER an evaluation input (ADR-0008).
+             */
+            servesGoal?: string;
+        };
+        /** @description A periodisation laid out on time. Distinct from a ProgramVersion, which says WHAT the training is with no dates; this says WHEN and nothing about content, so a taper can move without revising a block. */
+        Plan: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            /**
+             * Format: date
+             * @description Day zero. Every phase offset is relative to it, so the whole plan can be shifted by changing one field.
+             */
+            epoch: string;
+            /** @description MUST NOT overlap: an athlete is in one phase at a time, and two overlapping phases make 'what am I doing this week' unanswerable. Order is not significant -- the client sorts by start. */
+            phases: components["schemas"]["Phase"][];
+        };
+        MealItem: {
+            /**
+             * Format: uuid
+             * @description Unique across the whole PLAN, not per meal: these are node ids in the editor's flat document, so two items sharing one would be a single node with two parents.
+             */
+            id: string;
+            /** @description The coach's words. NOT a catalogue reference -- ADR-0012 makes catalogue versioning a prerequisite for historical display fidelity and it is still pending. */
+            food: string;
+            /** @description Free text: '200 g', '1 cup', 'a handful'. Constraining it to a catalogue's units would be pretending the catalogue exists. */
+            amount: string;
+            /** @description Zero-based WITHIN its meal. Exactly 0..n-1, each once. */
+            order: number;
+        };
+        Meal: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** @description Free text -- 'post-training', 'before bed'. Not a clock reading: neither of those is one, and a time field would force one into the other's shape. */
+            when: string;
+            items: components["schemas"]["MealItem"][];
+            order: number;
+        };
+        /** @description Meals and what is in them -- the only NESTED document in this API. No nutrient totals: computing them needs a versioned food catalogue (ADR-0012, pending), and without one a plan would silently change meaning whenever a catalogue entry was corrected. */
+        NutritionPlan: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            meals: components["schemas"]["Meal"][];
+        };
+        WorkflowStep: {
+            /** Format: uuid */
+            id: string;
+            /**
+             * @description A trigger accepts no incoming edge and offers one output; a condition offers 'true' and 'false'; an action accepts input and offers one output. The client enforces all of it (see BACKEND-CONTRACT 4.8).
+             * @enum {string}
+             */
+            kind: "trigger" | "condition" | "action";
+            /** @description Which event, comparison or effect, in the vocabulary the RUNNER owns. Free text on the wire on purpose: the client does not duplicate that vocabulary, so a workflow authored against a newer server still renders. */
+            detail: string;
+            /** @description Canvas coordinate. Layout, not semantics -- two workflows differing only in coordinates behave identically. */
+            x: number;
+            y: number;
+        };
+        WorkflowEdge: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            from: string;
+            /**
+             * @description WHICH output the edge leaves from -- this is what makes a condition a branch. 'out' for a trigger or an action; 'true'/'false' for a condition.
+             * @enum {string}
+             */
+            port: "out" | "true" | "false";
+            /** Format: uuid */
+            to: string;
+        };
+        /** @description A coaching automation: a directed acyclic graph of triggers, conditions and actions. The only GRAPH-shaped document in this API -- every other authored artefact is a list or a list of lists. Nodes carry no order because a graph has none; execution order is derived from the edges. */
+        Workflow: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            nodes: components["schemas"]["WorkflowStep"][];
+            edges: components["schemas"]["WorkflowEdge"][];
+            /** @description Whether the runner should act on it. A workflow that is not runnable MUST NOT be stored with this true -- see BACKEND-CONTRACT 4.8. */
+            enabled: boolean;
         };
     };
     responses: {
@@ -127,6 +1112,896 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    requestCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RequestCodeBody"];
+            };
+        };
+        responses: {
+            /** @description code dispatched */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequestCodeResult"];
+                };
+            };
+            /** @description rate limited */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    verifyCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerifyCodeBody"];
+            };
+        };
+        responses: {
+            /** @description session established */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VerifyCodeResult"];
+                };
+            };
+            /** @description code incorrect or expired */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description too many attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    completeOnboarding: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompleteOnboardingBody"];
+            };
+        };
+        responses: {
+            /** @description recorded */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Athlete"];
+                };
+            };
+            /** @description invalid */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    listMyGoals: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ok */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Goal"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    declareGoal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeclareGoalBody"];
+            };
+        };
+        responses: {
+            /** @description declared */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Goal"];
+                };
+            };
+            /** @description invalid */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    getCurrentProgram: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ok */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Program"];
+                };
+            };
+            /** @description no programme yet */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    listUpcomingSessions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ok */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrescribedSession"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    logSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LogSessionBody"];
+            };
+        };
+        responses: {
+            /** @description recorded */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PerformedSession"];
+                };
+            };
+            /** @description invalid */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            /** @description already logged */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PerformedSession"];
+                };
+            };
+        };
+    };
+    reviseProgram: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                programId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviseProgramBody"];
+            };
+        };
+        responses: {
+            /** @description this revision was already stored -- the same id replayed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Program"];
+                };
+            };
+            /** @description revised */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Program"];
+                };
+            };
+            /** @description invalid */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            /** @description the base version is no longer current; body is the programme as it stands now */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Program"];
+                };
+            };
+        };
+    };
+    listObservations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ok */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Observation"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    recordObservation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordObservationBody"];
+            };
+        };
+        responses: {
+            /** @description this id was already stored -- a replay */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Observation"];
+                };
+            };
+            /** @description recorded */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Observation"];
+                };
+            };
+            /** @description invalid */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    listIndicators: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ok */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IndicatorSeries"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    listProposals: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ok */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Proposal"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    listOutcomes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ok */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DecisionOutcome"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    renderVerdict: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proposalId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RenderVerdictBody"];
+            };
+        };
+        responses: {
+            /** @description this id was already stored -- a replay */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DecisionOutcome"];
+                };
+            };
+            /** @description recorded */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DecisionOutcome"];
+                };
+            };
+            /** @description invalid */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    getCurrentCheckInForm: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ok */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckInForm"];
+                };
+            };
+            /** @description no form yet -- the normal state before a coach authors one, not an error */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    saveCheckInForm: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CheckInForm"];
+            };
+        };
+        responses: {
+            /** @description saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckInForm"];
+                };
+            };
+            /** @description invalid */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    getCurrentReport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ok */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Report"];
+                };
+            };
+            /** @description no report yet */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    saveReport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reportId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Report"];
+            };
+        };
+        responses: {
+            /** @description saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Report"];
+                };
+            };
+            /** @description invalid */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    getCurrentDashboard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ok */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Dashboard"];
+                };
+            };
+            /** @description no dashboard yet */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    saveDashboard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dashboardId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Dashboard"];
+            };
+        };
+        responses: {
+            /** @description saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Dashboard"];
+                };
+            };
+            /** @description invalid */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    getCurrentPlan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ok */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Plan"];
+                };
+            };
+            /** @description no plan yet */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    savePlan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                planId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Plan"];
+            };
+        };
+        responses: {
+            /** @description saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Plan"];
+                };
+            };
+            /** @description invalid */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    getCurrentNutritionPlan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ok */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NutritionPlan"];
+                };
+            };
+            /** @description no plan yet */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    saveNutritionPlan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                planId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NutritionPlan"];
+            };
+        };
+        responses: {
+            /** @description saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NutritionPlan"];
+                };
+            };
+            /** @description invalid */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    getCurrentWorkflow: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ok */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Workflow"];
+                };
+            };
+            /** @description none authored yet */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    saveWorkflow: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workflowId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Workflow"];
+            };
+        };
+        responses: {
+            /** @description saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Workflow"];
+                };
+            };
+            /** @description invalid, or enabled with a graph that cannot run */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    streamEvents: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Sent by the browser itself on reconnect. Replay everything after it, or signal that resume is impossible -- never silently resume from the newest event. */
+                "Last-Event-ID"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description An open stream. Each frame is `id:` + `data:`, where data is `{"kind":"<event-kind>"}`. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": string;
+                };
             };
             401: components["responses"]["Unauthorized"];
         };

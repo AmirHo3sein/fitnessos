@@ -46,8 +46,22 @@ export interface RequestOptions {
   readonly body?: unknown
   readonly auth?: AuthContext
   readonly signal?: AbortSignal
+  /**
+   * Statuses whose BODY is meaningful and must not be thrown away.
+   *
+   * A 409 from `POST /programs/{id}/versions` carries the programme as it stands now — the
+   * information the author needs to see what they collided with. `request` turns any non-ok
+   * status into an `ApiError`, which keeps the code and discards the body, so a caller that
+   * needs one of these must ask for it and use `requestWithStatus`.
+   */
+  readonly allowStatus?: readonly number[]
   /** Internal: suppresses the refresh-and-retry path. */
   readonly _isRetry?: boolean
+}
+
+export interface HttpResult<T> {
+  readonly status: number
+  readonly body: T
 }
 
 export interface HttpClient {
@@ -62,10 +76,36 @@ export interface HttpClient {
    * path of least resistance.
    */
   request: <T = unknown>(path: string, options?: RequestOptions) => Promise<T>
+  /**
+   * Same request, but the status comes back alongside the body.
+   *
+   * Only useful together with `allowStatus`: without it every non-ok status still throws, and
+   * an ok status tells the caller nothing it did not already know.
+   */
+  requestWithStatus: <T = unknown>(path: string, options?: RequestOptions) => Promise<HttpResult<T>>
   readonly refresher: Refresher
 }
 
 const REFRESH_PATH = '/auth/refresh'
+
+/**
+ * Endpoints where a 401 is an ANSWER, not an expired session.
+ *
+ * These are the requests that establish a session, so by definition there is none to
+ * refresh. Attempting one anyway is not merely wasted — the refresh fails (no cookie
+ * to present), and its failure replaces the real error. The user typed a wrong code
+ * and is told the network is down.
+ *
+ * Found by an integration test: verifying a code against a 401 tried to refresh, and
+ * MSW failed the unhandled request to `/auth/refresh`. Without that test the symptom
+ * in production would have been an incorrect error message on the most sensitive
+ * screen in the product.
+ */
+const NEVER_REFRESH: readonly string[] = [
+  REFRESH_PATH,
+  '/auth/request-code',
+  '/auth/verify-code',
+]
 
 export const createHttpClient = (config: HttpConfig = {}): HttpClient => {
   const baseUrl = config.baseUrl ?? '/api/v1'
@@ -98,13 +138,16 @@ export const createHttpClient = (config: HttpConfig = {}): HttpClient => {
     ...(config.onSessionLost ? { onSessionLost: config.onSessionLost } : {}),
   })
 
-  const request = async <T>(path: string, options: RequestOptions = {}): Promise<T> => {
+  const requestWithStatus = async <T>(
+    path: string,
+    options: RequestOptions = {},
+  ): Promise<HttpResult<T>> => {
     const response = await send(path, options)
 
     const mayRefresh =
       response.status === 401 &&
       !options._isRetry &&
-      path !== REFRESH_PATH &&
+      !NEVER_REFRESH.includes(path) &&
       // A server-mode client must NOT refresh, and this is the subtle one.
       //
       // Refresh tokens rotate strictly: a successful rotation invalidates the
@@ -125,15 +168,19 @@ export const createHttpClient = (config: HttpConfig = {}): HttpClient => {
       // If the refresh itself fails, surface THAT error — retrying against a
       // dead session would loop.
       await refresher.refresh()
-      return request<T>(path, { ...options, _isRetry: true })
+      return requestWithStatus<T>(path, { ...options, _isRetry: true })
     }
 
-    if (!response.ok) throw await problemFrom(response)
-    if (response.status === 204) return undefined as T
-    return (await response.json()) as T
+    const allowed = response.ok || (options.allowStatus?.includes(response.status) ?? false)
+    if (!allowed) throw await problemFrom(response)
+    if (response.status === 204) return { status: 204, body: undefined as T }
+    return { status: response.status, body: (await response.json()) as T }
   }
 
-  return { request, refresher }
+  const request = async <T>(path: string, options: RequestOptions = {}): Promise<T> =>
+    (await requestWithStatus<T>(path, options)).body
+
+  return { request, requestWithStatus, refresher }
 }
 
 export { ApiError, NetworkError }

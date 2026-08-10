@@ -1,5 +1,8 @@
+import type { Metadata } from 'next'
 import { getTranslations } from 'next-intl/server'
-import { AthleteSummary } from '@fitnessos/core/presentation'
+import { AthleteSummary } from '@fitnessos/core/athlete/presentation'
+import { IndicatorList } from '@fitnessos/ctx-measurement/presentation'
+import { UnjudgedHypotheses } from '@fitnessos/core/learning/presentation'
 import { hasLocale } from 'next-intl'
 import { routing } from '../../../../src/i18n/routing'
 import { enableStaticRendering } from '../../../../src/i18n/static'
@@ -25,6 +28,22 @@ import { enableStaticRendering } from '../../../../src/i18n/static'
  */
 export const dynamic = 'force-dynamic'
 
+/**
+ * Fills the `%s` in the root layout's title template.
+ *
+ * Localised through the same catalogue as the page's own heading, so the tab and the h1 cannot
+ * drift apart into two different names for one screen.
+ */
+export const generateMetadata = async ({
+  params,
+}: {
+  params: Promise<{ locale: string }>
+}): Promise<Metadata> => {
+  const { locale } = await params
+  const t = await getTranslations({ locale, namespace: 'dashboard' })
+  return { title: t('title') }
+}
+
 export default async function DashboardPage({
   params,
 }: {
@@ -34,6 +53,19 @@ export default async function DashboardPage({
   enableStaticRendering(locale)
   const t = await getTranslations('athlete.summary')
   const page = await getTranslations('dashboard')
+  const indicators = await getTranslations('measurement')
+  const unjudged = await getTranslations('learning.unjudged')
+
+  /*
+   * Today, resolved on the SERVER and passed down.
+   *
+   * Staleness is derived (ADR-0006), so it is computed from this date rather than from a clock
+   * inside the component. A `new Date()` in the client would also differ between the server
+   * render and hydration — a mismatch React resolves in favour of whichever ran second, which
+   * means the warning flickers on for some athletes and not others.
+   */
+  const now = new Date()
+  const asOf = { year: now.getFullYear(), month: now.getMonth() + 1, day: now.getDate() }
 
   return (
     <main>
@@ -53,6 +85,50 @@ export default async function DashboardPage({
             noCeiling: t('noCeiling'),
             loading: t('loading'),
             failed: t('failed'),
+          }}
+        />
+      </div>
+
+      {/*
+        ABOVE the indicators. An unanswered obligation is a question the coach owes an answer to;
+        the indicators are information they can browse. Putting the debt below the browsing is how
+        it stops being read.
+      */}
+      <div className="mt-6">
+        <UnjudgedHypotheses
+          locale={hasLocale(routing.locales, locale) ? locale : routing.defaultLocale}
+          asOf={asOf}
+          labels={{
+            title: unjudged('title'),
+            intro: unjudged('intro'),
+            claim: unjudged('claim'),
+            dueOn: unjudged('dueOn'),
+            overdue: unjudged('overdue'),
+            held: unjudged('held'),
+            didNotHold: unjudged('didNotHold'),
+            rationaleLabel: unjudged('rationaleLabel'),
+            rationalePlaceholder: unjudged('rationalePlaceholder'),
+            submit: unjudged('submit'),
+            rationaleRequired: unjudged('rationaleRequired'),
+          }}
+        />
+      </div>
+
+      <div className="mt-6">
+        <IndicatorList
+          locale={hasLocale(routing.locales, locale) ? locale : routing.defaultLocale}
+          asOf={asOf}
+          labels={{
+            title: indicators('title'),
+            none: indicators('none'),
+            noneHint: indicators('noneHint'),
+            measuredOn: indicators('measuredOn'),
+            stale: indicators('stale'),
+            notEnoughData: indicators('notEnoughData'),
+            kinds: {
+              bodyweight: indicators('kinds.bodyweight'),
+              'estimated-1rm': indicators('kinds.estimatedOneRepMax'),
+            },
           }}
         />
       </div>

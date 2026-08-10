@@ -1,33 +1,85 @@
 @import 'tailwindcss';
+@import '@fitnessos/design-tokens/tokens.css';
 
 /* ============================================================================
-   FitnessOS — "Violet Navy" design tokens.
-   Carried forward from V1's design system, which was the one part of the V1
-   frontend that needed no rework.
+   FitnessOS — Tailwind bindings for the design tokens.
+   Colour VALUES live in @fitnessos/design-tokens. This file only exposes them as
+   utilities, so `bg-surface` and `text-primary` work in a className.
 
-   Dual theme via [data-theme]. RTL-first: use logical properties (ps/pe,
-   start/end, border-s/e) everywhere. Physical properties are permitted only
-   when paired with an rtl:/ltr: variant.
+   Nothing here picks a colour. If you find yourself adding a hex value to this file,
+   the value belongs in tools/color/palette.mjs and the token belongs in semantic.mjs.
+
+   RTL-first: use logical properties (ps/pe, start/end, border-s/e). Physical
+   properties are permitted only when paired with an rtl:/ltr: variant.
    ========================================================================= */
 
 @theme inline {
   --font-sans: var(--font-vazirmatn), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-archivo), var(--font-vazirmatn), ui-sans-serif, sans-serif;
 
-  --color-bg: var(--bg);
-  --color-surface: var(--surface);
-  --color-elevated: var(--elevated);
-  --color-fg: var(--fg);
-  --color-muted: var(--muted);
-  --color-faint: var(--faint);
-  --color-line: var(--line);
-  --color-line-strong: var(--line-strong);
+  /* --- surfaces --- */
+  --color-canvas: var(--bg-canvas);
+  --color-surface: var(--bg-surface);
+  --color-surface-subtle: var(--bg-surface-subtle);
+  --color-surface-elevated: var(--bg-surface-elevated);
+  --color-surface-hover: var(--bg-surface-hover);
+  --color-surface-active: var(--bg-surface-active);
+  --color-surface-sunken: var(--bg-surface-sunken);
+  --color-inverse: var(--bg-inverse);
 
-  --color-accent: var(--accent);
-  --color-accent-strong: var(--accent-strong);
-  --color-accent-contrast: var(--accent-contrast);
-  --color-success: var(--success);
-  --color-danger: var(--danger);
+  /* --- text --- */
+  --color-primary: var(--text-primary);
+  --color-secondary: var(--text-secondary);
+  --color-muted: var(--text-muted);
+  --color-disabled: var(--text-disabled);
+  --color-on-inverse: var(--text-inverse);
+  --color-brand: var(--text-brand);
+  --color-on-brand: var(--text-on-brand);
+
+  /* --- borders --- */
+  --color-subtle: var(--border-subtle);
+  --color-default: var(--border-default);
+  --color-strong: var(--border-strong);
+  --color-brand-border: var(--border-brand);
+
+  /* --- actions --- */
+  --color-action: var(--action-primary);
+  --color-action-hover: var(--action-primary-hover);
+  --color-action-active: var(--action-primary-active);
+  --color-action-fg: var(--action-primary-fg);
+  --color-action-secondary: var(--action-secondary);
+  --color-action-secondary-hover: var(--action-secondary-hover);
+  --color-action-secondary-fg: var(--action-secondary-fg);
+  --color-ghost-hover: var(--action-ghost-hover);
+  --color-ghost-fg: var(--action-ghost-fg);
+  --color-destructive: var(--action-destructive);
+  --color-destructive-hover: var(--action-destructive-hover);
+  --color-destructive-fg: var(--action-destructive-fg);
+  --color-action-disabled: var(--action-disabled);
+  --color-action-disabled-fg: var(--action-disabled-fg);
+
+  /* --- status --- */
+  --color-success-surface: var(--status-success-surface);
+  --color-success-border: var(--status-success-border);
+  --color-success-fg: var(--status-success-fg);
+  --color-success-solid: var(--status-success-solid);
+  --color-warning-surface: var(--status-warning-surface);
+  --color-warning-border: var(--status-warning-border);
+  --color-warning-fg: var(--status-warning-fg);
+  --color-warning-solid: var(--status-warning-solid);
+  --color-error-surface: var(--status-error-surface);
+  --color-error-border: var(--status-error-border);
+  --color-error-fg: var(--status-error-fg);
+  --color-error-solid: var(--status-error-solid);
+  --color-info-surface: var(--status-info-surface);
+  --color-info-border: var(--status-info-border);
+  --color-info-fg: var(--status-info-fg);
+  --color-info-solid: var(--status-info-solid);
+
+  /* --- feedback --- */
+  --color-focus: var(--focus);
+  --color-selection: var(--selection-bg);
+  --color-selection-fg: var(--selection-fg);
 
   --radius-sm: 0.5rem;
   --radius-md: 0.75rem;
@@ -36,61 +88,33 @@
   --radius-2xl: 2rem;
 }
 
-:root,
-[data-theme='dim'] {
-  --bg: #0a0e1a;
-  --surface: #121829;
-  --elevated: #1b2238;
-  --fg: #eef1f8;
-  --muted: #9aa3bd;
-  /* Raised from V1's #646e8a, which measured ~3.7:1 and failed AA for the
-     body-sized text it was used on. */
-  --faint: #7c86a4;
-  --line: rgb(255 255 255 / 0.09);
-  --line-strong: rgb(255 255 255 / 0.17);
-
-  /* V1 used #8b5cf6 with white text at ~3.9:1 — below AA for normal text on
-     every primary button. Darkened to clear it. */
-  --accent: #7c3aed;
-  --accent-strong: #6d28d9;
-  --accent-contrast: #ffffff;
-  --success: #34d399;
-  --danger: #fb7185;
-  color-scheme: dark;
-}
-
-[data-theme='light'] {
-  --bg: #f5f6fb;
-  --surface: #ffffff;
-  --elevated: #ffffff;
-  --fg: #11162a;
-  --muted: #5b6480;
-  --faint: #6b7490;
-  --line: rgb(17 22 42 / 0.1);
-  --line-strong: rgb(17 22 42 / 0.18);
-
-  --accent: #6d28d9;
-  --accent-strong: #5b21b6;
-  --accent-contrast: #ffffff;
-  --success: #10b981;
-  --danger: #e11d48;
-  color-scheme: light;
-}
-
 @layer base {
   * {
-    border-color: var(--line);
+    border-color: var(--border-default);
   }
+
   body {
-    background-color: var(--bg);
-    color: var(--fg);
+    background-color: var(--bg-canvas);
+    color: var(--text-primary);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
   }
+
+  /*
+    A 2px ring with a 2px offset, not a 1px outline.
+    WCAG 2.4.11 wants a focus indicator with an area at least equal to a 2px perimeter and 3:1
+    against adjacent colours; the offset is what supplies the second requirement when the focused
+    element is itself brand-coloured, since the ring would otherwise sit teal-on-teal.
+  */
   :focus-visible {
-    outline: 2px solid var(--accent);
+    outline: 2px solid var(--focus);
     outline-offset: 2px;
     border-radius: var(--radius-sm);
+  }
+
+  ::selection {
+    background-color: var(--selection-bg);
+    color: var(--selection-fg);
   }
 }
 
@@ -100,6 +124,7 @@
     letter-spacing: -0.02em;
     font-weight: 800;
   }
+
   /* Numerals read LTR even inside an RTL layout. Apply to every number. */
   .nums {
     direction: ltr;

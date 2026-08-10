@@ -5,8 +5,15 @@
       "dashboard": "Dashboard",
       "programme": "Programme",
       "sessions": "Sessions",
-      "settings": "Settings"
-    }
+      "settings": "Settings",
+      "checkIn": "Check-in",
+      "report": "Report",
+      "layout": "Layout",
+      "plan": "Plan",
+      "nutrition": "Nutrition",
+      "automation": "Automation"
+    },
+    "description": "An operating system for physical development — programmes, sessions and the evidence that they worked."
   },
   "public": {
     "headline": "An operating system for physical development",
@@ -17,8 +24,21 @@
     "signIn": {
       "title": "Sign in",
       "subtitle": "Enter your mobile number",
+      "loading": "Loading the sign-in form",
       "phone": "Mobile number",
-      "submit": "Send code"
+      "phonePlaceholder": "0912 345 6789",
+      "phoneHint": "Persian or English digits, with or without the leading zero — all accepted.",
+      "submit": "Send code",
+      "code": "Verification code",
+      "codeSentTo": "Code sent to",
+      "verify": "Verify and sign in",
+      "changeNumber": "Change number",
+      "errors": {
+        "emptyPhone": "Enter your mobile number.",
+        "badPhone": "That does not look like an Iranian mobile number.",
+        "badCode": "The code must be digits only, at the expected length.",
+        "generic": "That did not work. Please try again."
+      }
     }
   },
   "athlete": {
@@ -38,5 +58,378 @@
   },
   "dashboard": {
     "title": "Dashboard"
+  },
+  "onboarding": {
+    "title": "Welcome",
+    "subtitle": "A few short questions so we can build your programme.",
+    "experienceLabel": "How long have you been training?",
+    "experience": {
+      "beginner": "Beginner",
+      "intermediate": "Intermediate",
+      "advanced": "Advanced"
+    },
+    "disciplinesLabel": "What kind of training?",
+    "disciplines": {
+      "strength": "Strength",
+      "hypertrophy": "Hypertrophy",
+      "running": "Running",
+      "cycling": "Cycling",
+      "mobility": "Mobility"
+    },
+    "daysLabel": "How many days per week?",
+    "ceilingLabel": "Longest session (minutes)",
+    "ceilingHint": "Leave blank if you have no limit.",
+    "submit": "Continue",
+    "errors": {
+      "daysOutOfRange": "Days per week must be between 1 and 7.",
+      "daysNotWhole": "Days per week must be a whole number.",
+      "ceilingTooShort": "A session needs at least 10 minutes.",
+      "ceilingNotPositive": "A session cannot be zero minutes. Leave it blank if you have no limit.",
+      "noDisciplines": "Choose at least one kind of training.",
+      "generic": "That did not save. Please try again."
+    }
+  },
+  "goal": {
+    "declare": {
+      "intentLabel": "What do you want?",
+      "intentPlaceholder": "Run 10k without stopping",
+      "intentHint": "In your own words. It does not need to be precise or measurable.",
+      "horizonLabel": "By when?",
+      "horizonHint": "You can change this later.",
+      "horizonOpenEnded": "No deadline",
+      "submit": "Set goal",
+      "skip": "Later",
+      "errors": {
+        "empty": "Write your goal, or choose Later.",
+        "tooLong": "Keep it shorter — one sentence is enough.",
+        "horizonInPast": "That date has already passed.",
+        "horizonTooNear": "A deadline needs to be at least a week away so progress can be judged.",
+        "generic": "That did not save. Please try again."
+      }
+    }
+  },
+  "programme": {
+    "heading": "Programme",
+    "title": "Training programme",
+    "version": "Version",
+    "noProgram": "You do not have a programme yet.",
+    "noProgramHint": "It will appear here once one has been built for you.",
+    "progression": {
+      "fixed": "Fixed",
+      "linear": "Linear",
+      "autoregulated": "Autoregulated"
+    },
+    "ratePerCycle": "per cycle",
+    "authoredByHuman": "Written by your coach",
+    "authoredByAssistant": "Proposed by the assistant, approved by your coach",
+    "loading": "Loading your programme",
+    "failed": "Your programme could not be loaded.",
+    "edit": "Edit programme",
+    "cancel": "Done editing",
+    "saveFailed": "Your changes could not be saved. They are still here — try again.",
+    "conflictTitle": "This programme was changed elsewhere",
+    "conflictBody": "Someone else saved a new version while you were editing. Your changes are still here and nothing has been lost.",
+    "conflictKeep": "Keep my changes open",
+    "conflictDiscard": "Discard mine and reload",
+    "builder": {
+      "heading": "Blocks",
+      "addBlock": "Add block",
+      "removeBlock": "Remove",
+      "undo": "Undo",
+      "redo": "Redo",
+      "save": "Save",
+      "blockName": "Block name",
+      "rate": "per cycle",
+      "newBlockName": "New block",
+      "empty": "This programme has no blocks yet."
+    },
+    "servesGoal": "Serves",
+    "refs": {
+      "loading": "Loading the goal",
+      "deleted": "no longer available",
+      "forbidden": "not visible to you",
+      "unnamedGoal": "a goal"
+    }
+  },
+  "sessions": {
+    "heading": "Sessions",
+    "title": "Upcoming sessions",
+    "none": "You have no upcoming sessions.",
+    "noneHint": "They will appear here once your programme has been built.",
+    "setsReps": "sets × reps",
+    "bodyweight": "bodyweight",
+    "screening": {
+      "clear": "No restrictions",
+      "modified": "Modified",
+      "blocked": "Blocked"
+    },
+    "basisWithheld": "the reason is not visible to you",
+    "loading": "Loading your sessions",
+    "failed": "Your sessions could not be loaded.",
+    "logger": {
+      "heading": "Log session",
+      "reps": "Reps",
+      "load": "Load",
+      "bodyweight": "Bodyweight",
+      "addSet": "Add set",
+      "save": "Save session",
+      "savedOffline": "Saved. It will sync when you are back online.",
+      "noteLabel": "Note (optional)",
+      "notePlaceholder": "How did it go?",
+      "errors": {
+        "noSets": "Fill in at least one set.",
+        "repsNotPositive": "Reps must be a positive number.",
+        "loadNotPositive": "Load cannot be zero. Leave it blank for bodyweight.",
+        "generic": "That did not save. Please try again."
+      }
+    },
+    "logCta": "Log this session",
+    "cancel": "Cancel",
+    "syncIssues": {
+      "conflictTitle": "This session was already recorded",
+      "conflictBody": "Another device recorded this session before yours arrived. Both are shown below — yours was not sent.",
+      "rejectedTitle": "A session could not be saved",
+      "rejectedBody": "We could not record this session and it is not saved anywhere. You will need to log it again.",
+      "mine": "You logged",
+      "theirs": "Recorded",
+      "summary": "{count} sets on {date}",
+      "unknownRecord": "details unavailable",
+      "dismiss": "Got it"
+    }
+  },
+  "notFound": {
+    "title": "That page does not exist",
+    "body": "The link may be out of date, or the address mistyped.",
+    "home": "Back to the start"
+  },
+  "measurement": {
+    "title": "What your training has produced",
+    "none": "Nothing measured yet",
+    "noneHint": "Log a session or record a measurement, and it will appear here.",
+    "measuredOn": "Measured",
+    "stale": "not measured recently",
+    "notEnoughData": "Not enough data to show a change yet",
+    "kinds": {
+      "bodyweight": "Bodyweight",
+      "estimatedOneRepMax": "Estimated one-rep max"
+    }
+  },
+  "learning": {
+    "unjudged": {
+      "title": "Waiting on your judgement",
+      "intro": "These changes were accepted and their claims have come due. Recording what happened is what keeps the next suggestion accountable.",
+      "claim": "Expected:",
+      "dueOn": "Due",
+      "overdue": "days overdue",
+      "held": "It held",
+      "didNotHold": "It did not hold",
+      "rationaleLabel": "What happened?",
+      "rationalePlaceholder": "What you observed, in your own words",
+      "submit": "Record",
+      "rationaleRequired": "A verdict needs a reason."
+    }
+  },
+  "checkIn": {
+    "heading": "Check-in form",
+    "title": "Check-in form",
+    "none": "No check-in form yet",
+    "noneHint": "A check-in form is how a self-reported measurement is recorded. Each question becomes an observation.",
+    "create": "Create one",
+    "loading": "Loading the form",
+    "saveFailed": "Your changes could not be saved. They are still here — try again.",
+    "newFormTitle": "Morning check-in",
+    "builder": {
+      "heading": "Questions",
+      "addField": "Add question",
+      "removeField": "Remove",
+      "undo": "Undo",
+      "redo": "Redo",
+      "save": "Save",
+      "fieldLabel": "Question",
+      "records": "Records",
+      "unit": "Unit",
+      "answerKind": {
+        "number": "Number",
+        "scale": "Scale",
+        "choice": "Choice"
+      },
+      "newFieldLabel": "New question",
+      "empty": "This form has no questions yet."
+    },
+    "loadFailed": "The check-in form could not be loaded.",
+    "retry": "Try again"
+  },
+  "report": {
+    "heading": "Report",
+    "title": "Report",
+    "none": "No report yet",
+    "noneHint": "A report is an arrangement of the athlete's published indicators. Each tile points at one; nothing is copied.",
+    "create": "Create one",
+    "loading": "Loading the report",
+    "saveFailed": "Your changes could not be saved. They are still here — try again.",
+    "newReportTitle": "Monthly review",
+    "builder": {
+      "heading": "Layout",
+      "addTile": "Add tile",
+      "removeTile": "Remove",
+      "undo": "Undo",
+      "redo": "Redo",
+      "save": "Save",
+      "alignLeft": "Align left",
+      "alignTop": "Align top",
+      "distributeX": "Space evenly",
+      "newTileLabel": "New tile",
+      "empty": "This report is empty.",
+      "multiSelect": "Select several",
+      "keyboardHint": "Arrow keys move the focused tile; hold Shift for a larger step.",
+      "tileMovable": "movable with the arrow keys"
+    },
+    "loadFailed": "The report could not be loaded.",
+    "retry": "Try again"
+  },
+  "layout": {
+    "heading": "Layout",
+    "title": "Dashboard layout",
+    "none": "No layout yet",
+    "noneHint": "A dashboard arranges the athlete's published views on a grid. Each widget points at one; nothing is copied.",
+    "create": "Create one",
+    "loading": "Loading the layout",
+    "saveFailed": "Your changes could not be saved. They are still here — try again.",
+    "newTitle": "Overview",
+    "builder": {
+      "heading": "Widgets",
+      "addWidget": "Add widget",
+      "removeWidget": "Remove",
+      "undo": "Undo",
+      "redo": "Redo",
+      "save": "Save",
+      "newWidgetLabel": "New widget",
+      "empty": "This dashboard is empty.",
+      "content": {
+        "upcoming-sessions": "Upcoming sessions",
+        "unjudged-proposals": "Awaiting judgement"
+      },
+      "keyboardHint": "Arrow keys move the focused widget one cell at a time.",
+      "widgetMovable": "movable with the arrow keys"
+    },
+    "loadFailed": "The layout could not be loaded.",
+    "retry": "Try again"
+  },
+  "plan": {
+    "heading": "Plan",
+    "title": "Training plan",
+    "none": "No plan yet",
+    "noneHint": "A plan lays out phases over time. It says WHEN, and nothing about what the training is.",
+    "create": "Create one",
+    "loading": "Loading the plan",
+    "saveFailed": "Your changes could not be saved. They are still here — try again.",
+    "newTitle": "This season",
+    "firstPhase": "Accumulation",
+    "builder": {
+      "heading": "Phases",
+      "addPhase": "Add phase",
+      "removePhase": "Remove",
+      "undo": "Undo",
+      "redo": "Redo",
+      "save": "Save",
+      "phaseLabel": "Phase",
+      "newPhaseLabel": "New phase",
+      "empty": "This plan has no phases yet.",
+      "weeks": "weeks",
+      "refused": "That would overlap another phase, so nothing moved.",
+      "keyboardHint": "Arrow keys move the focused phase by a week; hold Shift to change its length.",
+      "phaseMovable": "movable with the arrow keys"
+    },
+    "loadFailed": "The plan could not be loaded.",
+    "retry": "Try again"
+  },
+  "nutrition": {
+    "heading": "Nutrition",
+    "title": "Nutrition plan",
+    "none": "No nutrition plan has been written yet.",
+    "noneHint": "Meals, and what is eaten in each of them, go here.",
+    "create": "Create a nutrition plan",
+    "loading": "Loading the nutrition plan",
+    "saveFailed": "Your changes were not saved. They are still here; try again.",
+    "newTitle": "Nutrition plan",
+    "firstMeal": "Breakfast",
+    "firstMealWhen": "on waking",
+    "builder": {
+      "heading": "Meals",
+      "addMeal": "Add meal",
+      "removeMeal": "Remove meal",
+      "addItem": "Add item",
+      "removeItem": "Remove item",
+      "undo": "Undo",
+      "redo": "Redo",
+      "save": "Save",
+      "mealName": "Meal name",
+      "mealWhen": "When",
+      "food": "Food",
+      "amount": "Amount",
+      "moveTo": "In meal",
+      "newMealName": "New meal",
+      "newFood": "New food",
+      "newAmount": "100 g",
+      "empty": "This plan has no meals yet.",
+      "noItems": "Nothing in this meal yet."
+    },
+    "loadFailed": "The nutrition plan could not be loaded.",
+    "retry": "Try again"
+  },
+  "automation": {
+    "heading": "Automation",
+    "title": "Automation",
+    "none": "No automation has been written yet.",
+    "noneHint": "You can say what should happen when something happens.",
+    "create": "Create an automation",
+    "loading": "Loading the automation",
+    "saveFailed": "Your changes were not saved. They are still here; try again.",
+    "newTitle": "Automation",
+    "firstTrigger": "check-in submitted",
+    "builder": {
+      "heading": "Steps and connections",
+      "addTrigger": "Add trigger",
+      "addCondition": "Add condition",
+      "addAction": "Add action",
+      "removeStep": "Remove step",
+      "undo": "Undo",
+      "redo": "Redo",
+      "save": "Save",
+      "detail": "Detail",
+      "connectFrom": "From branch",
+      "connectTo": "To step",
+      "connect": "Connect",
+      "disconnect": "Disconnect",
+      "empty": "No steps yet.",
+      "newTrigger": "When…",
+      "newCondition": "If…",
+      "newAction": "Then…",
+      "steps": "Steps",
+      "canvas": "Automation canvas",
+      "enable": "Turn on",
+      "disable": "Turn off",
+      "notRunnable": "Nothing reaches some steps, so they will never run.",
+      "noTrigger": "This automation has no trigger.",
+      "node": {
+        "trigger": "Trigger",
+        "condition": "Condition",
+        "action": "Action",
+        "branchTrue": "true",
+        "branchFalse": "false",
+        "unreachable": "never runs"
+      },
+      "refusal": {
+        "missing-node": "That step is no longer there.",
+        "unknown-port": "This step has no such branch.",
+        "trigger-input": "Nothing can lead into a trigger; a trigger is where a run starts.",
+        "self-loop": "A step cannot follow itself.",
+        "cycle": "That would create a loop, and an automation has none.",
+        "port-taken": "That branch already leads somewhere.",
+        "duplicate": "Those two are already connected."
+      }
+    },
+    "loadFailed": "The automation could not be loaded.",
+    "retry": "Try again"
   }
 }

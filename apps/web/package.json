@@ -4,18 +4,27 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "next dev",
     "build": "next build",
-    "start": "next start",
-    "typecheck": "tsc --noEmit",
+    "dev": "next dev",
+    "e2e:critical": "playwright test --grep @critical",
+    "e2e:full": "playwright test",
     "lint": "eslint app composition src middleware.ts",
+    "start": "next start",
     "test:component": "vitest run",
-    "e2e:critical": "playwright test --grep @critical"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@fitnessos/core": "workspace:*",
+    "@fitnessos/ctx-dashboard": "workspace:*",
+    "@fitnessos/ctx-measurement": "workspace:*",
+    "@fitnessos/ctx-nutrition": "workspace:*",
+    "@fitnessos/ctx-prescription": "workspace:*",
+    "@fitnessos/ctx-report": "workspace:*",
+    "@fitnessos/ctx-timeline": "workspace:*",
+    "@fitnessos/ctx-workflow": "workspace:*",
     "@fitnessos/infra": "workspace:*",
     "@fitnessos/kernel": "workspace:*",
+    "@fitnessos/telemetry": "workspace:*",
     "@fitnessos/ui": "workspace:*",
     "@tanstack/react-query": "^5.59.16",
     "next": "^15.5.0",
@@ -24,6 +33,7 @@
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.12.1",
     "@fitnessos/config": "workspace:*",
     "@playwright/test": "^1.48.2",
     "@tailwindcss/postcss": "^4.0.0",
@@ -32,10 +42,10 @@
     "@testing-library/user-event": "^14.5.2",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "babel-plugin-react-compiler": "^19.0.0-beta-af1b7da-20250417",
     "jsdom": "^25.0.1",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.6.3",
-    "vitest": "^2.1.4",
-    "babel-plugin-react-compiler": "^19.0.0-beta-af1b7da-20250417"
+    "vitest": "^3.2.6"
   }
 }

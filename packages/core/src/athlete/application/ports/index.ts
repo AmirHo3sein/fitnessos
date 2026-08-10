@@ -1,4 +1,6 @@
 import type { AthleteId, PersonId, Quantity } from '@fitnessos/kernel'
+import type { AvailabilityInput } from '../../domain/Availability'
+import type { TrainingIdentityInput } from '../../domain/TrainingIdentity'
 
 /**
  * Athlete — ports.
@@ -14,16 +16,14 @@ import type { AthleteId, PersonId, Quantity } from '@fitnessos/kernel'
  */
 
 /**
- * These unions are the ubiquitous language, declared here rather than aliased off
- * the contract on purpose. Aliasing would mean a backend enum change flowed
- * silently into every `switch` in the codebase; declaring it means the change
- * breaks compilation in `infra/mappers`, which is the one place someone can
- * decide what the new value means in our language.
+ * Re-exported from the domain, where they are declared. The application layer is a
+ * consumer of the vocabulary, not its owner — a domain value object reaching into the
+ * application layer for the name of one of its own states would have the layering
+ * backwards, and `no-domain-to-app` says so.
  */
-export type ExperienceLevel = 'beginner' | 'intermediate' | 'advanced'
+import type { AthleteStatus, ExperienceLevel } from '../../domain/vocabulary'
 
-/** `dormant` is the athlete's own pause, not an administrative one — see ADR-0008. */
-export type AthleteStatus = 'active' | 'dormant' | 'archived'
+export type { AthleteStatus, ExperienceLevel }
 
 export interface TrainingIdentitySnapshot {
   readonly experienceLevel: ExperienceLevel
@@ -57,6 +57,25 @@ export interface AthleteReadPort {
   readonly getMine: (signal?: AbortSignal) => Promise<AthleteSnapshot>
 }
 
+/**
+ * The write side.
+ *
+ * Returns the updated `AthleteSnapshot` rather than void, and that is a deliberate
+ * contract choice rather than a convenience. A void mutation forces the client to
+ * either refetch (an extra round trip on the slowest connection in the flow) or guess
+ * the new state (which is how a cache and a database diverge). Returning the
+ * server's own view means the cache can be *set* rather than invalidated.
+ */
+export interface AthleteWritePort {
+  readonly completeOnboarding: (
+    input: {
+      readonly trainingIdentity: TrainingIdentityInput
+      readonly availability: AvailabilityInput
+    },
+    signal?: AbortSignal,
+  ) => Promise<AthleteSnapshot>
+}
+
 export interface AthletePorts {
-  readonly athlete: AthleteReadPort
+  readonly athlete: AthleteReadPort & AthleteWritePort
 }

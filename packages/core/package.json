@@ -3,11 +3,21 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "sideEffects": false,
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./presentation": "./src/presentation/index.ts"
+    "./athlete": "./src/athlete/index.ts",
+    "./athlete/presentation": "./src/athlete/presentation/index.ts",
+    "./auth": "./src/auth/index.ts",
+    "./auth/presentation": "./src/auth/presentation/index.ts",
+    "./goal": "./src/goal/index.ts",
+    "./goal/presentation": "./src/goal/presentation/index.ts",
+    "./execution": "./src/execution/index.ts",
+    "./execution/presentation": "./src/execution/presentation/index.ts",
+    "./learning": "./src/learning/index.ts",
+    "./learning/presentation": "./src/learning/presentation/index.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
@@ -34,6 +44,6 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "typescript": "^5.6.3",
-    "vitest": "^2.1.4"
+    "vitest": "^3.2.6"
   }
 }

@@ -1,0 +1,41 @@
+/*
+  Overrides for React Flow's own stylesheet, imported by `WorkflowCanvas` immediately after it.
+
+  Loaded with the lazy canvas chunk rather than from `globals.css`, so the twelve routes that never
+  mount a canvas do not carry React Flow's CSS knowledge in the stylesheet they download.
+
+  ## The attribution link, and why it is restyled rather than hidden
+
+  axe found a serious `color-contrast` violation on `a[target="_blank"]` inside the canvas — React
+  Flow's "React Flow" attribution badge, which their default styles render as #999 on a translucent
+  white background. On this app's dark theme that is unreadable.
+
+  `proOptions.hideAttribution` would have removed the finding in one line. It is also the thing
+  React Flow's licence asks a non-subscriber not to do, so it is not available — and it would have
+  been the wrong instinct anyway: the fix for text nobody can read is to make it readable.
+
+  So the badge stays, in the theme's own tokens, at a contrast the rest of this app is held to.
+*/
+.react-flow__attribution {
+  background: var(--color-surface);
+  border-radius: 0.25rem;
+  padding: 0 0.25rem;
+}
+
+.react-flow__attribution a {
+  color: var(--color-muted);
+}
+
+/*
+  Handles, sized for a finger rather than for a mouse.
+
+  React Flow's default is 6px, which is under every touch-target guideline there is and effectively
+  unhittable on a phone. This is not the accessibility answer — the accessible route is the step
+  list, because a drag is a drag — but a pointer affordance that a pointer cannot hit is simply a
+  bug.
+*/
+.react-flow__handle {
+  width: 12px;
+  height: 12px;
+  background: var(--color-accent-solid, currentColor);
+}

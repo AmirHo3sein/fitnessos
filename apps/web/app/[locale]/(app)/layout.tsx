@@ -1,10 +1,10 @@
-import { myAthleteQuery } from '@fitnessos/core'
+import { myAthleteQuery } from '@fitnessos/core/athlete'
 import { HydrationBoundary, dehydrate } from '@tanstack/react-query'
 import { getTranslations } from 'next-intl/server'
 import type { ReactNode } from 'react'
 import { AppProviders } from '../../../composition/app-providers'
 import { createQueryClient } from '../../../composition/query-client'
-import { createServerContainer } from '../../../composition/server'
+import { createServerAthletePorts } from '../../../composition/server'
 import { Link } from '../../../src/i18n/navigation'
 import { enableStaticRendering } from '../../../src/i18n/static'
 
@@ -61,32 +61,53 @@ export default async function AppLayout({
   const { locale } = await params
   enableStaticRendering(locale)
 
-  const [t, container] = await Promise.all([
+  const [t, athletePorts] = await Promise.all([
     getTranslations('app'),
-    createServerContainer(),
+    createServerAthletePorts(),
   ])
 
   const queryClient = createQueryClient()
-  await queryClient.prefetchQuery(myAthleteQuery(container.athlete))
+  await queryClient.prefetchQuery(myAthleteQuery(athletePorts))
 
+  // Only routes that exist. A shell that links to unbuilt pages hands the user a 404 for a
+  // link the product itself rendered — and it makes tests pass for the wrong reason, since a
+  // URL assertion cannot tell a real page from a not-found one.
+  //
+  // Still arriving: /settings. Its label is already in the catalogue.
   const nav = [
     { href: '/dashboard', label: t('nav.dashboard') },
     { href: '/programme', label: t('nav.programme') },
     { href: '/sessions', label: t('nav.sessions') },
-    { href: '/settings', label: t('nav.settings') },
+    { href: '/check-in', label: t('nav.checkIn') },
+    { href: '/report', label: t('nav.report') },
+    { href: '/layout', label: t('nav.layout') },
+    { href: '/plan', label: t('nav.plan') },
+    { href: '/nutrition', label: t('nav.nutrition') },
+    { href: '/automation', label: t('nav.automation') },
   ] as const
 
   return (
     <div className="min-h-dvh">
-      <header className="border-line bg-surface/80 sticky top-0 z-10 border-b backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-5xl items-center gap-6 px-6">
-          <span className="text-display text-fg">{t('name')}</span>
-          <nav className="flex items-center gap-4 text-sm">
+      {/*
+        `h-14` is gone and the row may wrap.
+        
+        The nav reached seven links and a 412px screen could not hold them on one fixed-height
+        line: they overflowed a `sticky` header and covered the top of every page, which broke
+        clicks on content beneath — including in tests that had nothing to do with navigation. A
+        fixed height with growing content is a promise the layout cannot keep.
+        
+        `min-h-14` keeps the desktop proportions; `flex-wrap` and the nav's own wrapping let a
+        phone use two rows instead of overlapping one.
+      */}
+      <header className="border-default bg-surface/80 sticky top-0 z-10 border-b backdrop-blur">
+        <div className="mx-auto flex min-h-14 max-w-5xl flex-wrap items-center gap-x-6 gap-y-2 px-6 py-2">
+          <span className="text-display text-primary">{t('name')}</span>
+          <nav className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
             {nav.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
-                className="text-muted hover:text-fg transition-colors"
+                className="text-muted hover:text-primary transition-colors"
               >
                 {item.label}
               </Link>

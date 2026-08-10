@@ -21,10 +21,54 @@ export { createRefresher } from './http/refresh'
 export type { Refresher, RefreshConfig } from './http/refresh'
 
 export { createAthleteReadAdapter } from './adapters/athleteReadAdapter'
+export { createAuthAdapter } from './adapters/authAdapter'
+export { createAthleteWriteAdapter } from './adapters/athleteWriteAdapter'
+export { createGoalAdapter } from './adapters/goalAdapter'
+export { createReferenceResolver, type ResolverDeps } from './adapters/referenceResolver'
+export { createMeasurementAdapter } from './adapters/measurementAdapter'
+export { createLearningAdapter } from './adapters/learningAdapter'
+export { createReportAdapter } from './adapters/reportAdapter'
+export { createDashboardAdapter } from './adapters/dashboardAdapter'
+export { createTimelineAdapter } from './adapters/timelineAdapter'
+export { createNutritionAdapter } from './adapters/nutritionAdapter'
+export { createWorkflowAdapter } from './adapters/workflowAdapter'
+export {
+  openEventStream,
+  type SseHandle,
+  type SseOptions,
+  type StreamEvent,
+} from './events/sseClient'
+export { INVALIDATIONS, isKnownKind, keysFor } from './events/invalidationMap'
+export {
+  createPrescriptionAdapter,
+  createPrescriptionWriteAdapter,
+} from './adapters/prescriptionAdapter'
+export { createExecutionAdapter } from './adapters/executionAdapter'
+export {
+  createExecutionWriteAdapter,
+  createMutationSender,
+} from './adapters/executionWriteAdapter'
+
+export { createSyncEngine, QUEUE_SCHEMA_VERSION } from './sync/queue'
+export type {
+  DrainOutcome,
+  MutationKind,
+  MutationStore,
+  QueuedMutation,
+  SyncConfig,
+  SyncEngine,
+} from './sync/queue'
+export { createMemoryStore } from './sync/memoryStore'
+export { createIndexedDbStore } from './sync/indexedDbStore'
 
 // Only the mapping FUNCTION is exported, never a type. The types it produces are
 // declared by the application layer and re-exported from there; a type family
 // exported from infra would become a second source of truth and drift from the
 // first without anything detecting it.
-export { athleteFrom } from './mappers/athlete'
+export { athleteFrom, onboardingBodyFrom } from './mappers/athlete'
+export { codeRequestedFrom, sessionEstablishedFrom } from './mappers/auth'
+export { declareGoalBodyFrom, goalFrom, goalsFrom } from './mappers/goal'
+export { programFrom } from './mappers/program'
+export { sessionFrom, sessionsFrom } from './mappers/session'
+export { logSessionBodyFrom } from './mappers/performed'
 export { parseContract } from './mappers/parse'

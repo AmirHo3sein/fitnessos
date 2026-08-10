@@ -3,6 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "sideEffects": false,
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
@@ -17,13 +18,21 @@
   "dependencies": {
     "@fitnessos/contracts": "workspace:*",
     "@fitnessos/core": "workspace:*",
+    "@fitnessos/ctx-dashboard": "workspace:*",
+    "@fitnessos/ctx-measurement": "workspace:*",
+    "@fitnessos/ctx-nutrition": "workspace:*",
+    "@fitnessos/ctx-prescription": "workspace:*",
+    "@fitnessos/ctx-report": "workspace:*",
+    "@fitnessos/ctx-timeline": "workspace:*",
+    "@fitnessos/ctx-workflow": "workspace:*",
+    "@fitnessos/editor-engine": "workspace:^",
     "@fitnessos/kernel": "workspace:*",
     "zod": "^3.23.8"
   },
   "devDependencies": {
     "@fitnessos/config": "workspace:*",
+    "msw": "^2.6.0",
     "typescript": "^5.6.3",
-    "vitest": "^2.1.4",
-    "msw": "^2.6.0"
+    "vitest": "^3.2.6"
   }
 }
