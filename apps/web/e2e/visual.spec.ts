@@ -14,11 +14,20 @@ import { expect, test, type Page } from '@playwright/test'
  * It was found by accident, debugging something else. That is the argument for these tests: a
  * stylesheet can lose an entire package and every other signal stays green.
  *
- * ## Baselines are per platform, and that is not a flaw to work around
+ * ## Baselines are per platform, and BOTH platforms' are committed
  *
- * Font rasterisation and subpixel antialiasing differ between macOS and the Linux container CI
- * runs. Playwright names snapshots with the platform, so a baseline committed from a laptop is
- * simply not consulted on CI, which generates its own on first run.
+ * Font rasterisation and subpixel antialiasing differ between macOS and Linux, and Playwright names
+ * snapshots with `process.platform` — so a `-darwin` image is simply not the file a Linux run looks
+ * for.
+ *
+ * An earlier version of this comment claimed CI "generates its own on first run". **It does not.** A
+ * missing baseline is written AND fails the run, and the retry is skipped on purpose so that a second
+ * attempt cannot grade the file the first one just wrote. Verified empirically and in the pinned
+ * Playwright source; `docs/ci-baselines.md` has the detail and the regeneration command.
+ *
+ * So `-linux` baselines are committed too, generated in the same container image the CI job pins,
+ * because baselines produced anywhere other than where they are compared trade a red build for a diff
+ * nobody can explain.
  *
  * These live in the FULL tier rather than the critical one for the same reason. A visual diff is
  * a prompt to look, not proof of a defect, and blocking every PR on one is how a team learns to

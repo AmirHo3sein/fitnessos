@@ -197,11 +197,38 @@ describe('D-01 · undo does not get slower as history grows', () => {
     // avoids — the classic way a scaling test invents a regression that is not there.
     measure(20)
 
-    const shallow = measure(20)
-    const deep = measure(200)
+    /*
+     * INTERLEAVED samples, compared by median — and this was a real flake, not a precaution.
+     *
+     * The first version measured shallow once, then deep once. That is two timings taken at two
+     * different moments, so anything that loads the machine between them lands entirely on the
+     * second: it failed in a full `pnpm check` while a container was running the e2e suite on the
+     * same laptop, reporting 61 ms against a 16 ms budget — a 4× "regression" in code nobody had
+     * touched.
+     *
+     * Interleaving spreads contention across both series, and the median discards the sample that
+     * caught a GC pause or a scheduler decision. The invariant under test is a SHAPE — undo cost
+     * must not grow with history depth — and a shape survives this treatment while a real O(n)
+     * rewrite (~10× here) still fails it.
+     *
+     * This matters beyond the laptop: CI runs on a couple of shared vCPUs with turbo building
+     * several packages at once, which is exactly the condition that produced the false failure.
+     */
+    const shallows: number[] = []
+    const deeps: number[] = []
+    for (let round = 0; round < 5; round += 1) {
+      shallows.push(measure(20))
+      deeps.push(measure(200))
+    }
+    const median = (xs: number[]): number => [...xs].sort((a, b) => a - b)[2]!
+
+    const shallow = median(shallows)
+    const deep = median(deeps)
 
     // Generous: this is catching an O(n) rewrite, which would be ~10× here, not a 10% drift.
-    expect(deep).toBeLessThan(Math.max(shallow, 0.5) * 4)
+    expect(deep, `shallow=${shallow.toFixed(2)}ms deep=${deep.toFixed(2)}ms`).toBeLessThan(
+      Math.max(shallow, 0.5) * 4,
+    )
   })
 })
 
@@ -233,9 +260,20 @@ describe('D-03 · the spatial index is O(1) for query', () => {
      * to measure work. Found by breaking the implementation on purpose and watching the test not
      * notice, which is the only way that class of mistake ever gets found.
      *
-     * The work a query does is genuinely invisible in its result, so it has to be timed. Both
-     * measurements happen in one process moments apart, so runner speed cancels; and a full scan
-     * here is 20× the work, so the threshold has an order of magnitude of headroom.
+     * The work a query does is genuinely invisible in its result, so it has to be timed. A full
+     * scan here is 20× the work, so the threshold has an order of magnitude of headroom.
+     *
+     * ## "Runner speed cancels" was not enough, and the fix is interleaving
+     *
+     * The previous version measured small once and large once, and reasoned that a shared process
+     * made runner speed irrelevant. It does — steady runner speed cancels. Contention does not: a
+     * load that arrives between the two samples lands entirely on the second. Reproduced by pinning
+     * four cores busy and watching this test fail while nothing about the index had changed, which
+     * is what CI looks like when turbo builds several packages at once on two shared vCPUs.
+     *
+     * So the samples are interleaved and compared by median, the same treatment the D-01 undo test
+     * needed for the same reason. The invariant is a SHAPE — query cost must not grow with index
+     * size — and a shape survives this while a 20× full scan still fails it.
      */
     const area = documentRect(0, 0, 200, 200)
 
@@ -251,7 +289,20 @@ describe('D-03 · the spatial index is O(1) for query', () => {
     measure(small)
     measure(large)
 
-    expect(measure(large)).toBeLessThan(Math.max(measure(small), 0.5) * 4)
+    const smalls: number[] = []
+    const larges: number[] = []
+    for (let round = 0; round < 5; round += 1) {
+      smalls.push(measure(small))
+      larges.push(measure(large))
+    }
+    const median = (xs: number[]): number => [...xs].sort((a, b) => a - b)[2]!
+
+    const smallMedian = median(smalls)
+    const largeMedian = median(larges)
+    expect(
+      largeMedian,
+      `small=${smallMedian.toFixed(2)}ms large=${largeMedian.toFixed(2)}ms`,
+    ).toBeLessThan(Math.max(smallMedian, 0.5) * 4)
   })
 
   it('a moved node leaves no trace in its old bucket', () => {
