@@ -349,6 +349,27 @@ Renaming one silently changes what a stored workflow says it does.
 canvas has no origin corner. Two workflows differing only in coordinates behave identically, so
 nothing may be derived from them.
 
+### 4.9 A failed READ must be distinguishable from "nothing authored"
+
+Not a request of the backend so much as a consequence of one, recorded because the backend's shape
+is what made the client bug possible and a change there could reintroduce it.
+
+Six authoring screens treated a failed `GET /{artefact}/current` exactly as they treated a 204: the
+workspace received `null` either way, rendered "nothing has been written yet", and offered a Create
+button. Pressing it `PUT`s a **new id** — and because "current" is keyed per athlete rather than by
+id, the artefact that had merely failed to load was replaced by an empty one. A dropped request
+became data loss.
+
+The client now distinguishes them and never offers to create over a read it could not complete. Two
+obligations follow for the server:
+
+  - **204 means there is genuinely nothing**, and must not be used for a transient failure. A 503 or
+    a 500 is the honest answer to "I could not read it", and the client shows a retry for those.
+  - **`PUT /{artefact}/{id}` with an unknown id creates.** That is what makes the above a data-loss
+    path rather than a 404, and it stays that way because ADR-0010's client-generated ids require it.
+    If a server ever wants to refuse creation on PUT, say so before it ships: the client would need a
+    different flow, not a different error message.
+
 ---
 
 ## How to check

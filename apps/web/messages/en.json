@@ -255,7 +255,9 @@
       },
       "newFieldLabel": "New question",
       "empty": "This form has no questions yet."
-    }
+    },
+    "loadFailed": "The check-in form could not be loaded.",
+    "retry": "Try again"
   },
   "report": {
     "heading": "Report",
@@ -281,7 +283,9 @@
       "multiSelect": "Select several",
       "keyboardHint": "Arrow keys move the focused tile; hold Shift for a larger step.",
       "tileMovable": "movable with the arrow keys"
-    }
+    },
+    "loadFailed": "The report could not be loaded.",
+    "retry": "Try again"
   },
   "layout": {
     "heading": "Layout",
@@ -307,7 +311,9 @@
       },
       "keyboardHint": "Arrow keys move the focused widget one cell at a time.",
       "widgetMovable": "movable with the arrow keys"
-    }
+    },
+    "loadFailed": "The layout could not be loaded.",
+    "retry": "Try again"
   },
   "plan": {
     "heading": "Plan",
@@ -333,7 +339,9 @@
       "refused": "That would overlap another phase, so nothing moved.",
       "keyboardHint": "Arrow keys move the focused phase by a week; hold Shift to change its length.",
       "phaseMovable": "movable with the arrow keys"
-    }
+    },
+    "loadFailed": "The plan could not be loaded.",
+    "retry": "Try again"
   },
   "nutrition": {
     "heading": "Nutrition",
@@ -365,7 +373,9 @@
       "newAmount": "100 g",
       "empty": "This plan has no meals yet.",
       "noItems": "Nothing in this meal yet."
-    }
+    },
+    "loadFailed": "The nutrition plan could not be loaded.",
+    "retry": "Try again"
   },
   "automation": {
     "heading": "Automation",
@@ -418,6 +428,8 @@
         "port-taken": "That branch already leads somewhere.",
         "duplicate": "Those two are already connected."
       }
-    }
+    },
+    "loadFailed": "The automation could not be loaded.",
+    "retry": "Try again"
   }
 }

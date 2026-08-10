@@ -38,6 +38,8 @@ export default async function AutomationPage({
           noneHint: t('noneHint'),
           create: t('create'),
           loading: t('loading'),
+          loadFailed: t('loadFailed'),
+          retry: t('retry'),
           saveFailed: t('saveFailed'),
           newTitle: t('newTitle'),
           firstTrigger: t('firstTrigger'),

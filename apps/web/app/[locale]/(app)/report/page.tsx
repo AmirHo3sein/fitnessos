@@ -38,6 +38,8 @@ export default async function ReportPage({
           noneHint: t('noneHint'),
           create: t('create'),
           loading: t('loading'),
+          loadFailed: t('loadFailed'),
+          retry: t('retry'),
           saveFailed: t('saveFailed'),
           newReportTitle: t('newReportTitle'),
           builder: {

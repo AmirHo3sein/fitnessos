@@ -12,6 +12,15 @@ export interface NutritionWorkspaceLabels {
   readonly noneHint: string
   readonly create: string
   readonly loading: string
+  /**
+   * Shown when the LOAD failed, and never shown alongside the create button.
+   *
+   * A separate string from `saveFailed` on purpose: "we could not read your plan" and "we could not
+   * store your change" call for different actions, and one message covering both tells the reader
+   * neither.
+   */
+  readonly loadFailed: string
+  readonly retry: string
   readonly saveFailed: string
   readonly newTitle: string
   readonly firstMeal: string
@@ -26,13 +35,31 @@ export interface NutritionWorkspaceProps {
 
 /** Authoring the nutrition plan. */
 export const NutritionWorkspace = ({ locale, labels }: NutritionWorkspaceProps) => {
-  const { plan, isLoading, save, isSaving, error } = useNutritionPlan()
+  const { plan, isLoading, save, isSaving, error, loadFailed, retry } = useNutritionPlan()
 
   if (isLoading) {
     return (
       <Card>
         <Skeleton className="h-6 w-48" label={labels.loading} />
         <Skeleton className="mt-3 h-32 w-full" label={labels.loading} />
+      </Card>
+    )
+  }
+
+  /*
+    The load failed. Reported BEFORE the empty state, because both used to look identical from here
+    and the empty state carries a create button — which, pressed after a failed load, PUT a new id
+    over an artefact that was only unreachable. A failed read must never offer to replace what it
+    could not read.
+  */
+  if (loadFailed) {
+    return (
+      <Card>
+        <CardTitle>{labels.title}</CardTitle>
+        <CardDescription>{labels.loadFailed}</CardDescription>
+        <Button type="button" variant="secondary" className="mt-4" onPress={retry}>
+          {labels.retry}
+        </Button>
       </Card>
     )
   }

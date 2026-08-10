@@ -44,6 +44,8 @@ export default async function CheckInPage({
           noneHint: t('noneHint'),
           create: t('create'),
           loading: t('loading'),
+          loadFailed: t('loadFailed'),
+          retry: t('retry'),
           saveFailed: t('saveFailed'),
           newFormTitle: t('newFormTitle'),
           builder: {

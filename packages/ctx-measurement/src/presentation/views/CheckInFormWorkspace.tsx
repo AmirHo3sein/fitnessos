@@ -26,6 +26,15 @@ export interface WorkspaceLabels {
   readonly noneHint: string
   readonly create: string
   readonly loading: string
+  /**
+   * Shown when the LOAD failed, and never shown alongside the create button.
+   *
+   * A separate string from `saveFailed` on purpose: "we could not read your plan" and "we could not
+   * store your change" call for different actions, and one message covering both tells the reader
+   * neither.
+   */
+  readonly loadFailed: string
+  readonly retry: string
   readonly saveFailed: string
   readonly newFormTitle: string
   readonly builder: FormBuilderLabels
@@ -46,7 +55,7 @@ export interface CheckInFormWorkspaceProps {
  * click before every use with nobody on the other side of it.
  */
 export const CheckInFormWorkspace = ({ locale, labels }: CheckInFormWorkspaceProps) => {
-  const { form, isLoading, save, isSaving, error } = useCheckInForm()
+  const { form, isLoading, save, isSaving, error, loadFailed, retry } = useCheckInForm()
 
   if (isLoading) {
     return (
@@ -58,6 +67,24 @@ export const CheckInFormWorkspace = ({ locale, labels }: CheckInFormWorkspacePro
   }
 
   // `null` is a real answer, not a loading state: no coach has authored one yet.
+  /*
+    The load failed. Reported BEFORE the empty state, because both used to look identical from here
+    and the empty state carries a create button — which, pressed after a failed load, PUT a new id
+    over an artefact that was only unreachable. A failed read must never offer to replace what it
+    could not read.
+  */
+  if (loadFailed) {
+    return (
+      <Card>
+        <CardTitle>{labels.title}</CardTitle>
+        <CardDescription>{labels.loadFailed}</CardDescription>
+        <Button type="button" variant="secondary" className="mt-4" onPress={retry}>
+          {labels.retry}
+        </Button>
+      </Card>
+    )
+  }
+
   if (form === null) {
     return (
       <Card>
