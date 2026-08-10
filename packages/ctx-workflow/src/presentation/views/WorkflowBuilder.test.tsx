@@ -95,10 +95,24 @@ describe('what is on screen', () => {
   })
 
   it('gives the canvas an accessible name, once the lazy chunk lands', async () => {
-    // `findBy`, because the canvas is behind a `lazy` boundary — 55 kB of React Flow is not on the
-    // path to interactivity, and the step list below is fully usable before it arrives.
+    /*
+     * `findBy`, because the canvas is behind a `lazy` boundary — 55 kB of React Flow is not on the
+     * path to interactivity, and the step list below is fully usable before it arrives.
+     *
+     * With an EXPLICIT timeout, which this test needed and did not have. Testing Library's default
+     * is 1000 ms; resolving a dynamic import plus mounting React Flow fits inside that on a laptop
+     * and does not on a CI runner with two shared vCPUs running eleven packages' component tests at
+     * once. It failed there five times in a row while passing locally every time — the same test,
+     * the same commit.
+     *
+     * 10 s is not a performance claim: nothing here asserts how FAST the chunk arrives, only that it
+     * does and that the canvas is named when it has. A generous ceiling on a correctness assertion
+     * costs nothing when it passes and removes a false red when the machine is busy.
+     */
     mount()
-    expect(await screen.findByRole('application', { name: 'Workflow canvas' })).toBeInTheDocument()
+    expect(
+      await screen.findByRole('application', { name: 'Workflow canvas' }, { timeout: 10_000 }),
+    ).toBeInTheDocument()
   })
 
   /*
