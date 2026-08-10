@@ -21,6 +21,8 @@ const LABELS: DashboardBuilderLabels = {
   save: 'Save',
   newWidgetLabel: 'New widget',
   empty: 'This dashboard is empty.',
+  keyboardHint: 'Arrow keys move the focused widget.',
+  widgetMovable: 'movable with the arrow keys',
   content: { 'upcoming-sessions': 'Upcoming sessions', 'unjudged-proposals': 'Awaiting judgement' },
 }
 
@@ -147,5 +149,56 @@ describe('what the builder preserves', () => {
 
     const saved = onSave.mock.calls[0]![0]
     expect(saved).toMatchObject({ id: 'd1', title: 'Overview', columns: 12 })
+  })
+})
+
+describe('moving a widget without a pointer', () => {
+  /**
+   * The gap Phase 6 found: position was pointer-only in all three drag-based builders — no
+   * `onKeyDown`, no focusable item. A WCAG 2.1.1 failure at level A that axe cannot see.
+   */
+  it('nudges a focused widget by one CELL', async () => {
+    // A cell, because a cell is the only position this grid has. Pixels would be a unit the document
+    // cannot store.
+    const onSave = mount()
+    const widget = screen.getAllByRole('group')[0]!
+    widget.focus()
+    await userEvent.keyboard('{ArrowDown}')
+    await userEvent.click(screen.getByRole('button', { name: LABELS.save }))
+
+    const saved = onSave.mock.calls[0]![0].widgets
+    expect(saved[0]!.y).toBe(1)
+  })
+
+  it('displaces an occupant exactly as a drop does', async () => {
+    /*
+     * `movesFor` for both input methods. If the keyboard had its own placement logic, a nudge could
+     * land somewhere a drag could not — two rules for one grid, differing only in how you asked.
+     */
+    const onSave = mount()
+    const widget = screen.getAllByRole('group')[0]!
+    widget.focus()
+    await userEvent.keyboard('{ArrowDown}')
+    await userEvent.click(screen.getByRole('button', { name: LABELS.save }))
+
+    const saved = onSave.mock.calls[0]![0].widgets
+    // Nothing occupies two cells at once, whatever moved to make room.
+    const cells = saved.map((w) => `${String(w.x)},${String(w.y)}`)
+    expect(new Set(cells).size).toBe(cells.length)
+  })
+
+  it('does not consume an undo for a press that changes nothing', async () => {
+    // Holding an arrow at the edge of the grid must not fill the history with no-ops.
+    mount()
+    const widget = screen.getAllByRole('group')[0]!
+    widget.focus()
+    await userEvent.keyboard('{ArrowUp}{ArrowUp}{ArrowUp}')
+    expect(screen.getByRole('button', { name: LABELS.undo })).toBeDisabled()
+  })
+
+  it('names the widget and says what it responds to', () => {
+    mount()
+    const name = screen.getAllByRole('group')[0]!.getAttribute('aria-label') ?? ''
+    expect(name).toContain('movable with the arrow keys')
   })
 })

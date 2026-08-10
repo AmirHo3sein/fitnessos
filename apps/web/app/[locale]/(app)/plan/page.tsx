@@ -63,6 +63,8 @@ export default async function PlanPage({
             empty: t('builder.empty'),
             weeks: t('builder.weeks'),
             refused: t('builder.refused'),
+            keyboardHint: t('builder.keyboardHint'),
+            phaseMovable: t('builder.phaseMovable'),
           },
         }}
       />

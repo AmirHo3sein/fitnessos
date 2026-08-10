@@ -24,6 +24,8 @@ const LABELS: ReportBuilderLabels = {
   redo: 'Redo',
   save: 'Save',
   multiSelect: 'Select several',
+  keyboardHint: 'Arrow keys move the focused tile.',
+  tileMovable: 'movable with the arrow keys',
   alignLeft: 'Align left',
   alignTop: 'Align top',
   distributeX: 'Distribute',
@@ -153,5 +155,71 @@ describe('what the builder preserves', () => {
 
     // The original tile stays first: sorting would silently change what draws on top.
     expect(onSave.mock.calls[0]![0].tiles[0]?.id).toBe('t1')
+  })
+})
+
+describe('moving a tile without a pointer', () => {
+  /**
+   * The gap Phase 6 found: position in this builder was pointer-only. No `onKeyDown` anywhere, no
+   * focusable tile — a WCAG 2.1.1 failure at level A, invisible to axe, in a builder that passed
+   * every automated check.
+   */
+  it('nudges a focused tile with the arrow keys', async () => {
+    const onSave = mount()
+    const tile = screen.getAllByRole('group')[0]!
+    tile.focus()
+    await userEvent.keyboard('{ArrowRight}{ArrowDown}')
+    await userEvent.click(screen.getByRole('button', { name: LABELS.save }))
+
+    const saved = onSave.mock.calls[0]![0].tiles[0]!
+    expect(saved.x).toBe(41)
+    expect(saved.y).toBe(61)
+  })
+
+  it('takes a larger step with Shift, because a canvas is wide', async () => {
+    // One pixel at a time across 960px is technically operable and practically not. The larger step
+    // is the same grid the drag snaps to, so the keyboard cannot author an off-grid position the
+    // pointer would refuse.
+    const onSave = mount()
+    const tile = screen.getAllByRole('group')[0]!
+    tile.focus()
+    await userEvent.keyboard('{Shift>}{ArrowRight}{/Shift}')
+    await userEvent.click(screen.getByRole('button', { name: LABELS.save }))
+
+    expect(onSave.mock.calls[0]![0].tiles[0]!.x).toBeGreaterThan(48)
+  })
+
+  it('refuses to move a tile off the canvas', async () => {
+    // Clamped at zero rather than allowed negative: a tile at x = -40 is unreachable by pointer and
+    // invisible, and nothing would tell the coach where it went.
+    const onSave = mount()
+    const tile = screen.getAllByRole('group')[0]!
+    tile.focus()
+    await userEvent.keyboard('{ArrowLeft}{ArrowLeft}{ArrowLeft}{ArrowLeft}{ArrowLeft}')
+    await userEvent.click(screen.getByRole('button', { name: LABELS.save }))
+
+    expect(onSave.mock.calls[0]![0].tiles[0]!.x).toBeGreaterThanOrEqual(0)
+  })
+
+  it('coalesces a burst of presses into ONE undo', async () => {
+    // The same treatment a burst of typing gets. Five presses needing five undos is the reason
+    // people stop trusting undo.
+    const onSave = mount()
+    const tile = screen.getAllByRole('group')[0]!
+    tile.focus()
+    await userEvent.keyboard('{ArrowRight}{ArrowRight}{ArrowRight}')
+    await userEvent.click(screen.getByRole('button', { name: LABELS.undo }))
+    await userEvent.click(screen.getByRole('button', { name: LABELS.save }))
+
+    expect(onSave.mock.calls[0]![0].tiles[0]!.x).toBe(40)
+  })
+
+  it('names the tile so a screen reader says what it is and what it does', () => {
+    // "Squat 1RM — movable with the arrow keys". The name alone is what tells someone the affordance
+    // exists; the visible hint beside the canvas is for everyone else.
+    mount()
+    const name = screen.getAllByRole('group')[0]!.getAttribute('aria-label') ?? ''
+    expect(name).toContain('Squat 1RM')
+    expect(name).toContain('movable with the arrow keys')
   })
 })

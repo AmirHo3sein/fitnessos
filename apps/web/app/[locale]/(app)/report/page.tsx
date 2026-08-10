@@ -48,6 +48,8 @@ export default async function ReportPage({
             redo: t('builder.redo'),
             save: t('builder.save'),
             multiSelect: t('builder.multiSelect'),
+            keyboardHint: t('builder.keyboardHint'),
+            tileMovable: t('builder.tileMovable'),
             alignLeft: t('builder.alignLeft'),
             alignTop: t('builder.alignTop'),
             distributeX: t('builder.distributeX'),

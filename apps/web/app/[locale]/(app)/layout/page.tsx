@@ -54,6 +54,8 @@ export default async function LayoutPage({
             save: t('builder.save'),
             newWidgetLabel: t('builder.newWidgetLabel'),
             empty: t('builder.empty'),
+            keyboardHint: t('builder.keyboardHint'),
+            widgetMovable: t('builder.widgetMovable'),
             content: {
               'upcoming-sessions': t('builder.content.upcoming-sessions'),
               'unjudged-proposals': t('builder.content.unjudged-proposals'),

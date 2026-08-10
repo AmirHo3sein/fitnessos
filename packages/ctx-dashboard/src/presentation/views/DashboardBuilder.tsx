@@ -32,6 +32,10 @@ export interface DashboardBuilderLabels {
   readonly save: string
   readonly newWidgetLabel: string
   readonly empty: string
+  /** How to move a widget without a pointer, in words — see the note on `onKeyDown` below. */
+  readonly keyboardHint: string
+  /** The accessible name of a focusable widget: "<label>, movable with the arrow keys". */
+  readonly widgetMovable: string
   readonly content: Readonly<Record<string, string>>
 }
 
@@ -228,6 +232,48 @@ const BuilderShell = ({
     window.addEventListener('pointerup', finish)
   }
 
+  /**
+   * A keyboard nudge, through the SAME collision resolution a drop uses.
+   *
+   * `movesFor` returns every widget that has to move, not just this one — so a nudge that pushes
+   * into an occupied cell displaces the occupant downward exactly as a drag would, and one press is
+   * one history entry however many widgets it moved.
+   *
+   * A press that changes nothing (into a wall, or a resolution that lands where it started)
+   * dispatches nothing, so holding an arrow at the edge of the grid does not fill the history with
+   * no-ops.
+   */
+  const nudgeWidget = (id: NodeId, delta: { col: number; row: number }) => {
+    const document = store.getState().document
+    const rect = rectOfNode(document.nodes[id]?.props ?? {})
+    const to = documentRect(
+      Math.max(0, rect.x + delta.col),
+      Math.max(0, rect.y + delta.row),
+      rect.width,
+      rect.height,
+    )
+
+    const moves = movesFor({ document, preserved: { id: '', title: '', columns } }, id, to)
+    if (moves.length === 0) return
+
+    const actions: EditorAction[] = []
+    for (const m of moves) {
+      actions.push({ type: 'SetProperty', nodeId: m.id, key: 'x', value: m.rect.x })
+      actions.push({ type: 'SetProperty', nodeId: m.id, key: 'y', value: m.rect.y })
+    }
+    store.setEphemeral({ selected: [id] })
+    /*
+     * A batch here, unlike the Report and Timeline nudges — so one press is one undo and a burst of
+     * presses does NOT coalesce.
+     *
+     * That asymmetry is deliberate. A press on this grid can displace neighbours, and which
+     * neighbours differs from press to press. Merging two presses that each pushed a different
+     * widget out of the way would produce a single entry whose undo can restore neither
+     * arrangement — worse than needing two undos.
+     */
+    store.dispatchBatch(actions, { label: 'nudge widget' })
+  }
+
   const rows = widgetIds.reduce((max, id) => {
     const rect = rectOfNode(state.document.nodes[id]?.props ?? {})
     return Math.max(max, rect.y + rect.height)
@@ -253,6 +299,21 @@ const BuilderShell = ({
 
       <div
         ref={grid}
+      /*
+        `role="application"`, and it is load-bearing rather than decorative.
+ 
+        This is a direct-manipulation surface: the objects inside are focusable and respond to the
+        arrow keys, which is not something ARIA has a role for. `application` is the sanctioned way
+        to say "the author owns the keyboard in here" — inside it a screen reader stops intercepting
+        arrow keys for browse mode and passes them through, which is exactly what has to happen for
+        a nudge to work at all.
+ 
+        It is also why the items below need an eslint-disable: `jsx-a11y` models a `group` as
+        non-interactive and objects to a key handler on one. The rule is right about a page and
+        wrong about a canvas, and `application` is how the platform expresses the difference.
+      */
+        role="application"
+        aria-label={labels.heading}
         data-testid="dashboard-grid"
         onPointerDown={onPointerDown}
         style={{ height: rows * (ROW_HEIGHT + ROW_GAP) }}
@@ -269,6 +330,7 @@ const BuilderShell = ({
             onRemove={() => {
               removeWidget(id)
             }}
+            onNudge={nudgeWidget}
           />
         ))}
       </div>
@@ -282,12 +344,14 @@ const WidgetView = ({
   locale,
   labels,
   onRemove,
+  onNudge,
 }: {
   id: NodeId
   columns: number
   locale: Locale
   labels: DashboardBuilderLabels
   onRemove: () => void
+  onNudge: (id: NodeId, delta: { col: number; row: number }) => void
 }) => {
   const node = useNode(id)
   const selected = useEphemeral((s) => s.selected.includes(id))
@@ -302,10 +366,49 @@ const WidgetView = ({
   const kind = text('contentKind')
   const label = kind === 'indicator' ? text('fallbackLabel') : (labels.content[kind] ?? kind)
 
+  /**
+   * Arrow keys move the widget by one CELL — the keyboard path.
+   *
+   * Direction is logical, not physical: `ArrowRight` in Persian moves toward column 0, because
+   * column 0 is where the reader starts and that is the right-hand edge. Mapping arrows physically
+   * would make the keyboard disagree with the layout the pointer produces — the same trap
+   * `insetInlineStart` avoids for rendering.
+   *
+   * A cell, not a pixel, because a cell is the only position this grid HAS. And it routes through
+   * `movesFor` in the parent, so a keyboard move displaces the occupants exactly as a drop does.
+   */
+  const onKeyDown = (event: React.KeyboardEvent) => {
+    const rtl = getComputedStyle(event.currentTarget).direction === 'rtl'
+    const inline = rtl ? -1 : 1
+    const delta =
+      event.key === 'ArrowLeft'
+        ? { col: -inline, row: 0 }
+        : event.key === 'ArrowRight'
+          ? { col: inline, row: 0 }
+          : event.key === 'ArrowUp'
+            ? { col: 0, row: -1 }
+            : event.key === 'ArrowDown'
+              ? { col: 0, row: 1 }
+              : null
+    if (delta === null) return
+    event.preventDefault()
+    onNudge(id, delta)
+  }
+
   return (
+    /*
+      Inside `role="application"` — see the canvas container for why `jsx-a11y`'s model of a
+      non-interactive element does not fit a direct-manipulation surface.
+    */
+    // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
     <div
       data-widget={id}
       data-testid={`widget-${id}`}
+      // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
+      tabIndex={0}
+      role="group"
+      aria-label={`${label} — ${labels.widgetMovable}`}
+      onKeyDown={onKeyDown}
       style={{
         position: 'absolute',
         // Logical, not physical: column 0 is where the reader starts, which is the right-hand
