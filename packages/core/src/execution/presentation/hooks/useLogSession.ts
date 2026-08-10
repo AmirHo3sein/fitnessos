@@ -38,9 +38,28 @@ export const useLogSession = (onLogged: () => void): UseLogSession => {
      * itself.
      *
      * It cost an afternoon to find, because nothing errors — the whole offline architecture is
-     * defeated silently by a library default that appears unrelated to it. Set per-mutation rather
-     * than globally: sign-in, onboarding and goal declaration DO hit the server, and pausing those
-     * offline is the right behaviour.
+     * defeated silently by a library default that appears unrelated to it.
+     *
+     * ## A correction to what this comment used to say
+     *
+     * It read: "Set per-mutation rather than globally: sign-in, onboarding and goal declaration DO
+     * hit the server, and pausing those offline is the right behaviour." The second half is wrong,
+     * and it is now the QueryClient's global default (see `composition/query-client.ts`).
+     *
+     * Pausing is not a behaviour a person can perceive. `mutationFn` is never called, `isPending`
+     * stays true, the promise never settles — so a builder's save button sits disabled with nothing
+     * on screen, and a sign-in press does nothing visible at all. Worse than silent: the paused
+     * mutation fires when connectivity returns, which can request a verification code minutes after
+     * the person gave up and walked away.
+     *
+     * Demonstrated rather than argued: an e2e that goes offline and presses save waited fifteen
+     * seconds for the "your changes were not saved" card this app shows on every other failure, and
+     * it never came.
+     *
+     * So `'always'` is now the default everywhere and this line agrees with it rather than departing
+     * from it. It is kept explicit anyway, because here it means something different: not "fail fast
+     * so the author can retry" but "never consult the network in the first place — this writes to a
+     * durable queue". Same setting, opposite reason.
      */
     networkMode: 'always',
     retry: false,

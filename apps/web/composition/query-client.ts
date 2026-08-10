@@ -54,7 +54,42 @@ export const createQueryClient = (telemetry: TelemetryPort = noopTelemetry): Que
       },
     }),
     defaultOptions: {
+      /*
+       * `networkMode: 'always'` for BOTH queries and mutations — the single most consequential line
+       * in this file, and it is here because the default silently breaks every offline interaction.
+       *
+       * TanStack Query defaults to `networkMode: 'online'`, which does not fail when the browser is
+       * offline. It **pauses**. For a mutation that means `mutationFn` is never called, `isPending`
+       * stays true forever, and the promise never settles — so a builder's save button sits disabled
+       * with nothing on screen, indistinguishable from the app having ignored the press. For a query
+       * with no cached data it means `isPending` stays true and the workspace shows its loading
+       * skeleton indefinitely.
+       *
+       * Found by testing it: an e2e that puts the browser offline and presses save waited 15 seconds
+       * for the "your changes were not saved" card that this app renders on every other failure, and
+       * it never appeared. Twelve mutation sites were affected, including sign-in, onboarding and
+       * goal declaration.
+       *
+       * It also contradicted an intent already written down. `useReviseProgram` says a save "must
+       * fail while the author is looking at it rather than be paused and replayed against a programme
+       * that has since moved" — correct, and the default it relied on does the opposite.
+       *
+       * ## Why global rather than per hook
+       *
+       * Because it is true of every mutation in this app except one, and of every query. These are
+       * interactive actions with a person waiting: the honest response to "there is no network" is to
+       * say so, not to hold the press and act on it later against state that has moved.
+       *
+       * The exception is session logging, which is queued deliberately (ADR-0033) and sets this
+       * explicitly for its own reasons — it now agrees with the default rather than departing from
+       * it, and its comment is worth reading for the difference between "queue this" and "fail now".
+       *
+       * The cost of `'always'`: a save attempted offline fails immediately rather than waiting for a
+       * connection. That is the intended behaviour for an authored artefact — the edits stay in the
+       * editor, the commit boundary does not move, and the author decides when to retry.
+       */
       queries: {
+        networkMode: 'always',
         // Non-zero on purpose. With staleTime: 0 the client refetches every
         // prefetched query immediately on mount, which makes the RSC prefetch
         // pure overhead — two requests for one render. Individual query
@@ -68,6 +103,9 @@ export const createQueryClient = (telemetry: TelemetryPort = noopTelemetry): Que
           return failureCount < 2
         },
         refetchOnWindowFocus: false,
+      },
+      mutations: {
+        networkMode: 'always',
       },
       dehydrate: {
         // Include pending queries so a streamed RSC render can hand the browser a

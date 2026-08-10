@@ -801,10 +801,21 @@ and closes the stream itself. That inference **is a guess**, marked as one in th
 
 Phases 0–6 are done: all seven editors, strict CSP, AA on every builder including keyboard
 operability, bundle budgets per route, Lighthouse on the public routes, offline logging, and live
-invalidation. `pnpm check` is the gate; `pnpm e2e:full` is 278 tests across a chromium and a mobile-RTL
-project — 277 passing and one skipped, described at the end of this section.
+invalidation. `pnpm check` is the gate; `pnpm e2e:full` is 294 tests across a chromium and a mobile-RTL
+project — 293 passing and one skipped, described at the end of this section.
 
 What is **not** done, and what each waits on:
+
+### Offline is a per-mutation decision, and the default was wrong for all of them
+
+`networkMode: 'always'` is set globally on the QueryClient. TanStack Query's default, `'online'`,
+does not fail when the browser is offline — it **pauses**: `mutationFn` is never called, the promise
+never settles, and a save button sits disabled with nothing on screen. Twelve mutation sites were
+affected, including sign-in, and every query with no cached data showed its skeleton forever.
+
+The exception is session logging (ADR-0033), which sets the same value for the opposite reason:
+not "fail fast so the author can retry" but "never consult the network — this writes to a durable
+queue". An authored artefact must fail while its author is looking at it; a session log must not.
 
 | Open | Waits on |
 |---|---|

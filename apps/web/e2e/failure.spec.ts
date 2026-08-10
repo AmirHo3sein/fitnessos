@@ -204,6 +204,61 @@ test.describe('a LOAD that fails, in an authoring screen', () => {
     await expect(page.getByText('خودکارسازی بارگذاری نشد.')).toBeVisible()
     await expect(page.getByRole('button', { name: 'ساختن خودکارسازی' })).toHaveCount(0)
   })
+
+  /**
+   * The remaining three, table-driven — because this is ONE behaviour in six places and six
+   * hand-written copies would read as six behaviours.
+   *
+   * The two newest were written out longhand above, when the defect was being found and the fix
+   * shaped. These three exist so the claim "all six share the branch" is asserted rather than
+   * asserted-about.
+   */
+  const LOAD_FAILURES = [
+    { route: '/report', api: 'GET /api/v1/reports/current', create: 'ساختن گزارش', told: 'گزارش بارگذاری نشد.' },
+    { route: '/layout', api: 'GET /api/v1/dashboards/current', create: 'ساختن چیدمان', told: 'چیدمان بارگذاری نشد.' },
+    { route: '/plan', api: 'GET /api/v1/plans/current', create: 'ساختن برنامه', told: 'زمان‌بندی بارگذاری نشد.' },
+  ] as const
+
+  for (const [index, editor] of LOAD_FAILURES.entries()) {
+    test(`${editor.route} reports a failed load and does not offer to create over it`, async ({
+      page,
+    }) => {
+      await signIn(page, phoneFor(`20${String(index)}`, test.info().project.name))
+
+      // Author one first, so there is something a stray "create" would destroy.
+      await page.goto(editor.route)
+      await page.getByRole('button', { name: editor.create }).click()
+      await expect(page.getByRole('button', { name: 'ذخیره' })).toBeVisible()
+
+      await arm(page, editor.api, 'malformed')
+      await page.goto(editor.route)
+
+      await expect(page.getByText(editor.told)).toBeVisible()
+      await expect(page.getByRole('button', { name: editor.create })).toHaveCount(0)
+      await expect(page.getByRole('button', { name: 'تلاش دوباره' })).toBeVisible()
+    })
+  }
+
+  test('the check-in form reports a failed LOAD too', async ({ page }) => {
+    /*
+     * The sixth of the six hooks that shared the defect, and the oldest — in a different context
+     * from the two asserted above. The remaining three (report, layout, plan) share the identical
+     * branch, typechecked against the same interface; this covers the one that is furthest from the
+     * others in the codebase rather than pretending six e2e tests of one code path add six things.
+     */
+    await signIn(page, phoneFor('102', test.info().project.name))
+    await page.goto('/check-in')
+    await page.getByRole('button', { name: 'ساختن فرم' }).click()
+    await expect(page.getByRole('button', { name: 'ذخیره' })).toBeVisible()
+
+    await arm(page, 'GET /api/v1/check-in-forms/current', 'malformed')
+    await page.goto('/check-in')
+
+    await expect(page.getByText('فرم بررسی بارگذاری نشد.')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'ساختن فرم' })).toHaveCount(0)
+    // And a retry, so the answer to a dropped request is one press rather than a reload.
+    await expect(page.getByRole('button', { name: 'تلاش دوباره' })).toBeVisible()
+  })
 })
 
 test.describe('a save that fails in the newer editors', () => {
@@ -241,6 +296,53 @@ test.describe('a save that fails in the newer editors', () => {
     await expect(page.getByRole('button', { name: 'واگرد' })).toBeEnabled()
   })
 
+  /*
+   * Counted differently per editor because the builders expose different handles: the dashboard
+   * writes `data-testid` on each widget, the form builder does not and is counted by the label its
+   * question fields carry. Using a testid the form builder does not have would have produced a test
+   * that counted zero and asserted zero — passing while measuring nothing.
+   */
+  const SAVE_FAILURES = [
+    {
+      route: '/layout',
+      api: 'PUT /api/v1/dashboards/:dashboardId',
+      create: 'ساختن چیدمان',
+      add: 'افزودن ویجت',
+      count: (page: Page) => page.locator('[data-testid^="widget-"]'),
+    },
+    {
+      route: '/check-in',
+      api: 'PUT /api/v1/check-in-forms/:formId',
+      create: 'ساختن فرم',
+      add: 'افزودن پرسش',
+      count: (page: Page) => page.getByLabel('پرسش', { exact: true }),
+    },
+  ] as const
+
+  for (const [index, editor] of SAVE_FAILURES.entries()) {
+    test(`${editor.route} keeps the edit when the save fails`, async ({ page }) => {
+      await signIn(page, phoneFor(`21${String(index)}`, test.info().project.name))
+      await page.goto(editor.route)
+      await page.getByRole('button', { name: editor.create }).click()
+      await expect(page.getByRole('button', { name: 'ذخیره' })).toBeVisible()
+
+      await page.getByRole('button', { name: editor.add }).click()
+      const before = await editor.count(page).count()
+      expect(before).toBeGreaterThan(0)
+
+      await arm(page, editor.api, 'server-error')
+      await page.getByRole('button', { name: 'ذخیره' }).click()
+
+      await expect(
+        page.getByText('تغییرات شما ذخیره نشد. تغییرات همچنان اینجاست؛ دوباره تلاش کنید.'),
+      ).toBeVisible()
+      // The edit is still on screen and still reversible — the commit boundary did not move past a
+      // save that never happened.
+      expect(await editor.count(page).count()).toBe(before)
+      await expect(page.getByRole('button', { name: 'واگرد' })).toBeEnabled()
+    })
+  }
+
   test('a KEYBOARD move survives a failed save, exactly as a drag does', async ({ page }) => {
     /*
      * The arrow-key paths are new, and they dispatch through the same store as a drag — so this
@@ -266,26 +368,105 @@ test.describe('a save that fails in the newer editors', () => {
     await expect(page.getByRole('button', { name: 'واگرد' })).toBeEnabled()
   })
 
-  test('the check-in form reports a failed LOAD too', async ({ page }) => {
-    /*
-     * The sixth of the six hooks that shared the defect, and the oldest — in a different context
-     * from the two asserted above. The remaining three (report, layout, plan) share the identical
-     * branch, typechecked against the same interface; this covers the one that is furthest from the
-     * others in the codebase rather than pretending six e2e tests of one code path add six things.
-     */
-    await signIn(page, phoneFor('102', test.info().project.name))
-    await page.goto('/check-in')
-    await page.getByRole('button', { name: 'ساختن فرم' }).click()
+})
+
+test.describe('saving with no network at all', () => {
+  /**
+   * The case none of the above covers: not a 5xx, not a malformed body — no network.
+   *
+   * Every builder's hook leaves TanStack Query's `networkMode` at its default, and
+   * `useReviseProgram` states the intent for doing so: a save "must fail while the author is
+   * looking at it rather than be paused and replayed against a programme that has since moved".
+   * That is the right intent for an authored artefact — unlike a session log, which is queued
+   * deliberately.
+   *
+   * These tests assert that intent against a genuinely offline browser.
+   */
+  test('@critical the programme builder REPORTS a failed save rather than hanging', async ({
+    page,
+    context,
+  }) => {
+    await signIn(page, phoneFor('103', test.info().project.name))
+    await page.goto('/programme')
+    await page.getByRole('button', { name: 'ویرایش برنامه' }).click()
+
+    const name = page.getByLabel('نام بلوک').first()
+    await name.fill('Edited with no signal')
+
+    await context.setOffline(true)
+    await page.getByRole('button', { name: 'ذخیره' }).click()
+
+    // Told, and told in a bounded time. A save that never settles leaves the button disabled and
+    // nothing on screen, which is indistinguishable from the app having ignored the press.
+    await expect(
+      page.getByText('تغییرات شما ذخیره نشد. تغییرات همچنان اینجاست؛ دوباره تلاش کنید.'),
+    ).toBeVisible({ timeout: 15_000 })
+
+    await expect(name).toHaveValue('Edited with no signal')
+    await expect(page.getByRole('button', { name: 'واگرد' })).toBeEnabled()
+
+    await context.setOffline(false)
+  })
+
+  test('the nutrition builder does the same', async ({ page, context }) => {
+    await signIn(page, phoneFor('104', test.info().project.name))
+    await page.goto('/nutrition')
+    await page.getByRole('button', { name: 'ساختن برنامه‌ی تغذیه' }).click()
     await expect(page.getByRole('button', { name: 'ذخیره' })).toBeVisible()
 
-    await arm(page, 'GET /api/v1/check-in-forms/current', 'malformed')
-    await page.goto('/check-in')
+    const meal = page.getByLabel('نام وعده').first()
+    await meal.fill('پیش از تمرین')
 
-    await expect(page.getByText('فرم بررسی بارگذاری نشد.')).toBeVisible()
-    await expect(page.getByRole('button', { name: 'ساختن فرم' })).toHaveCount(0)
-    // And a retry, so the answer to a dropped request is one press rather than a reload.
-    await expect(page.getByRole('button', { name: 'تلاش دوباره' })).toBeVisible()
+    await context.setOffline(true)
+    await page.getByRole('button', { name: 'ذخیره' }).click()
+
+    await expect(
+      page.getByText('تغییرات شما ذخیره نشد. تغییرات همچنان اینجاست؛ دوباره تلاش کنید.'),
+    ).toBeVisible({ timeout: 15_000 })
+    await expect(meal).toHaveValue('پیش از تمرین')
+
+    await context.setOffline(false)
   })
+
+  test('@critical sign-in with no network says so rather than doing nothing', async ({
+    page,
+    context,
+  }) => {
+    /**
+     * The claim that justified the old per-mutation setting was that pausing sign-in offline is
+     * "the right behaviour". It is not, and this is the demonstration rather than the argument.
+     *
+     * A paused sign-in shows nothing at all — and worse, it fires when connectivity returns, so a
+     * verification code can be requested minutes after the person gave up and walked away.
+     */
+    await page.goto('/sign-in')
+    await page.getByLabel('شماره‌ی موبایل').fill('۰۹۱۲۱۰۵۱۳۰۹')
+
+    await context.setOffline(true)
+    await page.getByRole('button', { name: 'ارسال کد' }).click()
+
+    // Something on screen, within a bounded time — and NOT the code step, which would ask for a
+    // code that was never sent.
+    await expect(page.getByRole('alert')).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByLabel('کد تأیید')).toHaveCount(0)
+
+    await context.setOffline(false)
+  })
+
+  /*
+   * There is no offline READ test here, and that is a limit rather than an omission.
+   *
+   * A first draft navigated offline and asserted nothing — the document request fails before any
+   * client code runs, so it caught the exception and passed unconditionally. A test that cannot fail
+   * is worse than no test, because it reads as coverage.
+   *
+   * The read path offline cannot be exercised at this level for the same reason offline STARTUP is
+   * untested (see the note in `useLogSession`): without a service worker the document itself cannot
+   * be fetched, and a client-side navigation needs an RSC payload that is equally unreachable. What
+   * IS testable — a read that fails and renders "could not be loaded" instead of an empty state —
+   * is covered above with an armed fault, and the mechanism is identical: the query rejects rather
+   * than pausing, which is what `networkMode: 'always'` changed.
+   */
 })
 
 test.describe('rate limiting', () => {
