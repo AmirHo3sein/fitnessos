@@ -44,17 +44,14 @@ const chain = (n: number): Workflow => {
   return { id: 'w', title: 'w', enabled: false, nodes, edges }
 }
 
-/** Median of several runs, because a single sample catches a GC pause as easily as a regression. */
-const timePerCall = (workflow: Workflow, iterations: number): number => {
-  const samples: number[] = []
-  for (let run = 0; run < 5; run += 1) {
-    const started = performance.now()
-    for (let i = 0; i < iterations; i += 1) problemsOf(workflow)
-    samples.push((performance.now() - started) / iterations)
-  }
-  samples.sort((a, b) => a - b)
-  return samples[2]!
+/** One timed batch. */
+const timeBatch = (workflow: Workflow, iterations: number): number => {
+  const started = performance.now()
+  for (let i = 0; i < iterations; i += 1) problemsOf(workflow)
+  return (performance.now() - started) / iterations
 }
+
+const median = (xs: number[]): number => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)]!
 
 describe('problemsOf scales linearly', () => {
   // Explicit timeout for the same reason as `editor-engine`'s benchmarks: 2,000 iterations of the
@@ -63,10 +60,30 @@ describe('problemsOf scales linearly', () => {
     const small = chain(50)
     const large = chain(400)
 
-    // Enough iterations that the small case is well above timer resolution — otherwise the ratio is
-    // dominated by the noise floor and the test measures nothing, while still passing.
-    const smallPer = timePerCall(small, 2_000)
-    const largePer = timePerCall(large, 200)
+    /*
+     * INTERLEAVED, and this test failed for want of it.
+     *
+     * The first version measured the small case five times, then the large case five times. Under a
+     * full `pnpm check` — turbo building and testing eleven packages at once — load that arrived
+     * during the second phase inflated all five of its samples and the median with them: it reported
+     * 45.5× for an 8× graph and failed a gate in code nobody had touched.
+     *
+     * That is precisely the flaw I had just diagnosed and fixed in `editor-engine`'s two benchmarks,
+     * left in place here. Alternating the two sizes inside one loop spreads contention across both
+     * series, and the median then discards the sample that caught it.
+     *
+     * Iteration counts differ so both batches are well above timer resolution: without that the
+     * ratio is dominated by the noise floor and the test passes while measuring nothing.
+     */
+    const smalls: number[] = []
+    const larges: number[] = []
+    for (let round = 0; round < 5; round += 1) {
+      smalls.push(timeBatch(small, 2_000))
+      larges.push(timeBatch(large, 200))
+    }
+
+    const smallPer = median(smalls)
+    const largePer = median(larges)
     expect(smallPer).toBeGreaterThan(0)
 
     const ratio = largePer / smallPer
