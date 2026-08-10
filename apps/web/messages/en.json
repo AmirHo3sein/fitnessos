@@ -278,7 +278,9 @@
       "distributeX": "Space evenly",
       "newTileLabel": "New tile",
       "empty": "This report is empty.",
-      "multiSelect": "Select several"
+      "multiSelect": "Select several",
+      "keyboardHint": "Arrow keys move the focused tile; hold Shift for a larger step.",
+      "tileMovable": "movable with the arrow keys"
     }
   },
   "layout": {
@@ -302,7 +304,9 @@
       "content": {
         "upcoming-sessions": "Upcoming sessions",
         "unjudged-proposals": "Awaiting judgement"
-      }
+      },
+      "keyboardHint": "Arrow keys move the focused widget one cell at a time.",
+      "widgetMovable": "movable with the arrow keys"
     }
   },
   "plan": {
@@ -326,7 +330,9 @@
       "newPhaseLabel": "New phase",
       "empty": "This plan has no phases yet.",
       "weeks": "weeks",
-      "refused": "That would overlap another phase, so nothing moved."
+      "refused": "That would overlap another phase, so nothing moved.",
+      "keyboardHint": "Arrow keys move the focused phase by a week; hold Shift to change its length.",
+      "phaseMovable": "movable with the arrow keys"
     }
   },
   "nutrition": {

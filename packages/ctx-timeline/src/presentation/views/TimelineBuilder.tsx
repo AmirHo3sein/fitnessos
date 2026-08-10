@@ -42,6 +42,10 @@ export interface TimelineBuilderLabels {
   readonly weeks: string
   /** Shown when a drag or resize is refused, because silence reads as a broken canvas. */
   readonly refused: string
+  /** How to move and resize a phase without a pointer — see the note on `onKeyDown`. */
+  readonly keyboardHint: string
+  /** The accessible name of a focusable phase: "<label>, movable with the arrow keys". */
+  readonly phaseMovable: string
 }
 
 export interface TimelineBuilderProps {
@@ -217,6 +221,41 @@ const BuilderShell = ({
     window.addEventListener('pointerup', finish)
   }
 
+  /**
+   * A keyboard move or resize, in whole weeks, through the same two functions a drag uses.
+   *
+   * `placeSpan` and `resizeSpan` REFUSE rather than displace, so a press that would overlap a
+   * neighbour changes nothing and says why — identical to a refused drop, because it is the same
+   * rule being applied to a different input device.
+   */
+  const nudgePhase = (id: NodeId, weeks: number, mode: 'move' | 'resize') => {
+    const draft = { document: store.getState().document, preserved }
+    const node = store.getState().document.nodes[id]
+    if (node === undefined) return
+
+    const span = spanOfNode(node.props)
+    const others = otherSpans(draft, id)
+    const delta = weeks * DAYS_PER_WEEK
+    const placed =
+      mode === 'move'
+        ? placeSpan(span, others, span.start + delta)
+        : resizeSpan(span, others, span.start + span.length + delta)
+
+    if (placed === null) {
+      refuse()
+      return
+    }
+    if (placed.start === span.start && placed.length === span.length) return
+
+    store.setEphemeral({ selected: [id] })
+    // Two dispatches rather than a batch, so a burst of presses coalesces into one undo — see the
+    // note in the Report Builder's nudge. Move and resize carry different labels, so a run of moves
+    // never merges with a run of resizes.
+    const label = mode === 'move' ? 'nudge phase' : 'nudge phase length'
+    store.dispatch({ type: 'SetProperty', nodeId: id, key: 'start', value: placed.start }, { label })
+    store.dispatch({ type: 'SetProperty', nodeId: id, key: 'length', value: placed.length }, { label })
+  }
+
   const weeks = Math.max(
     MIN_WEEKS,
     phaseIds.reduce((max, id) => {
@@ -279,6 +318,21 @@ const BuilderShell = ({
       <div data-testid="timeline-viewport" className="min-w-0 max-w-full overflow-x-auto">
         <div
           ref={track}
+      /*
+        `role="application"`, and it is load-bearing rather than decorative.
+ 
+        This is a direct-manipulation surface: the objects inside are focusable and respond to the
+        arrow keys, which is not something ARIA has a role for. `application` is the sanctioned way
+        to say "the author owns the keyboard in here" — inside it a screen reader stops intercepting
+        arrow keys for browse mode and passes them through, which is exactly what has to happen for
+        a nudge to work at all.
+ 
+        It is also why the items below need an eslint-disable: `jsx-a11y` models a `group` as
+        non-interactive and objects to a key handler on one. The rule is right about a page and
+        wrong about a canvas, and `application` is how the platform expresses the difference.
+      */
+          role="application"
+          aria-label={labels.heading}
           data-testid="timeline-track"
           style={{ width: weeks * DAYS_PER_WEEK * PX_PER_DAY, height: 132 }}
           className="border-default bg-surface-sunken relative rounded-xl border"
@@ -308,6 +362,7 @@ const BuilderShell = ({
               locale={locale}
               labels={labels}
               onGesture={beginGesture}
+              onKeys={nudgePhase}
               onRemove={() => {
                 store.dispatch({ type: 'RemoveNode', nodeId: id }, { label: 'remove phase' })
               }}
@@ -325,6 +380,7 @@ const PhaseView = ({
   locale,
   labels,
   onGesture,
+  onKeys,
   onRemove,
 }: {
   id: NodeId
@@ -332,6 +388,7 @@ const PhaseView = ({
   locale: Locale
   labels: TimelineBuilderLabels
   onGesture: (event: React.PointerEvent, id: NodeId, mode: 'move' | 'resize') => void
+  onKeys: (id: NodeId, weeks: number, mode: 'move' | 'resize') => void
   onRemove: () => void
 }) => {
   const node = useNode(id)
@@ -348,11 +405,45 @@ const PhaseView = ({
   const label = typeof node.props['label'] === 'string' ? node.props['label'] : ''
   const nf = new Intl.NumberFormat(locale)
 
+  /**
+   * Arrow keys move a phase; Shift+arrows resize it. In WEEKS.
+   *
+   * A week rather than a day, because a week is the unit this editor snaps to — a coach dragging a
+   * boundary is choosing which week a block starts in, not which Tuesday. A per-day keyboard step
+   * would let the keyboard author positions the pointer cannot, which is the same drift in the
+   * opposite direction from a keyboard that cannot author at all.
+   *
+   * Direction is logical: later time runs ALONG the reading direction, so in Persian `ArrowLeft`
+   * moves a phase later. Mapping arrows physically would make the keyboard disagree with the track.
+   *
+   * Refusal is unchanged and shared: `placeSpan` and `resizeSpan` refuse rather than displace, and a
+   * refused key press says so in the same message a refused drag does.
+   */
+  const onKeyDown = (event: React.KeyboardEvent) => {
+    const rtl = getComputedStyle(event.currentTarget).direction === 'rtl'
+    const later = rtl ? -1 : 1
+    const weeks =
+      event.key === 'ArrowLeft' ? -later : event.key === 'ArrowRight' ? later : 0
+    if (weeks === 0) return
+    event.preventDefault()
+    onKeys(id, weeks, event.shiftKey ? 'resize' : 'move')
+  }
+
   return (
+    /*
+      Inside `role="application"` — see the canvas container for why `jsx-a11y`'s model of a
+      non-interactive element does not fit a direct-manipulation surface.
+    */
+    // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
     <div
       data-testid={`phase-${id}`}
       data-start={start}
       data-length={length}
+      // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
+      tabIndex={0}
+      role="group"
+      aria-label={`${label} — ${labels.phaseMovable}`}
+      onKeyDown={onKeyDown}
       onPointerDown={(event) => {
         onGesture(event, id, 'move')
       }}

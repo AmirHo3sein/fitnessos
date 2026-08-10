@@ -761,6 +761,20 @@ test.describe('the program builder', () => {
 
     await page.getByRole('button', { name: 'افزودن بلوک' }).click()
     await page.getByRole('button', { name: 'ذخیره' }).click()
+
+    /*
+     * Wait for the save to LAND before leaving the builder.
+     *
+     * This test failed once under a full parallel run and passed in isolation. The cause was the
+     * test, not the product: it clicked "end editing" and reloaded while the POST was still in
+     * flight, so the reload occasionally raced the write and found two blocks.
+     *
+     * Undo going disabled is the right thing to wait for rather than an arbitrary timeout — the
+     * commit boundary only moves when the save is persisted, so this asserts the save happened AND
+     * removes the race with one line.
+     */
+    await expect(page.getByRole('button', { name: 'واگرد' })).toBeDisabled()
+
     await page.getByRole('button', { name: 'پایان ویرایش' }).click()
     await page.reload()
 

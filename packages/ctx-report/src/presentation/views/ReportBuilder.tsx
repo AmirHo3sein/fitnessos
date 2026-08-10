@@ -43,6 +43,13 @@ export interface ReportBuilderLabels {
   readonly redo: string
   readonly save: string
   readonly multiSelect: string
+  /**
+   * How to move a tile without a pointer. Rendered as instructions beside the canvas, because an
+   * affordance nobody is told about is not one — arrow keys on a focused tile are not discoverable.
+   */
+  readonly keyboardHint: string
+  /** The accessible name of a focusable tile: "<label>, movable with the arrow keys". */
+  readonly tileMovable: string
   readonly alignLeft: string
   readonly alignTop: string
   readonly distributeX: string
@@ -401,8 +408,26 @@ const BuilderShell = ({
         </Button>
       </div>
 
+      {/* The arrow-key affordance, in words. An affordance nobody is told about is not one. */}
+      <p className="text-muted text-xs">{labels.keyboardHint}</p>
+
       <div
         ref={canvas}
+      /*
+        `role="application"`, and it is load-bearing rather than decorative.
+ 
+        This is a direct-manipulation surface: the objects inside are focusable and respond to the
+        arrow keys, which is not something ARIA has a role for. `application` is the sanctioned way
+        to say "the author owns the keyboard in here" — inside it a screen reader stops intercepting
+        arrow keys for browse mode and passes them through, which is exactly what has to happen for
+        a nudge to work at all.
+ 
+        It is also why the items below need an eslint-disable: `jsx-a11y` models a `group` as
+        non-interactive and objects to a key handler on one. The rule is right about a page and
+        wrong about a canvas, and `application` is how the platform expresses the difference.
+      */
+        role="application"
+        aria-label={labels.heading}
         data-testid="report-canvas"
         onPointerDown={onPointerDown}
         className="border-default bg-surface-sunken relative h-[520px] w-full touch-none overflow-hidden rounded-xl border"
@@ -454,9 +479,75 @@ const TileView = ({
   const text = (key: string) => (typeof node.props[key] === 'string' ? node.props[key] : '')
   const label = text('fallbackLabel') !== '' ? text('fallbackLabel') : text('text')
 
+  /**
+   * Arrow keys move the tile — the KEYBOARD path, and the reason this component is focusable.
+   *
+   * Until Phase 6 went looking, position in this builder was pointer-only: no `onKeyDown` anywhere,
+   * no focusable tile. That is a WCAG 2.1.1 failure at level A, and axe cannot see it — a canvas
+   * full of perfectly-named controls passes every automated check while being unusable without a
+   * mouse. Three builders had the same gap and all three were the drag-based ones.
+   *
+   * Design decisions worth stating:
+   *
+   *   - It goes through `resolveOverlap` exactly as a drop does, so a keyboard move cannot reach a
+   *     position a drag could not. One rule, two input methods.
+   *   - Shift multiplies the step. Moving a tile across a 960px canvas one pixel at a time is
+   *     technically operable and practically not, and `GRID` is the same unit the drag snaps to.
+   *   - Every press shares one label, so a burst of presses coalesces into ONE undo entry — the
+   *     same treatment a burst of typing gets, and for the same reason.
+   */
+  const onKeyDown = (event: React.KeyboardEvent) => {
+    const step = event.shiftKey ? GRID : 1
+    const delta =
+      event.key === 'ArrowLeft'
+        ? { x: -step, y: 0 }
+        : event.key === 'ArrowRight'
+          ? { x: step, y: 0 }
+          : event.key === 'ArrowUp'
+            ? { x: 0, y: -step }
+            : event.key === 'ArrowDown'
+              ? { x: 0, y: step }
+              : null
+    if (delta === null) return
+
+    // The canvas owns arrow keys once a tile has focus; letting the page scroll as well would move
+    // the tile and the view at once.
+    event.preventDefault()
+
+    const next = documentRect(
+      Math.max(0, rect.x + delta.x),
+      Math.max(0, rect.y + delta.y),
+      rect.width,
+      rect.height,
+    )
+    store.setEphemeral({ selected: [id] })
+    /*
+     * Two dispatches, NOT a batch — and this was a test finding.
+     *
+     * A batch never coalesces, by design, so every arrow press became its own undo entry: three
+     * presses, three undos. A burst of arrow presses is one intent in exactly the way a burst of
+     * typing is, so it wants the coalescing path — same label, same target, and the history merges
+     * both axes and every press in the window into one entry.
+     */
+    store.dispatch({ type: 'SetProperty', nodeId: id, key: 'x', value: next.x }, { label: 'nudge tile' })
+    store.dispatch({ type: 'SetProperty', nodeId: id, key: 'y', value: next.y }, { label: 'nudge tile' })
+  }
+
   return (
+    /*
+      Inside `role="application"` — see the canvas container for why `jsx-a11y`'s model of a
+      non-interactive element does not fit a direct-manipulation surface.
+    */
+    // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
     <div
       data-testid={`tile-${id}`}
+      // Focusable, named, and told what it responds to. `role="group"` rather than `button`: it is
+      // not a thing you activate, it is a region whose position you change.
+      // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
+      tabIndex={0}
+      role="group"
+      aria-label={`${label} — ${labels.tileMovable}`}
+      onKeyDown={onKeyDown}
       style={{
         position: 'absolute',
         // The ephemeral position wins while dragging, so the tile follows the pointer without

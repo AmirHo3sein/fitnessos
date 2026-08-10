@@ -25,6 +25,8 @@ const LABELS: TimelineBuilderLabels = {
   empty: 'This plan is empty.',
   weeks: 'weeks',
   refused: 'That would overlap another phase.',
+  keyboardHint: 'Arrow keys move the focused phase by a week.',
+  phaseMovable: 'movable with the arrow keys',
 }
 
 const plan = (): PlanSnapshot => ({
@@ -146,5 +148,70 @@ describe('what the builder preserves', () => {
       title: 'Spring',
       epoch: { year: 2026, month: 1, day: 5 },
     })
+  })
+})
+
+describe('moving a phase without a pointer', () => {
+  /*
+   * The fixture is two ADJACENT phases — 0..28 and 28..49 — so what is legal depends on which one
+   * is focused. The second has open time after it; the first is boxed in. Every assertion below
+   * picks its phase for that reason, which is also why a naive "move the first phase right" test
+   * would have been asserting a refusal without meaning to.
+   */
+  it('moves it by a WEEK, not a day', async () => {
+    /**
+     * A week, because a week is the unit this editor snaps to — a coach dragging a boundary is
+     * choosing which week a block starts in, not which Tuesday. A per-day keyboard step would let
+     * the keyboard author positions the pointer cannot reach.
+     */
+    const onSave = mount()
+    screen.getByTestId('phase-p2').focus()
+    await userEvent.keyboard('{ArrowRight}')
+    await userEvent.click(screen.getByRole('button', { name: LABELS.save }))
+
+    expect(onSave.mock.calls[0]![0].phases[1]!.start).toBe(35)
+  })
+
+  it('resizes with Shift, in whole weeks', async () => {
+    const onSave = mount()
+    screen.getByTestId('phase-p2').focus()
+    await userEvent.keyboard('{Shift>}{ArrowRight}{/Shift}')
+    await userEvent.click(screen.getByRole('button', { name: LABELS.save }))
+
+    const saved = onSave.mock.calls[0]![0].phases[1]!
+    expect(saved.start).toBe(28)
+    expect(saved.length).toBe(28)
+  })
+
+  it('REFUSES a press that would overlap, and says so', async () => {
+    /*
+     * The same rule as a refused drop, applied to a different input device: `placeSpan` refuses
+     * rather than displacing, because time has no "below" to push a phase into and moving a
+     * neighbour would reschedule training the athlete may already have done.
+     */
+    const onSave = mount()
+    screen.getByTestId('phase-p2').focus()
+    await userEvent.keyboard('{ArrowLeft}')
+
+    expect(screen.getByText(LABELS.refused)).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: LABELS.save }))
+    expect(onSave.mock.calls[0]![0].phases[1]!.start).toBe(28)
+  })
+
+  it('coalesces a burst into one undo', async () => {
+    const onSave = mount()
+    screen.getByTestId('phase-p2').focus()
+    await userEvent.keyboard('{ArrowRight}{ArrowRight}{ArrowRight}')
+    await userEvent.click(screen.getByRole('button', { name: LABELS.undo }))
+    await userEvent.click(screen.getByRole('button', { name: LABELS.save }))
+
+    expect(onSave.mock.calls[0]![0].phases[1]!.start).toBe(28)
+  })
+
+  it('names the phase and says what it responds to', () => {
+    mount()
+    const name = screen.getByTestId('phase-p2').getAttribute('aria-label') ?? ''
+    expect(name).toContain('Intensification')
+    expect(name).toContain('movable with the arrow keys')
   })
 })

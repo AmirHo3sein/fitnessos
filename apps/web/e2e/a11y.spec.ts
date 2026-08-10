@@ -183,6 +183,50 @@ test.describe('every page passes WCAG 2.1 AA', () => {
     await expectNoViolations(page)
   })
 
+  test('the report builder, canvas and toolbar', async ({ page }) => {
+    /*
+     * One of three builders that had NO scan at all until Phase 6 went looking — and the three
+     * unscanned ones were the three drag-based ones, which is the worst possible coincidence: a
+     * canvas is where controls are most likely to be unlabelled shapes.
+     */
+    await signIn(page, phoneFor('222', test.info().project.name))
+    await page.goto('/report')
+    await expectNoViolations(page)
+
+    await page.getByRole('button', { name: 'ساختن گزارش' }).click()
+    await expect(page.getByTestId('report-canvas')).toBeVisible()
+    await expectNoViolations(page)
+
+    // With a tile selected, since selection reveals the alignment toolbar — a set of controls that
+    // does not exist in the default state and so would go unscanned.
+    await page.locator('[data-testid^="tile-"]').first().click()
+    await expectNoViolations(page)
+  })
+
+  test('the dashboard layout builder', async ({ page }) => {
+    await signIn(page, phoneFor('333', test.info().project.name))
+    await page.goto('/layout')
+    await expectNoViolations(page)
+
+    await page.getByRole('button', { name: 'ساختن چیدمان' }).click()
+    await expect(page.locator('[data-testid^="widget-"]').first()).toBeVisible()
+    await expectNoViolations(page)
+  })
+
+  test('the timeline builder', async ({ page }) => {
+    await signIn(page, phoneFor('444', test.info().project.name))
+    await page.goto('/plan')
+    await expectNoViolations(page)
+
+    await page.getByRole('button', { name: 'ساختن برنامه' }).click()
+    await expect(page.getByTestId('timeline-track')).toBeVisible()
+    await expectNoViolations(page)
+
+    // With two phases, so the refusal message and the second phase's controls are on screen.
+    await page.getByRole('button', { name: 'افزودن مرحله' }).click()
+    await expectNoViolations(page)
+  })
+
   test('the 404', async ({ page }) => {
     await page.goto('/nope-does-not-exist')
     await expectNoViolations(page)
@@ -219,6 +263,66 @@ test.describe('what an automated scan cannot check', () => {
     await page.getByRole('button', { name: 'واگرد' }).focus()
     await page.keyboard.press('Enter')
     await expect(firstName).not.toHaveValue('Keyboard only')
+  })
+
+  test('@critical every DRAG builder can be driven without a pointer', async ({ page }) => {
+    /**
+     * WCAG 2.1.1, level A: all functionality operable by keyboard. The three drag-based builders
+     * failed it until Phase 6 went looking — no `onKeyDown` anywhere, no focusable item, so position
+     * and size were pointer-only in the Report canvas, the dashboard grid and the Timeline.
+     *
+     * Nothing automated could see it. All three pass axe: every button is named, every field is
+     * labelled, contrast is fine. What was missing was not a label but a capability, and the only
+     * way to assert a capability is to exercise it.
+     *
+     * Each builder is driven here through `Tab` and the arrow keys alone — no `click`, no `mouse`.
+     * The assertion is on the DOCUMENT's own attributes, so it fails if the visual moves without the
+     * document following.
+     */
+    await signIn(page, phoneFor('555', test.info().project.name))
+
+    // ── The report canvas: pixels ────────────────────────────────────────────────────────────────
+    await page.goto('/report')
+    await page.getByRole('button', { name: 'ساختن گزارش' }).focus()
+    await page.keyboard.press('Enter')
+    await expect(page.getByTestId('report-canvas')).toBeVisible()
+
+    const tile = page.locator('[data-testid^="tile-"]').first()
+    const startedAt = await tile.evaluate((el) => (el as HTMLElement).style.left)
+    await tile.focus()
+    await page.keyboard.press('Shift+ArrowRight')
+    await expect
+      .poll(async () => tile.evaluate((el) => (el as HTMLElement).style.left))
+      .not.toBe(startedAt)
+
+    // ── The dashboard grid: cells ───────────────────────────────────────────────────────────────
+    await page.goto('/layout')
+    await page.getByRole('button', { name: 'ساختن چیدمان' }).focus()
+    await page.keyboard.press('Enter')
+    const widget = page.locator('[data-testid^="widget-"]').first()
+    await expect(widget).toBeVisible()
+    const widgetTop = await widget.evaluate((el) => (el as HTMLElement).style.top)
+    await widget.focus()
+    await page.keyboard.press('ArrowDown')
+    await expect
+      .poll(async () => widget.evaluate((el) => (el as HTMLElement).style.top))
+      .not.toBe(widgetTop)
+
+    // ── The timeline: day offsets, moved a week at a time ───────────────────────────────────────
+    await page.goto('/plan')
+    await page.getByRole('button', { name: 'ساختن برنامه' }).focus()
+    await page.keyboard.press('Enter')
+    const phase = page.locator('[data-testid^="phase-"]').first()
+    await expect(phase).toHaveAttribute('data-start', '0')
+    await phase.focus()
+    // RTL: later time runs along the reading direction, so ArrowLeft moves a phase LATER.
+    await page.keyboard.press('ArrowLeft')
+    await expect(phase).toHaveAttribute('data-start', '7')
+
+    // And Shift resizes rather than moving — the two gestures a pointer has, both available.
+    await page.keyboard.press('Shift+ArrowLeft')
+    await expect(phase).toHaveAttribute('data-start', '7')
+    await expect(phase).toHaveAttribute('data-length', '35')
   })
 
   test('@critical focus is visible wherever it lands', async ({ page }) => {
