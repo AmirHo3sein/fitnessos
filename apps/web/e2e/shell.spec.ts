@@ -1856,3 +1856,117 @@ test.describe('the timeline builder', () => {
     expect(await spanOf(page, 0)).toEqual(before)
   })
 })
+
+test.describe('the nutrition builder', () => {
+  const GOOD_CODE = '۰۰۰۰۰۰'
+
+  const phoneFor = (testCode: string, project: string) => {
+    const projectCode = project === 'chromium' ? '160' : '161'
+    const ascii = `0912${testCode}${projectCode}9`
+    return [...ascii].map((d) => '۰۱۲۳۴۵۶۷۸۹'[Number(d)]).join('')
+  }
+
+  const openBuilder = async (page: import('@playwright/test').Page, phone: string) => {
+    await page.goto('/sign-in')
+    await page.getByLabel('شماره‌ی موبایل').fill(phone)
+    await page.getByRole('button', { name: 'ارسال کد' }).click()
+    await page.getByLabel('کد تأیید').fill(GOOD_CODE)
+    await page.getByRole('button', { name: 'تأیید و ورود' }).click()
+    await expect(page).not.toHaveURL(/\/sign-in/)
+
+    await page.goto('/nutrition')
+    await page.getByRole('button', { name: 'ساختن برنامه‌ی تغذیه' }).click()
+    await expect(page.getByRole('button', { name: 'ذخیره' })).toBeVisible()
+  }
+
+  /** Which meal an item sits under, by DOM containment rather than by index. */
+  const mealHoldingFood = async (page: import('@playwright/test').Page, food: string) => {
+    const item = page.locator('[data-testid^="item-"]').filter({
+      has: page.locator(`input[value="${food}"]`),
+    })
+    return (await item.locator('xpath=ancestor::li[starts-with(@data-testid,"meal-")]').getAttribute(
+      'data-testid',
+    ))!
+  }
+
+  test('@critical an item is added to its own meal, and both levels persist', async ({ page }) => {
+    /*
+     * The nesting itself, end to end. Two meals each with an item, saved and reloaded: if either
+     * `childIds` or the commit's per-meal ordering were wrong the items would come back merged
+     * into one meal or attached to the root, and nothing shallower than this would notice.
+     */
+    await openBuilder(page, phoneFor('111', test.info().project.name))
+    await page.getByRole('button', { name: 'افزودن وعده' }).click()
+    await expect(page.locator('[data-testid^="meal-"]')).toHaveCount(2)
+
+    await page.getByRole('button', { name: 'افزودن خوراک' }).first().click()
+    await page.getByRole('button', { name: 'افزودن خوراک' }).nth(1).click()
+    // Both fields exist before either is typed into, so a fill cannot race a re-render.
+    await expect(page.getByLabel('خوراک', { exact: true })).toHaveCount(2)
+    await page.getByLabel('خوراک', { exact: true }).first().fill('برنج')
+    await page.getByLabel('خوراک', { exact: true }).nth(1).fill('ماست')
+
+    await page.getByRole('button', { name: 'ذخیره' }).click()
+    await page.reload()
+
+    await expect(page.locator('[data-testid^="meal-"]')).toHaveCount(2)
+    // One item under each meal, not two under one.
+    const meals = page.locator('[data-testid^="meal-"]')
+    await expect(meals.nth(0).locator('[data-testid^="item-"]')).toHaveCount(1)
+    await expect(meals.nth(1).locator('[data-testid^="item-"]')).toHaveCount(1)
+    await expect(page.getByLabel('خوراک', { exact: true }).first()).toHaveValue('برنج')
+  })
+
+  test('@critical moving an item between meals re-parents it, and undo puts it back', async ({
+    page,
+  }) => {
+    /*
+     * `MoveNodes` with a changed parent — a path that existed in the engine from the start with no
+     * consumer until this builder. The assertion is on DOM CONTAINMENT, because an index-based
+     * check passes just as well if the item never left its original meal.
+     */
+    await openBuilder(page, phoneFor('222', test.info().project.name))
+    await page.getByRole('button', { name: 'افزودن وعده' }).click()
+    await page.getByRole('button', { name: 'افزودن خوراک' }).first().click()
+    await page.getByLabel('خوراک', { exact: true }).first().fill('شیک')
+
+    const origin = await mealHoldingFood(page, 'شیک')
+    const target = (await page
+      .locator('[data-testid^="meal-"]')
+      .nth(1)
+      .getAttribute('data-testid'))!
+    expect(target).not.toBe(origin)
+
+    // The select is labelled with the meal it would move INTO; its values are meal node ids.
+    await page.getByLabel('در وعده‌ی').first().selectOption(target.replace('meal-', ''))
+    expect(await mealHoldingFood(page, 'شیک')).toBe(target)
+
+    await page.getByRole('button', { name: 'واگرد' }).click()
+    expect(await mealHoldingFood(page, 'شیک')).toBe(origin)
+  })
+
+  test('@critical removing a meal takes its items, and ONE undo brings them all back', async ({
+    page,
+  }) => {
+    /*
+     * `RemoveNode`'s subtree capture into `InsertSubtree`, which had no consumer outside the
+     * engine's own unit tests. A builder that tracked the items itself would restore the meal and
+     * lose what was in it — the failure this exists to rule out.
+     */
+    await openBuilder(page, phoneFor('333', test.info().project.name))
+    await page.getByRole('button', { name: 'افزودن خوراک' }).first().click()
+    await page.getByRole('button', { name: 'افزودن خوراک' }).first().click()
+    await page.getByLabel('خوراک', { exact: true }).first().fill('جو دوسر')
+    await expect(page.locator('[data-testid^="item-"]')).toHaveCount(2)
+
+    await page.getByRole('button', { name: /^حذف وعده/ }).first().click()
+    await expect(page.locator('[data-testid^="meal-"]')).toHaveCount(0)
+    await expect(page.locator('[data-testid^="item-"]')).toHaveCount(0)
+    await expect(page.getByText('این برنامه هنوز وعده‌ای ندارد.')).toBeVisible()
+
+    await page.getByRole('button', { name: 'واگرد' }).click()
+    await expect(page.locator('[data-testid^="meal-"]')).toHaveCount(1)
+    await expect(page.locator('[data-testid^="item-"]')).toHaveCount(2)
+    await expect(page.getByLabel('خوراک', { exact: true }).first()).toHaveValue('جو دوسر')
+  })
+})

@@ -51,6 +51,9 @@ importers:
       '@fitnessos/ctx-measurement':
         specifier: workspace:*
         version: link:../../packages/ctx-measurement
+      '@fitnessos/ctx-nutrition':
+        specifier: workspace:*
+        version: link:../../packages/ctx-nutrition
       '@fitnessos/ctx-prescription':
         specifier: workspace:*
         version: link:../../packages/ctx-prescription
@@ -661,6 +664,9 @@ importers:
       '@fitnessos/ctx-measurement':
         specifier: workspace:*
         version: link:../ctx-measurement
+      '@fitnessos/ctx-nutrition':
+        specifier: workspace:*
+        version: link:../ctx-nutrition
       '@fitnessos/ctx-prescription':
         specifier: workspace:*
         version: link:../ctx-prescription

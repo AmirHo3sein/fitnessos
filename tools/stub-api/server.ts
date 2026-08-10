@@ -40,6 +40,7 @@ import {
   CheckInFormSchema,
   DashboardSchema,
   DecisionOutcomeSchema,
+  NutritionPlanSchema,
   PlanSchema,
   ReportSchema,
   IndicatorSeriesSchema,
@@ -138,6 +139,9 @@ const reports = new Map<string, unknown>()
 
 /** Dashboards, one per phone. Replaced wholesale, like the form and the report. */
 const dashboards = new Map<string, unknown>()
+
+/** Nutrition plans, one per phone. Same wholesale replace. */
+const nutritionPlans = new Map<string, unknown>()
 
 /** Plans, one per phone. Same wholesale replace. */
 const plans = new Map<string, unknown>()
@@ -576,6 +580,7 @@ const handlers: Record<string, (req: IncomingMessage, res: ServerResponse) => Pr
     reports.clear()
     dashboards.clear()
     plans.clear()
+    nutritionPlans.clear()
     faults.clear()
     res.writeHead(204).end()
     return Promise.resolve()
@@ -931,6 +936,35 @@ const handlers: Record<string, (req: IncomingMessage, res: ServerResponse) => Pr
     send(res, 200, PlanSchema, body.data)
   },
 
+  'GET /api/v1/nutrition-plans/current': async (req, res) => {
+    const phone = phoneFromToken(cookiesOf(req)['access_token'])
+    if (phone === null) {
+      problem(res, 401, 'unauthenticated', 'no valid session')
+      return
+    }
+    const stored = nutritionPlans.get(phone)
+    if (stored === undefined) {
+      res.writeHead(204).end()
+      return
+    }
+    send(res, 200, NutritionPlanSchema, stored)
+  },
+
+  'PUT /api/v1/nutrition-plans/:planId': async (req, res) => {
+    const phone = phoneFromToken(cookiesOf(req)['access_token'])
+    if (phone === null) {
+      problem(res, 401, 'unauthenticated', 'no valid session')
+      return
+    }
+    const body = NutritionPlanSchema.safeParse(await readBody(req))
+    if (!body.success) {
+      problem(res, 400, 'invalid_request', body.error.issues[0]?.message ?? 'invalid')
+      return
+    }
+    nutritionPlans.set(phone, body.data)
+    send(res, 200, NutritionPlanSchema, body.data)
+  },
+
   'GET /api/v1/proposals': async (req, res) => {
     const phone = phoneFromToken(cookiesOf(req)['access_token'])
     if (phone === null) {
@@ -1024,6 +1058,10 @@ createServer((req, res) => {
     .replace(/^\/api\/v1\/reports\/(?!current$)[^/]+$/, '/api/v1/reports/:reportId')
     .replace(/^\/api\/v1\/dashboards\/(?!current$)[^/]+$/, '/api/v1/dashboards/:dashboardId')
     .replace(/^\/api\/v1\/plans\/(?!current$)[^/]+$/, '/api/v1/plans/:planId')
+    .replace(
+      /^\/api\/v1\/nutrition-plans\/(?!current$)[^/]+$/,
+      '/api/v1/nutrition-plans/:planId',
+    )
   const routeKey = `${req.method ?? 'GET'} ${path}`
   const handler = handlers[routeKey]
 

@@ -442,6 +442,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/nutrition-plans/current": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The athlete's current nutrition plan */
+        get: operations["getCurrentNutritionPlan"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/nutrition-plans/{planId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Create or replace a nutrition plan
+         * @description PUT, like the other authored artefacts: nothing references a meal or an item, so replacing the plan cannot make anything else unreadable.
+         */
+        put: operations["saveNutritionPlan"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -896,6 +933,35 @@ export interface components {
             epoch: string;
             /** @description MUST NOT overlap: an athlete is in one phase at a time, and two overlapping phases make 'what am I doing this week' unanswerable. Order is not significant -- the client sorts by start. */
             phases: components["schemas"]["Phase"][];
+        };
+        MealItem: {
+            /**
+             * Format: uuid
+             * @description Unique across the whole PLAN, not per meal: these are node ids in the editor's flat document, so two items sharing one would be a single node with two parents.
+             */
+            id: string;
+            /** @description The coach's words. NOT a catalogue reference -- ADR-0012 makes catalogue versioning a prerequisite for historical display fidelity and it is still pending. */
+            food: string;
+            /** @description Free text: '200 g', '1 cup', 'a handful'. Constraining it to a catalogue's units would be pretending the catalogue exists. */
+            amount: string;
+            /** @description Zero-based WITHIN its meal. Exactly 0..n-1, each once. */
+            order: number;
+        };
+        Meal: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** @description Free text -- 'post-training', 'before bed'. Not a clock reading: neither of those is one, and a time field would force one into the other's shape. */
+            when: string;
+            items: components["schemas"]["MealItem"][];
+            order: number;
+        };
+        /** @description Meals and what is in them -- the only NESTED document in this API. No nutrient totals: computing them needs a versioned food catalogue (ADR-0012, pending), and without one a plan would silently change meaning whenever a catalogue entry was corrected. */
+        NutritionPlan: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            meals: components["schemas"]["Meal"][];
         };
     };
     responses: {
@@ -1680,6 +1746,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Plan"];
+                };
+            };
+            /** @description invalid */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    getCurrentNutritionPlan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ok */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NutritionPlan"];
+                };
+            };
+            /** @description no plan yet */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    saveNutritionPlan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                planId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NutritionPlan"];
+            };
+        };
+        responses: {
+            /** @description saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NutritionPlan"];
                 };
             };
             /** @description invalid */

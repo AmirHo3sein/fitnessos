@@ -18,3 +18,4 @@
  */
 export * from './domain/NutritionPlan'
 export * from './editor/schema'
+export * from './application/index'

@@ -1018,6 +1018,89 @@
           }
         }
       }
+    },
+    "/nutrition-plans/current": {
+      "get": {
+        "operationId": "getCurrentNutritionPlan",
+        "tags": [
+          "nutrition"
+        ],
+        "summary": "The athlete's current nutrition plan",
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NutritionPlan"
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "no plan yet"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/nutrition-plans/{planId}": {
+      "put": {
+        "operationId": "saveNutritionPlan",
+        "tags": [
+          "nutrition"
+        ],
+        "summary": "Create or replace a nutrition plan",
+        "description": "PUT, like the other authored artefacts: nothing references a meal or an item, so replacing the plan cannot make anything else unreadable.",
+        "parameters": [
+          {
+            "name": "planId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NutritionPlan"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NutritionPlan"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2344,6 +2427,97 @@
           }
         },
         "description": "A periodisation laid out on time. Distinct from a ProgramVersion, which says WHAT the training is with no dates; this says WHEN and nothing about content, so a taper can move without revising a block."
+      },
+      "MealItem": {
+        "type": "object",
+        "required": [
+          "id",
+          "food",
+          "amount",
+          "order"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique across the whole PLAN, not per meal: these are node ids in the editor's flat document, so two items sharing one would be a single node with two parents."
+          },
+          "food": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The coach's words. NOT a catalogue reference -- ADR-0012 makes catalogue versioning a prerequisite for historical display fidelity and it is still pending."
+          },
+          "amount": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Free text: '200 g', '1 cup', 'a handful'. Constraining it to a catalogue's units would be pretending the catalogue exists."
+          },
+          "order": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Zero-based WITHIN its meal. Exactly 0..n-1, each once."
+          }
+        }
+      },
+      "Meal": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "when",
+          "items",
+          "order"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "when": {
+            "type": "string",
+            "description": "Free text -- 'post-training', 'before bed'. Not a clock reading: neither of those is one, and a time field would force one into the other's shape."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MealItem"
+            }
+          },
+          "order": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "NutritionPlan": {
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "meals"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "meals": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/components/schemas/Meal"
+            }
+          }
+        },
+        "description": "Meals and what is in them -- the only NESTED document in this API. No nutrient totals: computing them needs a versioned food catalogue (ADR-0012, pending), and without one a plan would silently change meaning whenever a catalogue entry was corrected."
       }
     }
   }
