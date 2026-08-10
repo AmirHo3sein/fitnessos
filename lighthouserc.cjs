@@ -83,8 +83,13 @@ module.exports = {
     },
     assert: {
       assertions: {
-        // --- category scores: loose, because they are blends and they wobble ---
-        'categories:performance': ['warn', { minScore: 0.8 }],
+        /*
+         * --- category scores: loose, because they are blends and they wobble ---
+         *
+         * 0.9 rather than 0.8, from measurement: nine warm samples on a GitHub runner came in at
+         * 95, 95, 96 across the three routes. 0.8 was a guess that could not have failed.
+         */
+        'categories:performance': ['warn', { minScore: 0.9 }],
         'categories:accessibility': ['error', { minScore: 1 }],
         'categories:best-practices': ['error', { minScore: 0.9 }],
         'categories:seo': ['warn', { minScore: 0.9 }],
@@ -96,25 +101,28 @@ module.exports = {
 
         // --- metrics: tight, because a change here is a real change ---
         // Near-deterministic for a static layout. If it moves, something shifted after paint —
-        // which is the one thing a screenshot suite structurally cannot notice.
+        // which is the one thing a screenshot suite structurally cannot notice. Measured at exactly
+        // 0.000 on all nine warm samples, which is what the claim of determinism looks like when it
+        // is true.
         'cumulative-layout-shift': ['error', { maxNumericValue: 0.02 }],
         /*
-         * `warn`, not `error`, until this has been measured on a runner.
+         * Back to `error` at 3.5 s — the same number as before, but now MEASURED here rather than
+         * transplanted from a laptop.
          *
-         * The 3.5 s gate sits above a 2.8 s measurement — taken on a developer's Mac, which is the
-         * only place this config has ever run. A CI runner is slower and self-contended: it hosts the
-         * Next server, the stub, headless Chrome and lhci on a couple of vCPUs, and both public
-         * routes are `force-dynamic` (per-request CSP nonce), so every one of the nine page loads is
-         * a fresh server render with no prerendered HTML anywhere. 700 ms of headroom is not
-         * obviously enough, and an `error` on a number never observed in the environment that will
-         * produce it is a gate that fails for a reason nobody caused — which is how a gate gets
-         * disabled.
+         * The history is worth keeping, because it is an argument for not guessing. The gate was
+         * originally `error` at 3500 against a 2.8 s measurement taken on macOS, the only place this
+         * config had ever run. It was downgraded to `warn` before the first CI run on the grounds
+         * that 700 ms of headroom on an unmeasured, self-contended runner was not obviously enough.
+         * The first run came in at **3504 ms** — four milliseconds over. As an `error` it would have
+         * failed a run in which nothing was wrong.
          *
-         * Restore it to `error` with a threshold taken from the first few scheduled runs. CLS stays
-         * an error: it is near-deterministic for a static layout and the font is self-hosted and
-         * preloaded, so it does not depend on machine speed.
+         * That 3504 turned out to be cold start rather than the page: `/` was the first URL audited
+         * and paid for Next's first compile of a `force-dynamic` route. With the routes warmed before
+         * collection (see `scheduled.yml`), nine samples across the three routes give LCP 2589–2775 ms
+         * — a 7% spread. 3500 is 26% above the worst of them and still below the 4 s Lighthouse calls
+         * poor, so it catches a real regression and tolerates runner variance.
          */
-        'largest-contentful-paint': ['warn', { maxNumericValue: 3500 }],
+        'largest-contentful-paint': ['error', { maxNumericValue: 3500 }],
         'total-blocking-time': ['warn', { maxNumericValue: 400 }],
         /*
          * Asserted on SAVINGS, not on count — the first version used `maxLength: 0` and was
@@ -126,6 +134,8 @@ module.exports = {
          * What this catches is a blocking SCRIPT, or a stylesheet that grows enough to cost real
          * time. Both move the savings number; neither is visible in a count.
          */
+        // Measured at 0 ms of estimated savings on all nine warm samples, so the 100 ms error gate has
+        // the whole budget spare — it is watching for a blocking SCRIPT appearing, not for drift.
         'render-blocking-resources': ['error', { maxNumericValue: 100 }],
 
         // Informational rather than blocking. Next inlines and splits on its own terms, and
