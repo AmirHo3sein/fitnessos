@@ -43,6 +43,8 @@ export default async function LayoutPage({
           noneHint: t('noneHint'),
           create: t('create'),
           loading: t('loading'),
+          loadFailed: t('loadFailed'),
+          retry: t('retry'),
           saveFailed: t('saveFailed'),
           newTitle: t('newTitle'),
           builder: {

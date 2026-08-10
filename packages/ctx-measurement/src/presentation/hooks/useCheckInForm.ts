@@ -11,6 +11,17 @@ import { useMeasurementPorts } from '../di'
 export interface UseCheckInForm {
   readonly form: CheckInFormSnapshot | null
   readonly isLoading: boolean
+  /**
+   * The LOAD failed — distinct from "nothing authored yet", and that distinction is load-bearing.
+   *
+   * Both used to arrive at the workspace as `null`, so a transient network failure rendered the
+   * empty state: "nothing has been written yet", beside a Create button. Pressing it PUT a NEW id,
+   * and because the server keys "current" per athlete, the artefact that merely failed to load was
+   * overwritten by an empty one. Silent data loss from a dropped request.
+   */
+  readonly loadFailed: boolean
+  /** Refetch, so the answer to a failed load is one press rather than a full reload. */
+  readonly retry: () => void
   /** Resolves TRUE when the save reached the server — what moves the editor's commit boundary. */
   readonly save: (form: CheckInFormSnapshot) => Promise<boolean>
   readonly isSaving: boolean
@@ -44,6 +55,10 @@ export const useCheckInForm = (): UseCheckInForm => {
   return {
     form: query.data ?? null,
     isLoading: query.isPending,
+    loadFailed: query.isError,
+    retry: () => {
+      void query.refetch()
+    },
     save: async (form) => {
       try {
         await mutation.mutateAsync(form)

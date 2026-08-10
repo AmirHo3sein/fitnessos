@@ -48,6 +48,8 @@ export default async function PlanPage({
           noneHint: t('noneHint'),
           create: t('create'),
           loading: t('loading'),
+          loadFailed: t('loadFailed'),
+          retry: t('retry'),
           saveFailed: t('saveFailed'),
           newTitle: t('newTitle'),
           firstPhase: t('firstPhase'),

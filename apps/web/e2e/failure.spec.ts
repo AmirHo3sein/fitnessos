@@ -11,6 +11,18 @@ import { expect, test, type Page } from '@playwright/test'
  * The fault lives in the stub instead (`POST /__fault`), which is already a fabrication and never
  * ships. A test arms a route, then drives the UI normally.
  *
+ * ## An intermittent that was observed once and not reproduced
+ *
+ * One parallel run of this file failed three tests — two programme scans and the check-in load — and
+ * every one of them passed in isolation immediately afterwards, and the same parallel invocation
+ * passed 24/24 on the next attempt, and two consecutive full-suite runs passed 255/255. No
+ * mechanism was established, so none is claimed here.
+ *
+ * One nearby cause WAS found and fixed rather than left to suspicion: `an added block is persisted
+ * with a contiguous order` in `shell.spec.ts` was genuinely racy — it reloaded while a POST was in
+ * flight — and now waits for the commit boundary to move. If failures recur in this file, that is
+ * the shape to look for first: a test that continues before the write it depends on has landed.
+ *
  * ## What is NOT here, and why that is a finding rather than a gap
  *
  * The three error boundaries cannot be reached this way, and it turns out they cannot be reached
@@ -144,6 +156,135 @@ test.describe('a session that ends', () => {
 
     // Landed back at sign-in rather than sitting on a shell that 401s forever.
     await expect(page).toHaveURL(/\/sign-in/, { timeout: 15_000 })
+  })
+})
+
+test.describe('a LOAD that fails, in an authoring screen', () => {
+  test('@critical a nutrition plan that could not be loaded does not look like no plan', async ({
+    page,
+  }) => {
+    /**
+     * The defect this whole pass was looking for, and it is a data-loss path rather than a cosmetic
+     * one.
+     *
+     * Six authoring hooks expose only the MUTATION error. A failed GET leaves the workspace with
+     * `plan === null`, which is exactly what "nothing authored yet" looks like — so a transient
+     * network failure renders "no plan has been written yet" beside a Create button. Pressing it
+     * PUTs a NEW id, and since the server keys "current" per athlete, the plan that merely failed to
+     * load is overwritten by an empty one.
+     *
+     * The Programme route gets this right, which is why nobody noticed: the oldest editor
+     * distinguishes the two states and five later ones copied a hook that does not.
+     */
+    await signIn(page, phoneFor('666', test.info().project.name))
+
+    // Author a plan first, so there IS something to lose.
+    await page.goto('/nutrition')
+    await page.getByRole('button', { name: 'ساختن برنامه‌ی تغذیه' }).click()
+    await expect(page.getByRole('button', { name: 'ذخیره' })).toBeVisible()
+
+    await arm(page, 'GET /api/v1/nutrition-plans/current', 'malformed')
+    await page.goto('/nutrition')
+
+    // Told that it could not be loaded...
+    await expect(page.getByText('برنامه‌ی تغذیه بارگذاری نشد.')).toBeVisible()
+    // ...and NOT invited to create a second one over the top of it.
+    await expect(page.getByRole('button', { name: 'ساختن برنامه‌ی تغذیه' })).toHaveCount(0)
+  })
+
+  test('@critical the same for the automation', async ({ page }) => {
+    await signIn(page, phoneFor('777', test.info().project.name))
+    await page.goto('/automation')
+    await page.getByRole('button', { name: 'ساختن خودکارسازی' }).click()
+    await expect(page.getByTestId('workflow-canvas')).toBeVisible()
+
+    await arm(page, 'GET /api/v1/workflows/current', 'malformed')
+    await page.goto('/automation')
+
+    await expect(page.getByText('خودکارسازی بارگذاری نشد.')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'ساختن خودکارسازی' })).toHaveCount(0)
+  })
+})
+
+test.describe('a save that fails in the newer editors', () => {
+  test('@critical the nutrition builder keeps the meal that could not be saved', async ({ page }) => {
+    await signIn(page, phoneFor('888', test.info().project.name))
+    await page.goto('/nutrition')
+    await page.getByRole('button', { name: 'ساختن برنامه‌ی تغذیه' }).click()
+
+    const name = page.getByLabel('نام وعده').first()
+    await name.fill('پیش از تمرین')
+
+    await arm(page, 'PUT /api/v1/nutrition-plans/:planId', 'server-error')
+    await page.getByRole('button', { name: 'ذخیره' }).click()
+
+    await expect(page.getByText('تغییرات شما ذخیره نشد. تغییرات همچنان اینجاست؛ دوباره تلاش کنید.')).toBeVisible()
+    await expect(name).toHaveValue('پیش از تمرین')
+    // The commit boundary did not move past a save that never happened.
+    await expect(page.getByRole('button', { name: 'واگرد' })).toBeEnabled()
+  })
+
+  test('@critical the workflow builder keeps the graph, and stays reversible', async ({ page }) => {
+    await signIn(page, phoneFor('999', test.info().project.name))
+    await page.goto('/automation')
+    await page.getByRole('button', { name: 'ساختن خودکارسازی' }).click()
+    await expect(page.getByTestId('workflow-canvas')).toBeVisible()
+
+    await page.getByRole('button', { name: 'افزودن کنش' }).click()
+    await expect(page.locator('.react-flow__node')).toHaveCount(2)
+
+    await arm(page, 'PUT /api/v1/workflows/:workflowId', 'server-error')
+    await page.getByRole('button', { name: 'ذخیره' }).click()
+
+    await expect(page.getByText('تغییرات شما ذخیره نشد. تغییرات همچنان اینجاست؛ دوباره تلاش کنید.')).toBeVisible()
+    await expect(page.locator('.react-flow__node')).toHaveCount(2)
+    await expect(page.getByRole('button', { name: 'واگرد' })).toBeEnabled()
+  })
+
+  test('a KEYBOARD move survives a failed save, exactly as a drag does', async ({ page }) => {
+    /*
+     * The arrow-key paths are new, and they dispatch through the same store as a drag — so this
+     * should hold by construction. Asserted anyway, because "by construction" is what was believed
+     * about the commit boundary before an e2e showed it moving on a failed save.
+     */
+    await signIn(page, phoneFor('101', test.info().project.name))
+    await page.goto('/plan')
+    await page.getByRole('button', { name: 'ساختن برنامه' }).click()
+    await expect(page.getByTestId('timeline-track')).toBeVisible()
+
+    const phase = page.locator('[data-testid^="phase-"]').first()
+    await phase.focus()
+    // RTL: later time runs along the reading direction.
+    await page.keyboard.press('ArrowLeft')
+    await expect(phase).toHaveAttribute('data-start', '7')
+
+    await arm(page, 'PUT /api/v1/plans/:planId', 'server-error')
+    await page.getByRole('button', { name: 'ذخیره' }).click()
+
+    await expect(page.getByText('تغییرات شما ذخیره نشد. تغییرات همچنان اینجاست؛ دوباره تلاش کنید.')).toBeVisible()
+    await expect(phase).toHaveAttribute('data-start', '7')
+    await expect(page.getByRole('button', { name: 'واگرد' })).toBeEnabled()
+  })
+
+  test('the check-in form reports a failed LOAD too', async ({ page }) => {
+    /*
+     * The sixth of the six hooks that shared the defect, and the oldest — in a different context
+     * from the two asserted above. The remaining three (report, layout, plan) share the identical
+     * branch, typechecked against the same interface; this covers the one that is furthest from the
+     * others in the codebase rather than pretending six e2e tests of one code path add six things.
+     */
+    await signIn(page, phoneFor('102', test.info().project.name))
+    await page.goto('/check-in')
+    await page.getByRole('button', { name: 'ساختن فرم' }).click()
+    await expect(page.getByRole('button', { name: 'ذخیره' })).toBeVisible()
+
+    await arm(page, 'GET /api/v1/check-in-forms/current', 'malformed')
+    await page.goto('/check-in')
+
+    await expect(page.getByText('فرم بررسی بارگذاری نشد.')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'ساختن فرم' })).toHaveCount(0)
+    // And a retry, so the answer to a dropped request is one press rather than a reload.
+    await expect(page.getByRole('button', { name: 'تلاش دوباره' })).toBeVisible()
   })
 })
 

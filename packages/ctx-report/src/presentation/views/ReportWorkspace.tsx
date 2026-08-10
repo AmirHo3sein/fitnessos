@@ -12,6 +12,15 @@ export interface ReportWorkspaceLabels {
   readonly noneHint: string
   readonly create: string
   readonly loading: string
+  /**
+   * Shown when the LOAD failed, and never shown alongside the create button.
+   *
+   * A separate string from `saveFailed` on purpose: "we could not read your plan" and "we could not
+   * store your change" call for different actions, and one message covering both tells the reader
+   * neither.
+   */
+  readonly loadFailed: string
+  readonly retry: string
   readonly saveFailed: string
   readonly newReportTitle: string
   readonly builder: ReportBuilderLabels
@@ -30,13 +39,31 @@ export interface ReportWorkspaceProps {
  * click before every use with nobody on the other side of it.
  */
 export const ReportWorkspace = ({ locale, labels }: ReportWorkspaceProps) => {
-  const { report, isLoading, save, isSaving, error } = useReport()
+  const { report, isLoading, save, isSaving, error, loadFailed, retry } = useReport()
 
   if (isLoading) {
     return (
       <Card>
         <Skeleton className="h-6 w-48" label={labels.loading} />
         <Skeleton className="mt-3 h-64 w-full" label={labels.loading} />
+      </Card>
+    )
+  }
+
+  /*
+    The load failed. Reported BEFORE the empty state, because both used to look identical from here
+    and the empty state carries a create button — which, pressed after a failed load, PUT a new id
+    over an artefact that was only unreachable. A failed read must never offer to replace what it
+    could not read.
+  */
+  if (loadFailed) {
+    return (
+      <Card>
+        <CardTitle>{labels.title}</CardTitle>
+        <CardDescription>{labels.loadFailed}</CardDescription>
+        <Button type="button" variant="secondary" className="mt-4" onPress={retry}>
+          {labels.retry}
+        </Button>
       </Card>
     )
   }
