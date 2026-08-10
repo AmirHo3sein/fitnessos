@@ -56,6 +56,21 @@ const MIDDLEWARE_BUDGET_KB = 50
 const FIRST_LOAD_BUDGET_KB = 175
 
 /**
+ * Routes allowed a higher first load, with the reason attached to each.
+ *
+ * A per-route exception rather than a raised global, on the same argument as the exclusive budgets:
+ * the global number is what protects the twelve routes that have no business being heavy.
+ */
+const FIRST_LOAD_EXCEPTIONS_KB = [
+  // The Workflow Builder — see the note in ROUTE_BUDGETS_KB. 197.5 kB measured; the canvas is
+  // deferred, so a cold visitor is interactive well before this number is reached.
+  [/^\/\[locale\]\/\(app\)\/automation\//, 205],
+]
+
+const firstLoadBudgetFor = (route) =>
+  FIRST_LOAD_EXCEPTIONS_KB.find(([pattern]) => pattern.test(route))?.[1] ?? FIRST_LOAD_BUDGET_KB
+
+/**
  * Per-route budgets, first match wins.
  *
  * Deliberately not one number for every route. A marketing page and an authenticated
@@ -85,6 +100,33 @@ const FIRST_LOAD_BUDGET_KB = 175
  * would both have shown up here as well as in first load.
  */
 const ROUTE_BUDGETS_KB = [
+  /*
+   * The Workflow Builder. Measured 59 kB exclusive, of which ~53 kB is React Flow.
+   *
+   * The only route in this app with a budget in a different order of magnitude, and the reasons are
+   * written here rather than implied by the number:
+   *
+   * **The library is sanctioned.** Handbook D-11 names React Flow for this editor specifically.
+   * `react-grid-layout` was evaluated for the Dashboard and rejected; the Timeline's dragging is
+   * hand-rolled. This is the one place a library legitimately owns interaction, because edge
+   * routing, viewport transform, handle hit-testing and connection preview are a large amount of
+   * geometry with no product opinion in them.
+   *
+   * **The weight IS deferred, and this tool cannot see it.** The canvas is behind a `lazy`
+   * boundary, so it is not on the path to interactivity — the step list authors a workflow
+   * completely without it. But `app-build-manifest.json` lists a page's async chunks alongside its
+   * initial ones and does not distinguish them, so the number above counts bytes the browser
+   * fetches after first paint. Teaching this tool the difference means reading webpack stats
+   * instead of the manifests, which is a real change and not one to make while landing an editor.
+   *
+   * **Why not raise the general 15 kB.** Twelve other routes sit between 0.1 and 6.9 kB. A budget
+   * loose enough to admit React Flow everywhere would stop catching the two things this file has
+   * actually caught, both of which were an order of magnitude smaller than this.
+   *
+   * So: one route, one number, and a regression here still fails.
+   */
+  [/^\/\[locale\]\/\(app\)\/automation\//, 65],
+
   // The authenticated shell. Measured 9.6 kB exclusive.
   [/^\/\[locale\]\/\(app\)\/layout$/, 20],
 
@@ -200,9 +242,10 @@ for (const [route, files] of Object.entries(appManifest.pages ?? {})) {
     )
   }
 
-  if (firstLoadKb > FIRST_LOAD_BUDGET_KB) {
+  const firstLoadBudget = firstLoadBudgetFor(route)
+  if (firstLoadKb > firstLoadBudget) {
     fail(
-      `route ${route} costs a cold visitor ${firstLoadKb} kB, over the ${FIRST_LOAD_BUDGET_KB} kB ` +
+      `route ${route} costs a cold visitor ${firstLoadKb} kB, over the ${firstLoadBudget} kB ` +
         'first-load budget. Most of this is shared, so the fix is usually in what the route ' +
         'GROUP mounts rather than in the page itself.',
     )

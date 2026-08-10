@@ -1101,6 +1101,89 @@
           }
         }
       }
+    },
+    "/workflows/current": {
+      "get": {
+        "operationId": "getCurrentWorkflow",
+        "tags": [
+          "workflow"
+        ],
+        "summary": "The coach's current automation",
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Workflow"
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "none authored yet"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/workflows/{workflowId}": {
+      "put": {
+        "operationId": "saveWorkflow",
+        "tags": [
+          "workflow"
+        ],
+        "summary": "Create or replace an automation",
+        "description": "PUT, like the other authored artefacts. Unlike them, the stored value CHANGES BEHAVIOUR: an enabled workflow is acted on by the runner, so a 400 on a non-runnable graph with enabled=true is a required check rather than a courtesy.",
+        "parameters": [
+          {
+            "name": "workflowId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Workflow"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Workflow"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid, or enabled with a graph that cannot run",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2518,6 +2601,111 @@
           }
         },
         "description": "Meals and what is in them -- the only NESTED document in this API. No nutrient totals: computing them needs a versioned food catalogue (ADR-0012, pending), and without one a plan would silently change meaning whenever a catalogue entry was corrected."
+      },
+      "WorkflowStep": {
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "detail",
+          "x",
+          "y"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "trigger",
+              "condition",
+              "action"
+            ],
+            "description": "A trigger accepts no incoming edge and offers one output; a condition offers 'true' and 'false'; an action accepts input and offers one output. The client enforces all of it (see BACKEND-CONTRACT 4.8)."
+          },
+          "detail": {
+            "type": "string",
+            "description": "Which event, comparison or effect, in the vocabulary the RUNNER owns. Free text on the wire on purpose: the client does not duplicate that vocabulary, so a workflow authored against a newer server still renders."
+          },
+          "x": {
+            "type": "number",
+            "description": "Canvas coordinate. Layout, not semantics -- two workflows differing only in coordinates behave identically."
+          },
+          "y": {
+            "type": "number"
+          }
+        }
+      },
+      "WorkflowEdge": {
+        "type": "object",
+        "required": [
+          "id",
+          "from",
+          "port",
+          "to"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "from": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "port": {
+            "type": "string",
+            "enum": [
+              "out",
+              "true",
+              "false"
+            ],
+            "description": "WHICH output the edge leaves from -- this is what makes a condition a branch. 'out' for a trigger or an action; 'true'/'false' for a condition."
+          },
+          "to": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "Workflow": {
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "nodes",
+          "edges",
+          "enabled"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "nodes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkflowStep"
+            }
+          },
+          "edges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkflowEdge"
+            }
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether the runner should act on it. A workflow that is not runnable MUST NOT be stored with this true -- see BACKEND-CONTRACT 4.8."
+          }
+        },
+        "description": "A coaching automation: a directed acyclic graph of triggers, conditions and actions. The only GRAPH-shaped document in this API -- every other authored artefact is a list or a list of lists. Nodes carry no order because a graph has none; execution order is derived from the edges."
       }
     }
   }

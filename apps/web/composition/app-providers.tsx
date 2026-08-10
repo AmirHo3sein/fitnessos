@@ -10,6 +10,7 @@ import { ReportPortsProvider } from '@fitnessos/ctx-report/presentation'
 import { DashboardPortsProvider } from '@fitnessos/ctx-dashboard/presentation'
 import { TimelinePortsProvider } from '@fitnessos/ctx-timeline/presentation'
 import { NutritionPortsProvider } from '@fitnessos/ctx-nutrition/presentation'
+import { WorkflowPortsProvider } from '@fitnessos/ctx-workflow/presentation'
 import { useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useRef, type ReactNode } from 'react'
@@ -23,6 +24,7 @@ import { createReportPorts } from './report'
 import { createDashboardPorts } from './dashboard'
 import { createTimelinePorts } from './timeline'
 import { createNutritionPorts } from './nutrition'
+import { createWorkflowPorts } from './workflow'
 import { createHttp } from './container'
 
 /**
@@ -100,6 +102,7 @@ export const AppProviders = ({ children }: { children: ReactNode }) => {
       dashboardLayout: createDashboardPorts(http, {}),
       timeline: createTimelinePorts(http, {}),
       nutrition: createNutritionPorts(http, {}),
+      workflow: createWorkflowPorts(http, {}),
       execution: createExecutionPorts(http, {}, () => {
         void queryClient.invalidateQueries({ queryKey: ['sync-issues'] })
       }),
@@ -116,9 +119,11 @@ export const AppProviders = ({ children }: { children: ReactNode }) => {
                 <DashboardPortsProvider value={ports.dashboardLayout}>
                   <TimelinePortsProvider value={ports.timeline}>
                     <NutritionPortsProvider value={ports.nutrition}>
-                      <ExecutionPortsProvider value={ports.execution}>
-                        {children}
-                      </ExecutionPortsProvider>
+                      <WorkflowPortsProvider value={ports.workflow}>
+                        <ExecutionPortsProvider value={ports.execution}>
+                          {children}
+                        </ExecutionPortsProvider>
+                      </WorkflowPortsProvider>
                     </NutritionPortsProvider>
                   </TimelinePortsProvider>
                 </DashboardPortsProvider>

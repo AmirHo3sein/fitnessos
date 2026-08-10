@@ -479,6 +479,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workflows/current": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The coach's current automation */
+        get: operations["getCurrentWorkflow"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workflows/{workflowId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Create or replace an automation
+         * @description PUT, like the other authored artefacts. Unlike them, the stored value CHANGES BEHAVIOUR: an enabled workflow is acted on by the runner, so a 400 on a non-runnable graph with enabled=true is a required check rather than a courtesy.
+         */
+        put: operations["saveWorkflow"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -962,6 +999,43 @@ export interface components {
             id: string;
             title: string;
             meals: components["schemas"]["Meal"][];
+        };
+        WorkflowStep: {
+            /** Format: uuid */
+            id: string;
+            /**
+             * @description A trigger accepts no incoming edge and offers one output; a condition offers 'true' and 'false'; an action accepts input and offers one output. The client enforces all of it (see BACKEND-CONTRACT 4.8).
+             * @enum {string}
+             */
+            kind: "trigger" | "condition" | "action";
+            /** @description Which event, comparison or effect, in the vocabulary the RUNNER owns. Free text on the wire on purpose: the client does not duplicate that vocabulary, so a workflow authored against a newer server still renders. */
+            detail: string;
+            /** @description Canvas coordinate. Layout, not semantics -- two workflows differing only in coordinates behave identically. */
+            x: number;
+            y: number;
+        };
+        WorkflowEdge: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            from: string;
+            /**
+             * @description WHICH output the edge leaves from -- this is what makes a condition a branch. 'out' for a trigger or an action; 'true'/'false' for a condition.
+             * @enum {string}
+             */
+            port: "out" | "true" | "false";
+            /** Format: uuid */
+            to: string;
+        };
+        /** @description A coaching automation: a directed acyclic graph of triggers, conditions and actions. The only GRAPH-shaped document in this API -- every other authored artefact is a list or a list of lists. Nodes carry no order because a graph has none; execution order is derived from the edges. */
+        Workflow: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            nodes: components["schemas"]["WorkflowStep"][];
+            edges: components["schemas"]["WorkflowEdge"][];
+            /** @description Whether the runner should act on it. A workflow that is not runnable MUST NOT be stored with this true -- see BACKEND-CONTRACT 4.8. */
+            enabled: boolean;
         };
     };
     responses: {
@@ -1813,6 +1887,70 @@ export interface operations {
                 };
             };
             /** @description invalid */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    getCurrentWorkflow: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ok */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Workflow"];
+                };
+            };
+            /** @description none authored yet */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    saveWorkflow: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workflowId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Workflow"];
+            };
+        };
+        responses: {
+            /** @description saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Workflow"];
+                };
+            };
+            /** @description invalid, or enabled with a graph that cannot run */
             400: {
                 headers: {
                     [name: string]: unknown;

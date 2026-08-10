@@ -45,3 +45,38 @@ Object.defineProperty(globalThis, 'matchMedia', {
       dispatchEvent: () => false,
     }) as unknown as MediaQueryList,
 })
+
+/**
+ * `ResizeObserver` does not exist in jsdom either, and React Flow constructs one to measure its
+ * container before it will render anything at all.
+ *
+ * The stub NEVER fires. That is not laziness, it is the honest thing: jsdom has no layout, so any
+ * size it reported would be invented, and a canvas that believed an invented size is exactly how a
+ * geometry assertion passes in a test and fails in a browser. React Flow consequently renders with
+ * a zero-sized viewport here — which is fine for what this tier tests (does the component mount,
+ * does an event translate into the right action) and useless for anything about position, which is
+ * why the Workflow Builder's geometry lives in Playwright.
+ */
+Object.defineProperty(globalThis, 'ResizeObserver', {
+  writable: true,
+  value: class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  },
+})
+
+/**
+ * `DOMMatrixReadOnly`, for the same reason — React Flow parses its container's CSS transform
+ * through it to derive the viewport's zoom.
+ *
+ * Reports the identity transform: no pan, no zoom. A test asserting on a transformed viewport would
+ * be asserting about a number this stub made up.
+ */
+Object.defineProperty(globalThis, 'DOMMatrixReadOnly', {
+  writable: true,
+  value: class {
+    readonly m22 = 1
+    constructor(_transform?: string) {}
+  },
+})

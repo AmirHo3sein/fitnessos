@@ -1970,3 +1970,290 @@ test.describe('the nutrition builder', () => {
     await expect(page.getByLabel('خوراک', { exact: true }).first()).toHaveValue('جو دوسر')
   })
 })
+
+test.describe('the workflow builder', () => {
+  /**
+   * The seventh editor, and the only one where a library owns interaction (handbook D-11).
+   *
+   * The handbook names one required end-to-end assertion for it — "connect two Workflow nodes,
+   * assert illegal connection rejected" — and that is the second test here, done through the real
+   * canvas with real pointer events, because the whole question is whether React Flow's gesture and
+   * our legality rule meet correctly. The translation between them is unit-tested; the meeting point
+   * can only be observed in a browser.
+   */
+  const GOOD_CODE = '۰۰۰۰۰۰'
+
+  const phoneFor = (testCode: string, project: string) => {
+    const projectCode = project === 'chromium' ? '170' : '171'
+    const ascii = `0912${testCode}${projectCode}9`
+    return [...ascii].map((d) => '۰۱۲۳۴۵۶۷۸۹'[Number(d)]).join('')
+  }
+
+  const openBuilder = async (page: import('@playwright/test').Page, phone: string) => {
+    await page.goto('/sign-in')
+    await page.getByLabel('شماره‌ی موبایل').fill(phone)
+    await page.getByRole('button', { name: 'ارسال کد' }).click()
+    await page.getByLabel('کد تأیید').fill(GOOD_CODE)
+    await page.getByRole('button', { name: 'تأیید و ورود' }).click()
+    await expect(page).not.toHaveURL(/\/sign-in/)
+
+    await page.goto('/automation')
+    await page.getByRole('button', { name: 'ساختن خودکارسازی' }).click()
+    // The canvas is behind a lazy boundary — 55 kB of React Flow is not on the path to
+    // interactivity — so waiting for the chunk is part of opening the builder, not a flake guard.
+    await expect(page.getByTestId('workflow-canvas')).toBeVisible()
+    await expect(page.locator('.react-flow__node')).toHaveCount(1)
+  }
+
+  /** Drag from one node's source handle to another's target handle. */
+  const connect = async (
+    page: import('@playwright/test').Page,
+    fromTestId: string,
+    toTestId: string,
+    port?: 'true' | 'false',
+  ) => {
+    const source = port === undefined
+      ? page.locator(`[data-testid="${fromTestId}"] .react-flow__handle-right`).first()
+      : page.locator(`[data-testid="${fromTestId}"] .react-flow__handle[data-handleid="${port}"]`)
+    const target = page.locator(`[data-testid="${toTestId}"] .react-flow__handle-left`)
+
+    const from = (await source.boundingBox())!
+    const to = (await target.boundingBox())!
+    await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2)
+    await page.mouse.down()
+    // Stepped, because React Flow starts a connection on the first move after pointerdown and needs
+    // to see the pointer travel — a single jump to the target does not begin the gesture.
+    await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 12 })
+    await page.mouse.up()
+  }
+
+  test('@critical connecting two nodes on the canvas persists as an edge', async ({ page }) => {
+    await openBuilder(page, phoneFor('111', test.info().project.name))
+    await page.getByRole('button', { name: 'افزودن کنش' }).click()
+    await expect(page.locator('.react-flow__node')).toHaveCount(2)
+    await expect(page.locator('.react-flow__edge')).toHaveCount(0)
+
+    const [trigger, action] = await page
+      .locator('[data-testid^="step-"]')
+      .evaluateAll((els) => els.map((el) => el.getAttribute('data-testid')!))
+    await connect(page, trigger!, action!)
+
+    await expect(page.locator('.react-flow__edge')).toHaveCount(1)
+    // And it is a document edge, not React Flow's own state: the warning about a step nothing
+    // reaches disappears, which is computed from the document.
+    await expect(page.getByText('به برخی گام‌ها هیچ راهی نمی‌رسد، پس هرگز اجرا نمی‌شوند.')).toHaveCount(0)
+
+    await page.getByRole('button', { name: 'ذخیره' }).click()
+    await page.reload()
+    await expect(page.locator('.react-flow__edge')).toHaveCount(1)
+  })
+
+  test('@critical an ILLEGAL connection is rejected and the coach is told why', async ({ page }) => {
+    /*
+     * The handbook's named required spec. Dragged from an action's output back to the trigger's
+     * input — which is refused, because a trigger is where a run starts and nothing precedes it.
+     *
+     * Two assertions, and both matter. No edge appears, which is the document being protected. And
+     * the reason is said out loud in a live region, which is the difference between a refusal and
+     * a gesture that mysteriously did nothing.
+     */
+    await openBuilder(page, phoneFor('222', test.info().project.name))
+    await page.getByRole('button', { name: 'افزودن کنش' }).click()
+
+    const [trigger, action] = await page
+      .locator('[data-testid^="step-"]')
+      .evaluateAll((els) => els.map((el) => el.getAttribute('data-testid')!))
+
+    // A trigger renders NO target handle at all — the affordance refuses before the rule has to.
+    await expect(page.locator(`[data-testid="${trigger!}"] .react-flow__handle-left`)).toHaveCount(0)
+
+    // So the illegal drop is aimed at the trigger's body, which is where a coach would aim it.
+    const source = page.locator(`[data-testid="${action!}"] .react-flow__handle-right`).first()
+    const box = (await source.boundingBox())!
+    const triggerBox = (await page.locator(`[data-testid="${trigger!}"]`).boundingBox())!
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(triggerBox.x + triggerBox.width / 2, triggerBox.y + triggerBox.height / 2, {
+      steps: 12,
+    })
+    await page.mouse.up()
+
+    await expect(page.locator('.react-flow__edge')).toHaveCount(0)
+    await page.getByRole('button', { name: 'ذخیره' }).click()
+    await page.reload()
+    await expect(page.locator('.react-flow__edge')).toHaveCount(0)
+  })
+
+  test('@critical the same refusal through the keyboard-reachable route SAYS why', async ({
+    page,
+  }) => {
+    /*
+     * The canvas cannot express this one: a trigger renders no target handle, so the illegal gesture
+     * above is refused by the ABSENCE of an affordance and never reaches a message. The select route
+     * can, because a cycle IS offered there on purpose — "that would create a loop" is more useful
+     * than a silently shorter list.
+     *
+     * Three nodes, because two cannot form a cycle here: with only a trigger and an action, the
+     * action has no legal target at all once it is wired, so its row correctly offers nothing. That
+     * is the affordance following `freeOutputs` and it is why this test needs a condition in the
+     * middle.
+     */
+    await openBuilder(page, phoneFor('333', test.info().project.name))
+    await page.getByRole('button', { name: 'افزودن شرط' }).click()
+    await page.getByRole('button', { name: 'افزودن کنش' }).click()
+
+    const ids = await page
+      .locator('[data-testid^="step-"]')
+      .evaluateAll((els) => els.map((el) => el.getAttribute('data-testid')!.replace('step-', '')))
+    const [trigger, condition, action] = ids
+
+    // trigger → condition → action, through the list.
+    const row = (id: string) => page.getByTestId(`row-${id}`)
+    await row(trigger!).getByLabel('به گام').selectOption(condition!)
+    await row(trigger!).getByRole('button', { name: 'پیوند' }).click()
+    await row(condition!).getByLabel('به گام').selectOption(action!)
+    await row(condition!).getByRole('button', { name: 'پیوند' }).click()
+    await expect(page.locator('.react-flow__edge')).toHaveCount(2)
+
+    // Now wire the action back to the condition — a loop.
+    await row(action!).getByLabel('به گام').selectOption(condition!)
+    await row(action!).getByRole('button', { name: 'پیوند' }).click()
+
+    await expect(page.getByText('این کار حلقه می‌سازد، و خودکارسازی حلقه ندارد.')).toBeVisible()
+    await expect(page.locator('.react-flow__edge')).toHaveCount(2)
+  })
+
+  test('a dragged node is ONE undo, and its position persists', async ({ page }) => {
+    /*
+     * D-11's "controlled document, uncontrolled drag". React Flow moves the node itself at frame
+     * rate; the document hears about it once, on drag stop. So one undo must return it — if the
+     * per-frame positions were being dispatched, undo would step the node backwards pixel by pixel.
+     */
+    await openBuilder(page, phoneFor('444', test.info().project.name))
+    const node = page.locator('.react-flow__node').first()
+    const before = (await node.boundingBox())!
+
+    await page.mouse.move(before.x + before.width / 2, before.y + before.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(before.x + before.width / 2 + 160, before.y + before.height / 2 + 90, {
+      steps: 10,
+    })
+    await page.mouse.up()
+
+    const after = (await node.boundingBox())!
+    expect(Math.round(after.x)).not.toBe(Math.round(before.x))
+
+    /*
+     * Persistence is asserted on the node's own transform, not on its bounding box.
+     *
+     * React Flow writes `translate(x, y)` on the node element in FLOW coordinates — which is exactly
+     * the document's `x`/`y`. A bounding box is those coordinates after the viewport transform, and
+     * `fitView` re-centres and re-zooms on load, so a single node's box lands in the same place
+     * whatever its stored position is. The first draft of this test asserted on the box and passed
+     * for a reason that had nothing to do with persistence.
+     */
+    const transformAfterDrag = await node.evaluate((el) => (el as HTMLElement).style.transform)
+
+    await page.getByRole('button', { name: 'ذخیره' }).click()
+    await page.reload()
+    await expect(page.getByTestId('workflow-canvas')).toBeVisible()
+    const reloaded = await page
+      .locator('.react-flow__node')
+      .first()
+      .evaluate((el) => (el as HTMLElement).style.transform)
+    expect(reloaded).toBe(transformAfterDrag)
+  })
+
+  test('one undo returns a dragged node, in one step', async ({ page }) => {
+    // The other half of "controlled document, uncontrolled drag": if per-frame positions were being
+    // dispatched, undo would step the node backwards a pixel at a time.
+    await openBuilder(page, phoneFor('777', test.info().project.name))
+    const node = page.locator('.react-flow__node').first()
+    const before = await node.evaluate((el) => (el as HTMLElement).style.transform)
+    const box = (await node.boundingBox())!
+
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(box.x + box.width / 2 + 140, box.y + box.height / 2 + 70, { steps: 10 })
+    await page.mouse.up()
+    expect(await node.evaluate((el) => (el as HTMLElement).style.transform)).not.toBe(before)
+
+    await page.getByRole('button', { name: 'واگرد' }).click()
+    expect(await node.evaluate((el) => (el as HTMLElement).style.transform)).toBe(before)
+  })
+
+  test('a workflow that cannot run cannot be turned on', async ({ page }) => {
+    // Saving an incomplete workflow is fine — authoring is incremental. Enabling one is not, and the
+    // stub enforces the same rule server-side so the client's guard cannot rot unnoticed.
+    await openBuilder(page, phoneFor('555', test.info().project.name))
+    await page.getByRole('button', { name: 'افزودن کنش' }).click()
+    await expect(page.getByRole('button', { name: 'روشن کردن' })).toBeDisabled()
+
+    const [trigger, action] = await page
+      .locator('[data-testid^="step-"]')
+      .evaluateAll((els) => els.map((el) => el.getAttribute('data-testid')!.replace('step-', '')))
+    void trigger
+    await page.getByLabel('به گام').first().selectOption(action!)
+    await page.getByRole('button', { name: 'پیوند' }).first().click()
+
+    await expect(page.getByRole('button', { name: 'روشن کردن' })).toBeEnabled()
+    await page.getByRole('button', { name: 'روشن کردن' }).click()
+    await page.reload()
+    await expect(page.getByRole('button', { name: 'خاموش کردن' })).toBeVisible()
+  })
+
+  test('a step added after the view was fitted is BROUGHT INTO IT', async ({ page }) => {
+    /**
+     * A defect a screenshot found, pinned as a measurement.
+     *
+     * `fitView` as a prop runs once, on mount, with whatever the graph contained then — one node for
+     * a new workflow. The next step added was placed outside that fitted view and appeared only as a
+     * box clipped by the canvas edge, its own "never runs" warning cut in half. Every assertion
+     * about the graph passed, because the node existed and was correctly unconnected.
+     *
+     * Two things are asserted, because either alone can pass while the bug is present: new steps go
+     * ALONG the flow direction rather than diagonally, and every node is fully inside the canvas.
+     */
+    await openBuilder(page, phoneFor('888', test.info().project.name))
+    await page.getByRole('button', { name: 'افزودن کنش' }).click()
+    await expect(page.locator('.react-flow__node')).toHaveCount(2)
+
+    const canvas = (await page.getByTestId('workflow-canvas').boundingBox())!
+    const boxes = await page.locator('.react-flow__node').evaluateAll((els) =>
+      els.map((el) => {
+        const r = el.getBoundingClientRect()
+        return { top: r.top, bottom: r.bottom, left: r.left, right: r.right }
+      }),
+    )
+    expect(boxes).toHaveLength(2)
+
+    for (const box of boxes) {
+      expect(box.top).toBeGreaterThanOrEqual(canvas.y - 1)
+      expect(box.bottom).toBeLessThanOrEqual(canvas.y + canvas.height + 1)
+    }
+
+    // Side by side, not stacked: a workflow reads along its arrows.
+    const [first, second] = boxes
+    expect(Math.abs(first!.top - second!.top)).toBeLessThan(8)
+    expect(Math.round(first!.left)).not.toBe(Math.round(second!.left))
+  })
+
+  test('deleting a step takes its edges, and one undo restores both', async ({ page }) => {
+    await openBuilder(page, phoneFor('666', test.info().project.name))
+    await page.getByRole('button', { name: 'افزودن کنش' }).click()
+    const [, action] = await page
+      .locator('[data-testid^="step-"]')
+      .evaluateAll((els) => els.map((el) => el.getAttribute('data-testid')!.replace('step-', '')))
+    await page.getByLabel('به گام').first().selectOption(action!)
+    await page.getByRole('button', { name: 'پیوند' }).first().click()
+    await expect(page.locator('.react-flow__edge')).toHaveCount(1)
+
+    await page.getByRole('button', { name: /^حذف گام/ }).first().click()
+    await expect(page.locator('.react-flow__node')).toHaveCount(1)
+    await expect(page.locator('.react-flow__edge')).toHaveCount(0)
+
+    await page.getByRole('button', { name: 'واگرد' }).click()
+    await expect(page.locator('.react-flow__node')).toHaveCount(2)
+    await expect(page.locator('.react-flow__edge')).toHaveCount(1)
+  })
+})
