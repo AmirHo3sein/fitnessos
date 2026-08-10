@@ -9,6 +9,31 @@
  * connection anyone in this product will use. Authenticated routes are absent because
  * Lighthouse cannot sign in, and a lab run against a signed-out redirect measures the redirect.
  *
+ * ## Extending it to authenticated routes was tried, and abandoned — with reasons
+ *
+ * Every screen with real weight is behind the login, so a lab metric for the dashboard would be
+ * worth having. Two attempts, both recorded here so the next person does not spend the afternoon
+ * again:
+ *
+ * **`settings.extraHeaders: { Cookie: … }` silently measures the redirect.** A header authenticates
+ * the document request; it puts nothing in the browser's COOKIE JAR. So the shell rendered, then the
+ * client's own `/api/v1/*` calls went out unauthenticated, 401'd, `onSessionLost` fired, and all
+ * three runs finished on `/sign-in`. `finalDisplayedUrl` said so and the reports were full of
+ * "Failed to fetch RSC payload" for every prefetched nav link. It failed loudly only because
+ * `errors-in-console` was asserted at zero — with a looser assertion it would have reported a
+ * healthy score for a page nobody was looking at, which is the worst possible outcome for a
+ * measurement.
+ *
+ * **`collect.puppeteerScript` is the supported answer and costs too much here.** lhci resolves
+ * `puppeteer` to hand over a browser, and adding it means a second Chromium download beside the one
+ * Playwright already manages. That is a large, permanent cost for a lab number, so the answer is no
+ * until something else needs puppeteer anyway.
+ *
+ * What covers that ground instead, imperfectly and knowingly: `tools/bundle-budget.mjs` for bytes
+ * per route including deferred chunks, the axe suite for accessibility on every builder, and the
+ * e2e assertions that canvases have real height. None of them is LCP, CLS or TBT on a throttled
+ * mobile CPU, and that remains a gap rather than something quietly covered.
+ *
  * ## What this adds that the rest of the suite does not
  *
  * Bundle budgets measure bytes. The e2e suite measures behaviour. Neither can see:
