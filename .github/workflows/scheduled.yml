@@ -169,6 +169,21 @@ jobs:
               exit 1
             }
 
+      # Warm every audited route before measuring, and this is not a way of flattering the numbers.
+      #
+      # The first real run showed `/` — the first URL in the list — at TBT 1256 ms and a performance
+      # score of 66, while `/en` and `/sign-in` came in at 142 ms / 96 and 176 ms / 94. The pages are
+      # near-identical; what `/` was paying for was everything that happens once: Next's first
+      # compile of a `force-dynamic` route, the first `getTranslations` load, an empty module cache.
+      #
+      # A threshold set from that number would encode the warm-up rather than the page, and the
+      # penalty would silently move to whichever route happened to be listed first.
+      - name: warm the routes
+        run: |
+          for url in http://127.0.0.1:3000/ http://127.0.0.1:3000/en http://127.0.0.1:3000/sign-in; do
+            curl -fsS -o /dev/null "$url" && curl -fsS -o /dev/null "$url"
+          done
+
       - name: lighthouse
         run: pnpm lighthouse
 
