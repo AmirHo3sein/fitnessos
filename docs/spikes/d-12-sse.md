@@ -94,12 +94,37 @@ stream sufficient — the stream says what happened, and the map decides which q
 
 ---
 
-## What was NOT built, and why
+## The wiring, added after the decision
 
-**The wiring.** `sseClient` and `invalidationMap` exist and are tested; nothing mounts them yet. That
-is deliberate at this boundary: findings 3 and 4 change what a sensible wiring looks like, and the
-auth-loss path has to meet the HTTP client's single-flight refresh — which is a design conversation,
-not a mechanical step. The spike's job was the decision.
+One stream per tab, opened in `AppProviders` — not in a hook a page calls, which would open and close
+it on every navigation and lose events in each gap. An event's kinds go through `keysFor`, and each
+segment is invalidated by prefix.
+
+**Auth recovery reuses the HTTP client rather than reimplementing it.** On a suspected refusal the
+effect makes one authenticated request through the same client the ports use: it single-flights a
+refresh on a 401 and calls `onSessionLost` when the refresh itself fails. If the probe resolves the
+session was fine and the stream reopens; if it throws, the router is already on its way to sign-in. A
+second refresh path would rotate the token behind the first one's back and revoke the session it was
+trying to save. The probe is guarded by a flag, because the suspicion fires per failure and a probe
+per retry is the request storm the design is avoiding.
+
+**When the stream gives up, nothing is shown.** Live invalidation is an enhancement over
+refetch-on-mount, not a promise the product makes; telling someone "live updates have stopped" invites
+them to act on something they cannot affect.
+
+### The invalidation map was wrong on arrival
+
+Four of its five key segments were plausible names rather than real ones — `programme` for `program`,
+`sessions` for `session`, `indicators` for what is actually `measurement`, `proposals` for `learning`.
+Nothing would have failed. Every event would have invalidated a key nothing uses, and the only symptom
+would have been screens that quietly do not update: the least diagnosable class of bug in a TanStack
+Query app, arriving through the mechanism built to prevent it.
+
+`apps/web/composition/invalidation.test.ts` imports the real key factories and asserts every segment
+matches one. It is probe-verified — reverting a segment makes it name the exact offender — and it
+exposed a second problem on the way in: the file sat outside `src/`, so the app's test glob never
+collected it. The suite reported 27 passing tests and exit 0 with this one running zero times, which is
+the failure the vitest config's own comment warns about.
 
 **Anything that carries state on the stream.** An event says what happened; the response is always to
 invalidate and let the normal fetch path produce data. A stream carrying state would be a second

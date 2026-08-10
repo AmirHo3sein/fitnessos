@@ -245,3 +245,82 @@ test.describe('D-12 · row 4 — concurrent streams', () => {
     expect(openCount).toBeGreaterThan(0)
   })
 })
+
+test.describe('event-driven invalidation, wired', () => {
+  test('@critical a published event refreshes an open screen with no reload', async ({ page }) => {
+    /**
+     * The loop the spike was for, end to end and through the product rather than through
+     * `page.evaluate`: the app's own stream, the app's own invalidation map, the app's own query
+     * cache.
+     *
+     * The assertion is deliberately about a screen and not about a network call. A test that counted
+     * requests would pass for a client that refetched on a timer, which is the thing SSE replaces.
+     */
+    await signIn(page, phoneFor('777', test.info().project.name))
+    await page.goto('/sessions')
+    // Something from the sessions query is on screen, so there is a cache entry to invalidate.
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+
+    const requestsBefore = await settledSessionRequests(page)
+
+    // A coach revises the programme elsewhere. `programme-revised` maps to ['program', 'session'].
+    await emit(page, { kind: 'programme-revised' })
+
+    // The session query refetched, without a navigation or a reload.
+    await expect.poll(async () => countSessionRequests(page), { timeout: 10_000 }).toBeGreaterThan(
+      requestsBefore,
+    )
+    expect(page.url()).toContain('/sessions')
+  })
+
+  test('an unknown kind changes nothing', async ({ page }) => {
+    /*
+     * A newer server will publish kinds this build has never heard of. Ignoring them is the design —
+     * "refetch everything" would make each unrecognised event a thundering herd from every open tab —
+     * and this is the assertion that keeps it a decision rather than an accident.
+     */
+    await signIn(page, phoneFor('888', test.info().project.name))
+    await page.goto('/sessions')
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+
+    // Sampled once the page has stopped fetching on its own. The first draft read the count as soon
+    // as the heading appeared, which is before the client query has settled — so the test compared a
+    // number that was still moving and failed for a reason that had nothing to do with the event.
+    const before = await settledSessionRequests(page)
+    await emit(page, { kind: 'something-a-newer-server-sends' })
+
+    // Given time to be wrong in.
+    await page.waitForTimeout(2_000)
+    expect(await countSessionRequests(page)).toBe(before)
+  })
+})
+
+/**
+ * How many times the sessions endpoint has been fetched by this page.
+ *
+ * Counted from the browser's own resource timings rather than by intercepting, so the product is not
+ * altered by the measurement — `page.route` changes the very timing this asserts on.
+ */
+/**
+ * The count, once it has stopped moving.
+ *
+ * Two equal samples 400 ms apart. Without this the baseline is read while the page is still doing its
+ * own first fetches, and the comparison afterwards is against a number that was never stable.
+ */
+const settledSessionRequests = async (page: Page): Promise<number> => {
+  let previous = -1
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const current = await countSessionRequests(page)
+    if (current === previous) return current
+    previous = current
+    await page.waitForTimeout(400)
+  }
+  return previous
+}
+
+const countSessionRequests = (page: Page) =>
+  page.evaluate(() =>
+    performance
+      .getEntriesByType('resource')
+      .filter((entry) => entry.name.includes('/api/v1/sessions')).length,
+  )

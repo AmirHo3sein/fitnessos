@@ -19,5 +19,24 @@ export default mergeConfig(componentTestConfig, {
    * "React is not defined" — a build-configuration error that reads like a missing import.
    */
   esbuild: { jsx: 'automatic' },
-  test: { include: ['src/**/*.test.ts', 'src/**/*.test.tsx'] },
+  /*
+   * `composition/` as well as `src/`, and this was itself the failure the comment above describes.
+   *
+   * `composition/invalidation.test.ts` — which asserts that the event stream's invalidation map
+   * targets query keys that actually exist — sat outside `src/` and was silently not collected. The
+   * suite reported 25 passing tests and exit 0, and the test that would have caught a real defect
+   * ran zero times.
+   *
+   * `composition` is where the container is assembled, so it is exactly where a wiring test belongs.
+   * Widening the glob is the fix; moving the test into `src/` would put it away from the code it is
+   * about in order to satisfy a pattern.
+   */
+  test: {
+    include: [
+      'src/**/*.test.ts',
+      'src/**/*.test.tsx',
+      'composition/**/*.test.ts',
+      'composition/**/*.test.tsx',
+    ],
+  },
 })

@@ -11,11 +11,17 @@
  *
  * Each context owns its own key factory and `infra` must not import from a context — the dependency
  * runs the other way. So the map holds the FIRST SEGMENT of each key, which is the segment those
- * factories all derive from (`['programme', …]`, `['sync-issues']`), and invalidation is by prefix.
+ * factories all derive from (`['program', …]`, `['sync-issues']`), and invalidation is by prefix.
  *
- * That is a real coupling and it is worth naming: this table and those factories agree by
- * convention, not by type. The test asserts the segments exist, which is the cheapest thing that
- * fails when a factory is renamed.
+ * That is a real coupling, it agrees by convention rather than by type, and it was **already wrong
+ * when first written**: four of five segments here were plausible names rather than actual ones —
+ * `programme` for `program`, `sessions` for `session`, `indicators` for the key that is really
+ * `measurement`, `proposals` for `learning`. Nothing would have failed. Every event would have
+ * invalidated a key nothing uses, and the screens would simply not have updated.
+ *
+ * `apps/web/composition/invalidation.test.ts` now imports the REAL factories and asserts every
+ * segment below matches one of them. That test can live there and not here for the same reason this
+ * table holds strings: only the app is allowed to see both sides.
  */
 
 /** An event kind, and the key prefixes it makes stale. */
@@ -25,16 +31,16 @@ export const INVALIDATIONS: Readonly<Record<string, readonly string[]>> = {
    * sessions derive from it — the sessions list is the one that matters, because an athlete looking
    * at today's session while their coach changes it is the case this whole mechanism exists for.
    */
-  'programme-revised': ['programme', 'sessions'],
+  'programme-revised': ['program', 'session'],
 
   /* A session was logged elsewhere (another device, or the offline queue draining). */
-  'session-logged': ['sessions', 'indicators'],
+  'session-logged': ['session', 'measurement'],
 
   /* A measurement arrived, so every derived indicator may have moved. */
-  'observation-recorded': ['indicators'],
+  'observation-recorded': ['measurement'],
 
   /* Learning produced something to judge. */
-  'proposal-raised': ['proposals'],
+  'proposal-raised': ['learning'],
 
   /*
    * A sync issue was recorded by a background drain. The record is already durable — this only

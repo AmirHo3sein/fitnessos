@@ -123,7 +123,7 @@ describe('what the client does with a stream', () => {
 describe('the invalidation map', () => {
   it('maps a programme revision to the sessions the athlete is looking at', () => {
     // The case the mechanism exists for: an athlete on today's session while their coach changes it.
-    expect(keysFor('programme-revised')).toContain('sessions')
+    expect(keysFor('programme-revised')).toContain('session')
   })
 
   it('IGNORES an unknown kind rather than refetching everything', () => {
