@@ -36,7 +36,8 @@
     "plop": "^4.0.1",
     "turbo": "^2.2.3",
     "typescript": "^5.6.3",
-    "vitest": "^3.2.6"
+    "vitest": "^3.2.6",
+    "wait-on": "^9.1.0"
   },
   "pnpm": {
     "overrides": {

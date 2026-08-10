@@ -98,10 +98,23 @@ module.exports = {
         // Near-deterministic for a static layout. If it moves, something shifted after paint —
         // which is the one thing a screenshot suite structurally cannot notice.
         'cumulative-layout-shift': ['error', { maxNumericValue: 0.02 }],
-        // Measured 2.8 s under simulated mobile throttling. The gate sits at 3.5 s — above the
-        // measurement so ordinary run-to-run variance does not fail a build, and below the 4 s
-        // that Lighthouse calls poor, so a genuine regression still trips it.
-        'largest-contentful-paint': ['error', { maxNumericValue: 3500 }],
+        /*
+         * `warn`, not `error`, until this has been measured on a runner.
+         *
+         * The 3.5 s gate sits above a 2.8 s measurement — taken on a developer's Mac, which is the
+         * only place this config has ever run. A CI runner is slower and self-contended: it hosts the
+         * Next server, the stub, headless Chrome and lhci on a couple of vCPUs, and both public
+         * routes are `force-dynamic` (per-request CSP nonce), so every one of the nine page loads is
+         * a fresh server render with no prerendered HTML anywhere. 700 ms of headroom is not
+         * obviously enough, and an `error` on a number never observed in the environment that will
+         * produce it is a gate that fails for a reason nobody caused — which is how a gate gets
+         * disabled.
+         *
+         * Restore it to `error` with a threshold taken from the first few scheduled runs. CLS stays
+         * an error: it is near-deterministic for a static layout and the font is self-hosted and
+         * preloaded, so it does not depend on machine speed.
+         */
+        'largest-contentful-paint': ['warn', { maxNumericValue: 3500 }],
         'total-blocking-time': ['warn', { maxNumericValue: 400 }],
         /*
          * Asserted on SAVINGS, not on count — the first version used `maxLength: 0` and was

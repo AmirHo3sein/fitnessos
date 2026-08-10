@@ -16,6 +16,14 @@ env:
 jobs:
   e2e-full:
     runs-on: ubuntu-latest
+    # The SAME image the committed `-linux` baselines were generated in, pinned to the Playwright
+    # version in the lockfile. This is what makes visual regression meaningful in CI rather than a
+    # source of unexplainable diffs: `ubuntu-latest` and this container do not have the same fonts,
+    # and a screenshot is a picture of fonts. Bump this tag and the Playwright dependency together,
+    # then regenerate the baselines — `docs/ci-baselines.md` has the command.
+    container:
+      image: mcr.microsoft.com/playwright:v1.62.1-noble
+      options: --ipc=host --user pwuser
     env:
       STUB_API_URL: http://127.0.0.1:8791
       INTERNAL_API_URL: http://127.0.0.1:8791/api/v1
@@ -30,8 +38,8 @@ jobs:
       - name: install
         run: pnpm install --frozen-lockfile
 
-      - name: install browsers
-        run: pnpm --filter @fitnessos/web exec playwright install --with-deps chromium
+      # No `playwright install` step: the container already carries the browsers for exactly this
+      # Playwright version, which is half the reason for using it.
 
       - name: build
         run: pnpm --filter @fitnessos/web build
@@ -40,22 +48,52 @@ jobs:
       # a PR: a contrast regression on a page a change did not touch should be caught the same
       # day rather than blocking someone who did not cause it.
       #
-      # Also includes `visual.spec.ts`. Its baselines are PER PLATFORM — font rasterisation
-      # differs between a laptop and this container — so the images committed from a developer's
-      # machine are not consulted here. The first run on a new platform writes its own and
-      # reports them as missing rather than failing; commit those from the run's artefact.
+      # Also includes `visual.spec.ts`, whose baselines are PER PLATFORM: Playwright suffixes them
+      # with `process.platform`, so a `-darwin` image committed from a laptop is not the file this
+      # job looks for.
+      #
+      # ## A correction — the previous version of this comment was wrong in a way that mattered
+      #
+      # It said the first run on a new platform "writes its own and reports them as missing rather
+      # than failing". It does write them, and it FAILS. Verified twice: empirically, by deleting a
+      # baseline and running with CI=1 (the run reports "A snapshot doesn't exist … writing actual"
+      # and exits non-zero), and in the pinned Playwright 1.62.1 source, where `handleMissing`
+      # returns `softError` together with `shouldNotRetryTest: true` — so `retries: 1` cannot mask
+      # it either, deliberately, because a retry would grade the baseline the first attempt just
+      # wrote and manufacture a false pass.
+      #
+      # So this job needs `-linux` baselines to exist. They are committed, generated in the SAME
+      # image this job runs in — see `container:` above and `docs/ci-baselines.md`. Generating them
+      # anywhere else would trade a red build for a diff nobody can explain, because font
+      # rasterisation differs between environments.
       - name: e2e:full
         run: pnpm --filter @fitnessos/web e2e:full
 
+      # `always()`, and the snapshot directory alongside the report.
+      #
+      # The previous version uploaded only `playwright-report` on `failure()`, while the comment
+      # above told the reader to recover baselines from the artefact. Playwright writes baselines to
+      # the snapshot directory, not into the report — the report holds content-hash-named copies —
+      # so the recovery path it described could not have worked.
       - uses: actions/upload-artifact@v4
-        if: failure()
+        if: always()
         with:
           name: playwright-report
-          path: apps/web/playwright-report
+          path: |
+            apps/web/playwright-report
+            apps/web/test-results
+            apps/web/e2e/**-snapshots/**
           retention-days: 7
+          if-no-files-found: warn
 
-  # Stage 15 — Lighthouse, on the routes reachable without a session. Separate job so a browser
-  # download and nine page loads do not sit in the e2e job's critical path.
+  # Stage 15 — Lighthouse, on the routes reachable without a session. Separate job so nine page
+  # loads do not sit in the e2e job's critical path.
+  #
+  # It does NOT download a browser, contrary to what this comment said before: lhci finds Chrome
+  # through `chrome-launcher`'s PATH probing, and `ubuntu-latest` preinstalls google-chrome-stable.
+  # That is a dependency on the runner image which nothing here enforced, so it is now explicit —
+  # the step below fails loudly if Chrome is absent rather than surfacing as an opaque
+  # chrome-launcher error in the one job nobody watches.
   #
   # Scheduled rather than per-PR because a performance SCORE varies by several points between
   # two runs of identical code — a gate that fails for reasons nobody caused is a gate that gets
@@ -80,23 +118,56 @@ jobs:
       - name: build
         run: pnpm --filter @fitnessos/web build
 
+      # Chrome comes from the runner image. Asserted rather than assumed — see the job comment.
+      - name: chrome is present
+        run: google-chrome --version
+
       # The stub is needed even for unauthenticated routes: sign-in posts to it the moment
       # anyone interacts, and a page whose fetches 500 measures a different page.
+      #
+      # `nohup … &` with output redirected, not a bare `&`. Two reasons, both learned from reading
+      # this job rather than from running it: a step whose body is a single backgrounded job returns
+      # immediately, so a stub that crashed on startup was a GREEN step; and a background child
+      # holding the step's stdout open is the classic cause of a step that appears to hang.
       - name: start the stub
-        run: pnpm --filter @fitnessos/stub-api start &
+        run: nohup pnpm --filter @fitnessos/stub-api start > /tmp/stub.log 2>&1 &
 
       - name: start the app
-        run: pnpm --filter @fitnessos/web start &
+        run: nohup pnpm --filter @fitnessos/web start > /tmp/app.log 2>&1 &
 
-      - name: wait for the app
-        run: npx wait-on http://127.0.0.1:3000 --timeout 60000
+      # BOTH, not just the app. Nothing waited for the stub, so a stub that was slow to bind
+      # surfaced minutes later as a console-error assertion failure on an unrelated audit.
+      # `/api/v1/athletes/me` answers 401 without a session, which the e2e config already treats as
+      # a valid readiness signal.
+      #
+      # `pnpm exec`, not `npx`: `wait-on` is now a declared devDependency, so it comes from the
+      # lockfile and sits inside the `pnpm audit` gate rather than being fetched unpinned at run
+      # time — in the very job that runs lhci, whose own dependency tree is why two of this repo's
+      # security overrides exist.
+      - name: wait for the stub and the app
+        run: |
+          pnpm exec wait-on http://127.0.0.1:8791/api/v1/athletes/me --timeout 60000
+          pnpm exec wait-on http://127.0.0.1:3000 --timeout 60000
 
       - name: lighthouse
         run: pnpm lighthouse
 
+      - name: server logs
+        if: failure()
+        run: tail -50 /tmp/stub.log /tmp/app.log || true
+
+      # `include-hidden-files`, because `.lighthouseci` is a dot-directory and upload-artifact
+      # excludes hidden paths by default — the artifact would have been silently empty, and this is
+      # the only way the reports leave the runner (uploading them to a public bucket was refused on
+      # privacy grounds; see the note in lighthouserc.cjs).
+      #
+      # `if-no-files-found: error`, so an empty artifact is a red step rather than a warning nobody
+      # reads.
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: lighthouse-reports
           path: .lighthouseci
+          include-hidden-files: true
+          if-no-files-found: error
           retention-days: 7
