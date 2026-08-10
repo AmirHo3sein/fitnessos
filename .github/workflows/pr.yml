@@ -63,6 +63,13 @@ jobs:
       - name: WCAG contrast
         run: pnpm color:contrast
 
+      # Persian register consistency — a ratchet rather than a style opinion. Sections declare which
+      # second person they speak; drift into the other fails, and a new section with no declaration
+      # fails too. The two sections that are genuinely mixed are recorded as `undecided` and only
+      # reported, because choosing the product's voice is not a regex's decision.
+      - name: Persian register
+        run: pnpm copy:register
+
       # Stage 3
       - name: typecheck
         run: pnpm typecheck
