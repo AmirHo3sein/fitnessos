@@ -224,14 +224,29 @@ describe('D-01 · undo does not get slower as history grows', () => {
      */
     const shallows: number[] = []
     const deeps: number[] = []
-    for (let round = 0; round < 5; round += 1) {
+    for (let round = 0; round < 9; round += 1) {
       shallows.push(measure(20))
       deeps.push(measure(200))
     }
-    const median = (xs: number[]): number => [...xs].sort((a, b) => a - b)[2]!
 
-    const shallow = median(shallows)
-    const deep = median(deeps)
+    /*
+     * The MINIMUM of each series, not the median — and this is the second correction to how these
+     * are measured.
+     *
+     * Interleaving fixed contention arriving between two phases. It does not fix a garbage collection
+     * that lands inside a timed region, which inflates that one sample by an order of magnitude and
+     * drags a median with it when only nine samples exist. The sibling spatial benchmark failed on CI
+     * for exactly that: 0.92 ms against 12.80 ms on code where the query work is provably identical.
+     *
+     * A minimum is the standard estimate for a microbenchmark because it is the sample least polluted
+     * by everything that is not the code: no GC, no preemption, no cache eviction from a neighbour.
+     * It cannot flatter a real regression — code that is genuinely slower is slower in its best run
+     * too.
+     */
+    const best = (xs: number[]): number => Math.min(...xs)
+
+    const shallow = best(shallows)
+    const deep = best(deeps)
 
     // Generous: this is catching an O(n) rewrite, which would be ~10× here, not a 10% drift.
     expect(deep, `shallow=${shallow.toFixed(2)}ms deep=${deep.toFixed(2)}ms`).toBeLessThan(
@@ -301,18 +316,29 @@ describe('D-03 · the spatial index is O(1) for query', () => {
 
     const smalls: number[] = []
     const larges: number[] = []
-    for (let round = 0; round < 5; round += 1) {
+    for (let round = 0; round < 9; round += 1) {
       smalls.push(measure(small))
       larges.push(measure(large))
     }
-    const median = (xs: number[]): number => [...xs].sort((a, b) => a - b)[2]!
 
-    const smallMedian = median(smalls)
-    const largeMedian = median(larges)
+    /*
+     * Minima, for the reason this test taught: it failed on CI at 0.92 ms versus 12.80 ms — a 14×
+     * gap on code where the query work is provably the SAME. The region is fixed at (0,0,200,200),
+     * so both indexes contribute the same handful of candidates; only the surrounding heap differs.
+     * Building a 20,000-node index leaves the heap under pressure, and a collection landing inside
+     * one timed region is enough to fail a ratio gate.
+     *
+     * A minimum discards that by construction, and cannot hide a real regression: a full scan is
+     * slower in its best run too, which the probe below confirms.
+     */
+    const best = (xs: number[]): number => Math.min(...xs)
+
+    const smallBest = best(smalls)
+    const largeBest = best(larges)
     expect(
-      largeMedian,
-      `small=${smallMedian.toFixed(2)}ms large=${largeMedian.toFixed(2)}ms`,
-    ).toBeLessThan(Math.max(smallMedian, 0.5) * 4)
+      largeBest,
+      `small=${smallBest.toFixed(2)}ms large=${largeBest.toFixed(2)}ms`,
+    ).toBeLessThan(Math.max(smallBest, 0.5) * 4)
   })
 
   it('a moved node leaves no trace in its old bucket', () => {

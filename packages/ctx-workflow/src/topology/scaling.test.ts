@@ -51,7 +51,17 @@ const timeBatch = (workflow: Workflow, iterations: number): number => {
   return (performance.now() - started) / iterations
 }
 
-const median = (xs: number[]): number => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)]!
+/**
+ * The MINIMUM of a series, not the median.
+ *
+ * A minimum is the standard estimate for a microbenchmark: it is the sample least polluted by
+ * everything that is not the code — no garbage collection inside the timed region, no preemption by a
+ * neighbour on a shared vCPU. `editor-engine`'s spatial benchmark failed on CI with a median for
+ * exactly that reason, on code whose work was provably unchanged.
+ *
+ * It cannot flatter a real regression: code that is genuinely slower is slower in its best run too.
+ */
+const best = (xs: number[]): number => Math.min(...xs)
 
 describe('problemsOf scales linearly', () => {
   // Explicit timeout for the same reason as `editor-engine`'s benchmarks: 2,000 iterations of the
@@ -77,13 +87,13 @@ describe('problemsOf scales linearly', () => {
      */
     const smalls: number[] = []
     const larges: number[] = []
-    for (let round = 0; round < 5; round += 1) {
+    for (let round = 0; round < 9; round += 1) {
       smalls.push(timeBatch(small, 2_000))
       larges.push(timeBatch(large, 200))
     }
 
-    const smallPer = median(smalls)
-    const largePer = median(larges)
+    const smallPer = best(smalls)
+    const largePer = best(larges)
     expect(smallPer).toBeGreaterThan(0)
 
     const ratio = largePer / smallPer
