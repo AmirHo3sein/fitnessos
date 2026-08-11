@@ -24,6 +24,22 @@ puzzle. The output is written for someone who did not write the client.
   refused, publish a programme version to prove a stale `baseVersionId` is rejected. Do not point this
   at an account whose data matters.
 
+## Before conformance: is it even there?
+
+```sh
+COVERAGE_BASE_URL=https://api.example.test/api/v1 pnpm conformance:coverage
+```
+
+The conformance suite asks "does this behave correctly?" and assumes the endpoint exists. For a backend
+being built from nothing that is the wrong first question — every check would fail for the same
+uninteresting reason. `conformance:coverage` probes all 31 operations unauthenticated and reports which
+are wired, so the number goes from 0/31 to 31/31 as work lands. It is a map, not a gate: an
+unimplemented endpoint is a to-do, not a regression.
+
+It also lists what is absent in the order a vertical slice would want it — auth, then the athlete, then
+goals, then the programme — because that ordering is the difference between a backend you can test
+against and 31 half-built routes.
+
 ## What it does not check
 
 The requirements that are not observable from outside a single request — §3.5 (ordering is not

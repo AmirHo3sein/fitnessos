@@ -12,6 +12,7 @@
     "color:contrast": "node tools/color/contrast-report.mjs",
     "color:lint": "node tools/color/lint-usage.mjs",
     "conformance": "pnpm --filter @fitnessos/conformance test:conformance",
+    "conformance:coverage": "node tools/conformance/coverage.mjs",
     "contracts:generate": "turbo run contracts:generate",
     "copy:register": "node tools/copy/register.mjs",
     "dev:api": "pnpm --filter @fitnessos/stub-api start",
