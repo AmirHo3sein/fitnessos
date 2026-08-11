@@ -519,7 +519,7 @@ test.describe('programme and sessions', () => {
     await signIn(page, PHONE_NO_PROGRAMME)
     await page.goto('/programme')
 
-    await expect(page.getByText('هنوز برنامه‌ای نداری.')).toBeVisible()
+    await expect(page.getByText('هنوز برنامه‌ای ندارید.')).toBeVisible()
     await expect(page.getByRole('status')).toHaveCount(0)
   })
 
@@ -613,7 +613,7 @@ test.describe('offline session logging', () => {
     // The list no longer offers it. A logged session that still appears as upcoming reads as the
     // app not having noticed.
     await page.goto('/sessions')
-    await expect(page.getByText('جلسه‌ای در پیش نداری.')).toBeVisible()
+    await expect(page.getByText('جلسه‌ای در پیش ندارید.')).toBeVisible()
   })
 
   test('@critical a session logged OFFLINE is accepted, not rejected', async ({
@@ -668,7 +668,7 @@ test.describe('offline session logging', () => {
     // And the session is genuinely gone from upcoming, which is only true if the replayed
     // mutation was accepted rather than merely sent.
     await page.goto('/sessions')
-    await expect(page.getByText('جلسه‌ای در پیش نداری.')).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText('جلسه‌ای در پیش ندارید.')).toBeVisible({ timeout: 15_000 })
   })
 
   test('@critical the logger is pre-filled from the prescription', async ({ page }) => {

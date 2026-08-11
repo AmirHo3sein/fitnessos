@@ -2,13 +2,13 @@
   "why": [
     "Persian distinguishes an informal second person (تو: «تلاش کن») from a formal one (شما: «تلاش کنید»).",
     "This file records which one each section speaks, so drift fails a build instead of accumulating.",
-    "It does NOT decide the open question — see `undecided` below. Choosing the product's voice belongs",
-    "to somebody who speaks Persian; informal is common in Iranian fitness apps and formal is safer for",
-    "a coach-facing tool, and that is not a call a regex should make."
+    "The voice was chosen by the product owner, not by this checker: sessions and the programme address",
+    "the athlete as شما. The checker's job is to keep that true, and to fail on any new section that",
+    "does not say which voice it speaks."
   ],
   "observed": {
-    "note": "Measured by tools/copy/register.mjs, not asserted. 339 strings, 12 informal, 15 formal.",
-    "pattern": "Onboarding and goal declaration speak informally to the athlete; everything else is formal. That reads as a deliberate choice and is left alone."
+    "note": "Measured by tools/copy/register.mjs, not asserted. 339 strings, 7 informal, 20 formal.",
+    "pattern": "Sessions and the programme address the athlete as شما — decided by the product owner. Onboarding and goal declaration remain informal (تو): they are the first-run experience and read as a deliberately warmer voice. That split is now declared rather than accidental; converting those two as well is a one-line change here plus the strings the checker would then list."
   },
   "sections": {
     "app": "formal",
@@ -25,31 +25,14 @@
     "nutrition": "formal",
     "onboarding": "informal",
     "plan": "formal",
-    "programme": "undecided",
+    "programme": "formal",
     "public": "formal",
     "report": "formal",
-    "sessions": "undecided"
+    "sessions": "formal"
   },
-  "undecided": {
-    "programme": {
-      "mixture": "3 formal, 1 informal",
-      "informalStrings": ["programme.noProgram — «هنوز برنامه‌ای نداری.»"],
-      "question": "The programme screen is read by the athlete but its system messages were written formally («تغییرات شما ذخیره نشد»). Either the empty state becomes formal, or the system messages become informal."
-    },
-    "sessions": {
-      "mixture": "3 formal, 4 informal",
-      "informalStrings": [
-        "sessions.none — «جلسه‌ای در پیش نداری.»",
-        "sessions.logger.errors.noSets — «حداقل یک ست را پر کن.»",
-        "sessions.logger.errors.loadNotPositive — «… برای وزن بدن خالی بگذار.»",
-        "sessions.logger.errors.generic — «ثبت نشد. دوباره تلاش کن.»"
-      ],
-      "question": "Same question, and this is the screen where it matters most: an athlete logging sets reads informal validation errors and a formal sync-failure message on the same page."
-    }
-  },
+  "undecided": {},
   "howToResolve": [
-    "Pick one register for each undecided section, change that value here, run `pnpm copy:register`,",
-    "and the checker will list exactly which strings now violate it. Five strings in total.",
-    "That is the whole task — it does not require reading all 339."
+    "All sections are decided. To change one, edit its value here and run `pnpm copy:register`;",
+    "it lists exactly which strings violate the new declaration."
   ]
 }
