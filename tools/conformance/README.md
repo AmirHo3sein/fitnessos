@@ -20,6 +20,10 @@ puzzle. The output is written for someone who did not write the client.
   checks agree with the document, and `scheduled.yml` runs it that way nightly.
 - **A session.** Either `CONFORMANCE_COOKIE` (a `Cookie:` header value, for a real backend) or
   `CONFORMANCE_PHONE` to drive the OTP flow, which is what the stub accepts.
+- **Against the stub, a phone ending in `9`.** The stub seeds a programme and prescribed sessions only
+  for those, so any other number produces two failures that say "seed one first" — correct behaviour
+  reported against the wrong cause, and half an hour to work out. `+989126660009` works;
+  `+989126660001` does not.
 - **A disposable account.** Several checks WRITE: they log a session twice to prove the second is
   refused, publish a programme version to prove a stale `baseVersionId` is rejected. Do not point this
   at an account whose data matters.
