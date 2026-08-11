@@ -35,7 +35,7 @@ packages/infra        adapters — http client, mappers, ports implementations
 packages/core         un-graduated bounded contexts; each exposes `./{ctx}` and `./{ctx}/presentation`
 packages/ctx-*        graduated bounded contexts
 packages/ui           shared React layer — primitives, patterns, DI factory
-packages/telemetry    observability seam — closed event vocabulary, no vendor (ADR-0032)
+packages/telemetry    observability seam — closed event vocabulary, sink is our own API (ADR-0032)
 packages/flags        feature flags — closed vocabulary, server-evaluated, no vendor
 packages/design-tokens  the colour system — generated, contrast-gated (see its README)
 packages/editor-engine  document · inverse-action history · spatial index · coordinate spaces
@@ -865,6 +865,7 @@ read as authoritative and be fiction.
 | Authenticated Lighthouse metrics | A decision to take on `puppeteer`. See the note in `lighthouserc.cjs` — the header-based shortcut silently measures a redirect |
 | ADRs 0028, 0030 | The backend repository |
 | Rollout, scaling, incident escalation | A deployment target. Nothing here is written for infrastructure that does not exist |
+| Telemetry grouping and alerting | A vendor, if you ever want one. The sink now posts to our own API — production is no longer silent — but there is no dashboard, no grouping and no symbolisation. Swapping in a vendor is one adapter |
 
 One e2e is skipped on `mobile-rtl`: Playwright refuses to click the timeline's undo button after a
 drag, reporting that the toolbar intercepts pointer events on its own child, while

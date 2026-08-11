@@ -121,9 +121,12 @@ has still had no reader on the backend side.
 
 ## Things that are known-missing, not broken
 
-- **Telemetry has no production sink.** ADR-0032 chose the seam and deliberately no vendor; the
-  blocker is data residency under ADR-0002, which is a decision rather than engineering. Errors are
-  classified and reported to a port that currently drops them in production.
+- **Telemetry has no dashboard.** It does have a sink: `POST /api/v1/telemetry`, same-origin, batched,
+  never retried, beacon-flushed on the way out. So a crash in production is recorded — but there is no
+  grouping, no alerting and no stack symbolisation, because there is no vendor. To find a recent
+  failure you query that table. See BACKEND-CONTRACT §5.7 for what the endpoint must do, and do not
+  let anyone add a free-form field to the event vocabulary: its closedness is why these events needed
+  no data-residency decision.
 - **Offline app startup does not work** and is untested, because it cannot work without a service
   worker — the document itself cannot be fetched. Logging a session offline *does* work; that is the
   case ADR-0033 was built for.
