@@ -447,6 +447,27 @@ disagreement with the cache would be undebuggable. The vocabulary the client act
 `packages/infra/src/events/invalidationMap.ts`; an unrecognised kind is deliberately ignored rather
 than treated as "refetch everything", so adding a kind is safe and renaming one is not.
 
+### 5.7 `POST /telemetry` — cheap, and never the reason a request is slow
+
+The client is fire-and-forget by contract: it does not await the response, does not read it, **never
+retries**, and drops a batch it could not send. That makes this endpoint unusual in both directions.
+
+**Answer 202 and store asynchronously.** Nothing is returned because nothing is read. If persisting is
+slow, persist later — a telemetry write that blocks is a client that is slowest exactly when it is
+already unhealthy.
+
+**At most 50 events per batch.** The client caps its queue and drops the OLDEST past that, so a longer
+body is a client bug rather than something to accommodate.
+
+**Do not add a free-form field.** The vocabulary is closed (`packages/telemetry/src/events.ts`) so that
+a phone number, an athlete's goal in their own words, or a validator message with a value embedded
+*cannot* reach you. A `metadata` map or a `message` string would undo that in one commit, and the
+reason it is closed is ADR-0002's residency position: the events are stored here precisely because
+they contain nothing that needed a residency decision.
+
+**Expect nothing from an unhealthy client.** Silence is a signal, not a bug: a client that cannot reach
+you also cannot tell you so.
+
 ---
 
 ## How to check — run it

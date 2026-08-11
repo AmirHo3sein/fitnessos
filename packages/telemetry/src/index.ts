@@ -23,3 +23,9 @@ export {
 
 export { guarded, noopTelemetry, type TelemetryPort } from './port'
 export { createConsoleTelemetry } from './console'
+export {
+  createHttpTelemetry,
+  type HttpTelemetry,
+  type HttpTelemetryOptions,
+  type Transport,
+} from './http'

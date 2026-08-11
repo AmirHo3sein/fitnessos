@@ -536,6 +536,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/telemetry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * A batch of client telemetry events
+         * @description Fire-and-forget. The client NEVER retries, never awaits, and drops a batch it could not send -- so this endpoint must be cheap and must never be the reason a request is slow. Answer 202 and store asynchronously. The vocabulary is CLOSED (see packages/telemetry/src/events.ts): there is no free-form payload, no message string and no metadata map, deliberately, so that a phone number or an athlete's own words cannot reach it. Do not add one.
+         */
+        post: operations["reportTelemetry"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2001,6 +2021,45 @@ export interface operations {
                 };
                 content: {
                     "text/event-stream": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    reportTelemetry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description At most 50 -- the client caps its queue and drops the OLDEST past that, so a longer body is a client bug rather than something to accommodate. */
+                    events: ({
+                        kind: string;
+                    } & {
+                        [key: string]: unknown;
+                    })[];
+                };
+            };
+        };
+        responses: {
+            /** @description accepted; nothing is returned because the client does not read it */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description malformed batch */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
                 };
             };
             401: components["responses"]["Unauthorized"];

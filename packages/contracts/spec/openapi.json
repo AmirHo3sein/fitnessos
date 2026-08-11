@@ -1220,6 +1220,67 @@
           }
         }
       }
+    },
+    "/telemetry": {
+      "post": {
+        "operationId": "reportTelemetry",
+        "tags": [
+          "telemetry"
+        ],
+        "summary": "A batch of client telemetry events",
+        "description": "Fire-and-forget. The client NEVER retries, never awaits, and drops a batch it could not send -- so this endpoint must be cheap and must never be the reason a request is slow. Answer 202 and store asynchronously. The vocabulary is CLOSED (see packages/telemetry/src/events.ts): there is no free-form payload, no message string and no metadata map, deliberately, so that a phone number or an athlete's own words cannot reach it. Do not add one.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "events"
+                ],
+                "properties": {
+                  "events": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 50,
+                    "description": "At most 50 -- the client caps its queue and drops the OLDEST past that, so a longer body is a client bug rather than something to accommodate.",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "kind"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "accepted; nothing is returned because the client does not read it"
+          },
+          "400": {
+            "description": "malformed batch",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
     }
   },
   "components": {

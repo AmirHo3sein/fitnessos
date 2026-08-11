@@ -477,6 +477,63 @@ test.describe('saving with no network at all', () => {
    */
 })
 
+test.describe('a crash is actually reported', () => {
+  test('@critical a contract violation reaches the telemetry endpoint', async ({ page }) => {
+    /**
+     * ADR-0032 chose the seam and named no vendor, so production was deliberately SILENT — recorded as
+     * a known gap. It is not silent any more, and this is the assertion that says so end to end: a real
+     * failure, classified by the client, arriving at the sink.
+     *
+     * The event carried must be the classified SHAPE, not a message. `contract-violation` reports the
+     * schema name, the field paths and Zod's issue codes — never the validator's text, because
+     * `invalid_enum_value` renders the received value verbatim and a field holding user input would
+     * ship that input off the device.
+     */
+    await signIn(page, phoneFor('401', test.info().project.name))
+
+    await arm(page, 'GET /api/v1/programs/current', 'malformed')
+    await page.goto('/programme')
+    await expect(page.getByText('برنامه بارگذاری نشد.')).toBeVisible()
+
+    // The sink batches and flushes on a timer or on the way out; hiding the page is the way out.
+    await page.evaluate(() => {
+      Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true })
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+
+    const reported = await expect
+      .poll(
+        async () => {
+          const response = await page.request.get('/api/v1/__telemetry')
+          return (await response.json()) as { kind: string; resource?: string }[]
+        },
+        { timeout: 15_000 },
+      )
+      .toEqual(expect.arrayContaining([expect.objectContaining({ kind: 'contract-violation' })]))
+    void reported
+
+    const raw = await (await page.request.get('/api/v1/__telemetry')).text()
+
+    /*
+     * What travelled: the schema name, the field PATHS and Zod's issue CODES.
+     *
+     * A first version of this test asserted that `invalid_type` was absent, which was wrong — codes
+     * are a closed vocabulary and are exactly what makes the event useful. It is the MESSAGE that is
+     * refused, because `invalid_enum_value` renders the received value verbatim and a field holding
+     * user input would ship that input off the device. Codes and messages are not the same thing, and
+     * the test now says which one it means.
+     */
+    expect(raw).toContain('"paths"')
+    expect(raw).toContain('"codes"')
+
+    // What must NOT have travelled: the received VALUE, any message text, and any of the phrasing a
+    // validator uses to describe one.
+    expect(raw).not.toContain('not-a-uuid')
+    expect(raw).not.toContain('"message"')
+    expect(raw).not.toMatch(/Expected|received|Required/)
+  })
+})
+
 test.describe('rate limiting', () => {
   test('a 429 on requesting a code is reported, not retried into', async ({ page }) => {
     /*

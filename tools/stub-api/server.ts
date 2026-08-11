@@ -141,6 +141,12 @@ const reports = new Map<string, unknown>()
 /** Dashboards, one per phone. Replaced wholesale, like the form and the report. */
 const dashboards = new Map<string, unknown>()
 
+/**
+ * Telemetry batches, per phone. Counted rather than inspected: the point of storing them is to let a
+ * test assert that a crash was REPORTED, which is the one thing a silent sink makes impossible.
+ */
+const telemetry = new Map<string, unknown[]>()
+
 /** Workflows, one per phone. Same wholesale replace -- but see the enabled check below. */
 const workflows = new Map<string, unknown>()
 
@@ -619,6 +625,7 @@ const handlers: Record<string, (req: IncomingMessage, res: ServerResponse) => Pr
     plans.clear()
     nutritionPlans.clear()
     workflows.clear()
+    telemetry.clear()
     events.clear()
     faults.clear()
     res.writeHead(204).end()
@@ -847,6 +854,39 @@ const handlers: Record<string, (req: IncomingMessage, res: ServerResponse) => Pr
    * events between the drop and the reconnect are simply lost, and nothing on either side notices.
    * Replaying from the id is what makes a dropped connection recoverable rather than merely survivable.
    */
+  /**
+   * Telemetry. 202 and nothing else — the client never reads the response.
+   *
+   * Deliberately permissive about the event shapes: the closed vocabulary is enforced by the client's
+   * types, and a stub that re-validated it would be a second copy of that list to keep in step. What
+   * it does check is the envelope, because a malformed batch is worth a 400 in the contract.
+   */
+  'POST /api/v1/telemetry': async (req, res) => {
+    const phone = phoneFromToken(cookiesOf(req)['access_token'])
+    if (phone === null) {
+      problem(res, 401, 'unauthenticated', 'no valid session')
+      return
+    }
+    const body = (await readBody(req)) as { events?: unknown }
+    if (!Array.isArray(body.events) || body.events.length === 0) {
+      problem(res, 400, 'invalid_request', 'events must be a non-empty array')
+      return
+    }
+    telemetry.set(phone, [...(telemetry.get(phone) ?? []), ...body.events])
+    res.writeHead(202).end()
+  },
+
+  /** Test-only: what has been reported for this session. */
+  'GET /api/v1/__telemetry': async (req, res) => {
+    const phone = phoneFromToken(cookiesOf(req)['access_token'])
+    if (phone === null) {
+      problem(res, 401, 'unauthenticated', 'no valid session')
+      return
+    }
+    res.writeHead(200, { 'content-type': 'application/json' })
+    res.end(JSON.stringify(telemetry.get(phone) ?? []))
+  },
+
   'GET /api/v1/events': async (req, res) => {
     const phone = phoneFromToken(cookiesOf(req)['access_token'])
     if (phone === null) {
