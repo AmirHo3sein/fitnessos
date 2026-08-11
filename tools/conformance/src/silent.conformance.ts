@@ -70,6 +70,19 @@ describe('§5.2 · a prelude byte on connect', () => {
     // Read nothing; the headers are the assertion.
     await response.body?.cancel()
 
+    /*
+     * The status FIRST, and this was a real defect.
+     *
+     * Pointed at a backend that had not implemented `/events` yet, this check reached straight for
+     * `content-type`, got null, and reported "the given combination of arguments (null and string) is
+     * invalid for this assertion" — a vitest internal error where the useful answer was "the endpoint
+     * is not there". A conformance failure has to name the requirement, not the matcher.
+     */
+    expect(
+      response.status,
+      `the stream must answer 200 for an authenticated request; got ${String(response.status)}`,
+    ).toBe(200)
+
     expect(response.headers.get('content-type')).toContain('text/event-stream')
     expect(
       response.headers.get('cache-control') ?? '',
@@ -106,8 +119,22 @@ describe('§5.3 · the resume position, from the header AND the query string', (
      */
     await emitEvent()
     const all = idsIn(await readStream(1_200))
-    const from = all[0]!
 
+    /*
+     * Asserted before it is used, and this check FALSELY PASSED without it.
+     *
+     * Against a backend with no `/events` yet, `all` was empty, `from` was `undefined`, and
+     * `expect([]).not.toContain(undefined)` passed — reporting conformance for a requirement that was
+     * never exercised. The sibling header-based check happened to assert a length and failed
+     * correctly; this one did not, and a green tick on an unasked question is the worst output a
+     * conformance suite can produce.
+     */
+    expect(
+      all.length,
+      'no events on the stream, so resume-by-parameter could not be exercised — check §5.1 and §5.2',
+    ).toBeGreaterThan(0)
+
+    const from = all[0]!
     const resumed = idsIn(await readStream(1_200, { lastEventId: from, header: false }))
     expect(
       resumed,
