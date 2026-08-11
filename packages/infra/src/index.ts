@@ -38,7 +38,7 @@ export {
   type SseOptions,
   type StreamEvent,
 } from './events/sseClient'
-export { INVALIDATIONS, isKnownKind, keysFor } from './events/invalidationMap'
+export { INVALIDATIONS, isKnownKind, keysFor, RESUME_IMPOSSIBLE } from './events/invalidationMap'
 export {
   createPrescriptionAdapter,
   createPrescriptionWriteAdapter,

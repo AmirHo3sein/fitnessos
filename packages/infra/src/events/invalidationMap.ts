@@ -53,10 +53,29 @@ export const INVALIDATIONS: Readonly<Record<string, readonly string[]>> = {
 export const keysFor = (kind: string): readonly string[] => INVALIDATIONS[kind] ?? []
 
 /**
+ * The one kind that is NOT an entity event, and the one case where refetching everything is right.
+ *
+ * The server sends this when the position we resumed from has fallen out of its replay window
+ * (BACKEND-CONTRACT §5.3). It is deliberately not in `INVALIDATIONS`: those entries say "this thing
+ * changed", and this one says "you have a gap and cannot know what changed".
+ *
+ * The alternative the contract explicitly forbids is the server silently resuming from its newest
+ * event — "the same silent gap with extra steps" — because the client would then believe it was up to
+ * date. Having been told, the only honest response is to invalidate the world, and the thundering-herd
+ * objection that rules that out for an UNKNOWN kind does not apply: this arrives once per reconnect
+ * that outran the window, not once per unrecognised event.
+ */
+export const RESUME_IMPOSSIBLE = 'resume-impossible'
+
+/**
  * Whether an event kind is one we act on.
  *
  * An unknown kind is IGNORED rather than treated as "invalidate everything". A newer server will
  * publish kinds this client has never heard of, and the safe-looking choice — refetch the world —
  * turns every unrecognised event into a thundering herd from every open tab.
+ *
+ * `RESUME_IMPOSSIBLE` is known but absent from the map, because it is answered by a full invalidation
+ * rather than by a key list. `keysFor` returning nothing for it is correct, not an omission.
  */
-export const isKnownKind = (kind: string): boolean => kind in INVALIDATIONS
+export const isKnownKind = (kind: string): boolean =>
+  kind in INVALIDATIONS || kind === RESUME_IMPOSSIBLE

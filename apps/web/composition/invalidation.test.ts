@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { INVALIDATIONS } from '@fitnessos/infra'
+import { INVALIDATIONS, isKnownKind, keysFor, RESUME_IMPOSSIBLE } from '@fitnessos/infra'
 import { athleteKeys } from '@fitnessos/core/athlete'
 import { goalKeys } from '@fitnessos/core/goal'
 import { learningKeys } from '@fitnessos/core/learning'
@@ -58,5 +58,26 @@ describe('every invalidation targets a key that exists', () => {
     // Asserting a known root proves the imports are live.
     expect(REAL_ROOTS).toContain('program')
     expect(REAL_ROOTS).toContain('sync-issues')
+  })
+})
+
+describe('resume-impossible is known, and answered differently', () => {
+  /*
+   * The server sends it when the position we resumed from has fallen out of its replay window
+   * (BACKEND-CONTRACT §5.3). It must NOT be in the map — the entries there say "this thing changed",
+   * and this one says "you have a gap and cannot know what changed", which is answered by invalidating
+   * everything rather than by a key list.
+   *
+   * Asserted because the two properties pull against each other: adding it to `INVALIDATIONS` with a
+   * plausible-looking key list would make `isKnownKind` pass and quietly replace a full invalidation
+   * with a partial one. The gap would stay, and nothing would report it.
+   */
+  it('is recognised', () => {
+    expect(isKnownKind(RESUME_IMPOSSIBLE)).toBe(true)
+  })
+
+  it('yields no key segments, because it is not an entity event', () => {
+    expect(keysFor(RESUME_IMPOSSIBLE)).toEqual([])
+    expect(Object.keys(INVALIDATIONS)).not.toContain(RESUME_IMPOSSIBLE)
   })
 })

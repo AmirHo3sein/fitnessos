@@ -11,7 +11,7 @@ import { DashboardPortsProvider } from '@fitnessos/ctx-dashboard/presentation'
 import { TimelinePortsProvider } from '@fitnessos/ctx-timeline/presentation'
 import { NutritionPortsProvider } from '@fitnessos/ctx-nutrition/presentation'
 import { WorkflowPortsProvider } from '@fitnessos/ctx-workflow/presentation'
-import { keysFor, openEventStream } from '@fitnessos/infra'
+import { keysFor, openEventStream, RESUME_IMPOSSIBLE } from '@fitnessos/infra'
 import { useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useRef, type ReactNode } from 'react'
@@ -161,6 +161,21 @@ export const AppProviders = ({ children, liveInvalidation }: AppProvidersProps) 
       url: '/api/v1/events',
 
       onEvent: (event) => {
+        /*
+         * The server has told us we resumed from a position it no longer holds (BACKEND-CONTRACT
+         * §5.3), so there is a gap and we cannot know what is in it. This is the ONE case where
+         * refetching everything is right — and the reason the server is required to say so rather than
+         * quietly resuming from its newest event, which would leave this client believing it was up to
+         * date while a coach's revision sat unseen.
+         *
+         * Once per reconnect that outran the window, so the thundering-herd objection that rules this
+         * out for an unrecognised kind does not apply here.
+         */
+        if (event.kind === RESUME_IMPOSSIBLE) {
+          void queryClient.invalidateQueries()
+          return
+        }
+
         /*
          * Invalidate by PREFIX, and only for kinds this client knows.
          *
