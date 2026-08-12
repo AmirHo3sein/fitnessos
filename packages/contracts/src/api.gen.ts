@@ -922,6 +922,16 @@ export interface components {
             id: string;
             title: string;
             fields: components["schemas"]["FormField"][];
+            /**
+             * Format: int64
+             * @description The stored revision, returned on every read and every accepted write. Send it back as `baseRevision` when saving (§2.1a). NOT part of the artefact: it is a precondition on a write, and the client keeps it OUTSIDE the editor document — a revision inside an undoable document would be restored by undo and the next save would answer 409 for a reason the author cannot see (ADR-0035).
+             */
+            revision?: number;
+            /**
+             * Format: int64
+             * @description The `revision` this save is replacing (§2.1a). Absent only on a FIRST save, where there is nothing to collide with. Absent against an artefact that already exists is itself a collision — the commonest one, an author who never read what they are about to replace — and answers 409 with the artefact as it now stands.
+             */
+            baseRevision?: number;
         };
         TileContent: {
             /** @enum {string} */
@@ -950,6 +960,16 @@ export interface components {
             title: string;
             /** @description Array ORDER IS PAINT ORDER -- which tile draws on top when two overlap. It must be preserved verbatim; sorting it changes the arrangement the coach made. */
             tiles: components["schemas"]["ReportTile"][];
+            /**
+             * Format: int64
+             * @description The stored revision, returned on every read and every accepted write. Send it back as `baseRevision` when saving (§2.1a). NOT part of the artefact: it is a precondition on a write, and the client keeps it OUTSIDE the editor document — a revision inside an undoable document would be restored by undo and the next save would answer 409 for a reason the author cannot see (ADR-0035).
+             */
+            revision?: number;
+            /**
+             * Format: int64
+             * @description The `revision` this save is replacing (§2.1a). Absent only on a FIRST save, where there is nothing to collide with. Absent against an artefact that already exists is itself a collision — the commonest one, an author who never read what they are about to replace — and answers 409 with the artefact as it now stands.
+             */
+            baseRevision?: number;
         };
         WidgetContent: {
             /** @enum {string} */
@@ -977,6 +997,16 @@ export interface components {
             columns: number;
             /** @description Widgets MUST NOT overlap. Unlike a report's tiles, where list order is paint order, order carries nothing here — the layout is entirely in the coordinates. */
             widgets: components["schemas"]["Widget"][];
+            /**
+             * Format: int64
+             * @description The stored revision, returned on every read and every accepted write. Send it back as `baseRevision` when saving (§2.1a). NOT part of the artefact: it is a precondition on a write, and the client keeps it OUTSIDE the editor document — a revision inside an undoable document would be restored by undo and the next save would answer 409 for a reason the author cannot see (ADR-0035).
+             */
+            revision?: number;
+            /**
+             * Format: int64
+             * @description The `revision` this save is replacing (§2.1a). Absent only on a FIRST save, where there is nothing to collide with. Absent against an artefact that already exists is itself a collision — the commonest one, an author who never read what they are about to replace — and answers 409 with the artefact as it now stands.
+             */
+            baseRevision?: number;
         };
         Phase: {
             /** Format: uuid */
@@ -1010,6 +1040,16 @@ export interface components {
             epoch: string;
             /** @description MUST NOT overlap: an athlete is in one phase at a time, and two overlapping phases make 'what am I doing this week' unanswerable. Order is not significant -- the client sorts by start. */
             phases: components["schemas"]["Phase"][];
+            /**
+             * Format: int64
+             * @description The stored revision, returned on every read and every accepted write. Send it back as `baseRevision` when saving (§2.1a). NOT part of the artefact: it is a precondition on a write, and the client keeps it OUTSIDE the editor document — a revision inside an undoable document would be restored by undo and the next save would answer 409 for a reason the author cannot see (ADR-0035).
+             */
+            revision?: number;
+            /**
+             * Format: int64
+             * @description The `revision` this save is replacing (§2.1a). Absent only on a FIRST save, where there is nothing to collide with. Absent against an artefact that already exists is itself a collision — the commonest one, an author who never read what they are about to replace — and answers 409 with the artefact as it now stands.
+             */
+            baseRevision?: number;
         };
         MealItem: {
             /**
@@ -1039,6 +1079,16 @@ export interface components {
             id: string;
             title: string;
             meals: components["schemas"]["Meal"][];
+            /**
+             * Format: int64
+             * @description The stored revision, returned on every read and every accepted write. Send it back as `baseRevision` when saving (§2.1a). NOT part of the artefact: it is a precondition on a write, and the client keeps it OUTSIDE the editor document — a revision inside an undoable document would be restored by undo and the next save would answer 409 for a reason the author cannot see (ADR-0035).
+             */
+            revision?: number;
+            /**
+             * Format: int64
+             * @description The `revision` this save is replacing (§2.1a). Absent only on a FIRST save, where there is nothing to collide with. Absent against an artefact that already exists is itself a collision — the commonest one, an author who never read what they are about to replace — and answers 409 with the artefact as it now stands.
+             */
+            baseRevision?: number;
         };
         WorkflowStep: {
             /** Format: uuid */
@@ -1076,6 +1126,16 @@ export interface components {
             edges: components["schemas"]["WorkflowEdge"][];
             /** @description Whether the runner should act on it. A workflow that is not runnable MUST NOT be stored with this true -- see BACKEND-CONTRACT 4.8. */
             enabled: boolean;
+            /**
+             * Format: int64
+             * @description The stored revision, returned on every read and every accepted write. Send it back as `baseRevision` when saving (§2.1a). NOT part of the artefact: it is a precondition on a write, and the client keeps it OUTSIDE the editor document — a revision inside an undoable document would be restored by undo and the next save would answer 409 for a reason the author cannot see (ADR-0035).
+             */
+            revision?: number;
+            /**
+             * Format: int64
+             * @description The `revision` this save is replacing (§2.1a). Absent only on a FIRST save, where there is nothing to collide with. Absent against an artefact that already exists is itself a collision — the commonest one, an author who never read what they are about to replace — and answers 409 with the artefact as it now stands.
+             */
+            baseRevision?: number;
         };
     };
     responses: {

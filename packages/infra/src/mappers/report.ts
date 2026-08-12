@@ -1,4 +1,4 @@
-import type { ReportSnapshot, Tile, TileContent } from '@fitnessos/ctx-report'
+import type { Loaded, ReportSnapshot, Tile, TileContent } from '@fitnessos/ctx-report'
 import { ReportSchema, type components } from '@fitnessos/contracts'
 import type { z } from 'zod'
 import { parseContract, type FieldsAgree } from './parse'
@@ -23,25 +23,43 @@ const contentFrom = (raw: ValidatedReport['tiles'][number]['content']): TileCont
         fallbackLabel: raw.fallbackLabel ?? '',
       }
 
-export const reportFrom = (raw: unknown): ReportSnapshot => {
+const snapshotFrom = (c: ValidatedReport): ReportSnapshot => ({
+  id: c.id,
+  title: c.title,
+  tiles: c.tiles.map(
+    (tile): Tile => ({
+      id: tile.id,
+      x: tile.x,
+      y: tile.y,
+      width: tile.width,
+      height: tile.height,
+      content: contentFrom(tile.content),
+    }),
+  ),
+})
+
+export const reportFrom = (raw: unknown): ReportSnapshot =>
+  snapshotFrom(parseContract(ReportSchema, raw, 'Report'))
+
+/**
+ * The report, and the revision to send back when saving it (§2.1a).
+ *
+ * `revision` is read here and left OUT of the snapshot on purpose: the snapshot is the editor's
+ * document, and a revision inside an undoable document is restored by undo — the next save then
+ * answers 409 for a reason the author cannot see (ADR-0035).
+ *
+ * Absent means a server older than §2.1a. That becomes `null` — no base — rather than a default,
+ * because any invented number would satisfy the precondition and overwrite what is stored.
+ */
+export const reportLoadedFrom = (raw: unknown): Loaded<ReportSnapshot> => {
   const c = parseContract(ReportSchema, raw, 'Report')
-  return {
-    id: c.id,
-    title: c.title,
-    tiles: c.tiles.map(
-      (tile): Tile => ({
-        id: tile.id,
-        x: tile.x,
-        y: tile.y,
-        width: tile.width,
-        height: tile.height,
-        content: contentFrom(tile.content),
-      }),
-    ),
-  }
+  return { artefact: snapshotFrom(c), revision: c.revision ?? null }
 }
 
-export const reportBodyFrom = (report: ReportSnapshot): ValidatedReport => {
+export const reportBodyFrom = (
+  report: ReportSnapshot,
+  baseRevision: number | null = null,
+): ValidatedReport => {
   const body = {
     id: report.id,
     title: report.title,
@@ -62,6 +80,9 @@ export const reportBodyFrom = (report: ReportSnapshot): ValidatedReport => {
               fallbackLabel: tile.content.fallbackLabel,
             },
     })),
+    // Omitted entirely on a first save: absent means "nothing is stored yet", and a null on the
+    // wire would be a claim about a revision rather than the absence of one.
+    ...(baseRevision === null ? {} : { baseRevision }),
   }
   return parseContract(ReportSchema, body, 'Report (request)')
 }
@@ -70,6 +91,10 @@ export const REPORT_COVERAGE: Record<keyof ContractReport, true> = {
   id: true,
   title: true,
   tiles: true,
+  // Accounted for beside the document rather than in it: read into `Loaded`, sent back as
+  // `baseRevision`. Covered, and deliberately absent from `ReportSnapshot`.
+  revision: true,
+  baseRevision: true,
 }
 
 const _reportAgrees: FieldsAgree<ContractReport, ValidatedReport> = true

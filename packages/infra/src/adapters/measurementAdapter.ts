@@ -1,5 +1,6 @@
 import type {
   CheckInFormSnapshot,
+  Loaded,
   MeasurementReadPort,
   MeasurementWritePort,
   ObservationSnapshot,
@@ -8,8 +9,8 @@ import type {
 import type { AuthContext, HttpClient } from '../http/client'
 import {
   checkInFormBodyFrom,
-  checkInFormFrom,
   indicatorsFrom,
+  loadedCheckInFormFrom,
   observationFrom,
   observationsFrom,
   recordObservationBodyFrom,
@@ -37,7 +38,7 @@ export const createMeasurementAdapter = (
   indicators: async (signal?: AbortSignal) =>
     indicatorsFrom(await http.request('/indicators', { auth, ...(signal ? { signal } : {}) })),
 
-  checkInForm: async (signal?: AbortSignal): Promise<CheckInFormSnapshot | null> => {
+  checkInForm: async (signal?: AbortSignal): Promise<Loaded<CheckInFormSnapshot> | null> => {
     const raw = await http.request('/check-in-forms/current', {
       auth,
       ...(signal ? { signal } : {}),
@@ -45,14 +46,23 @@ export const createMeasurementAdapter = (
     // A 204 becomes null. "No form yet" is the normal state before a coach authors one, and
     // `undefined` reaching a component is how that becomes a blank screen with no explanation.
     if (raw === undefined || raw === null) return null
-    return checkInFormFrom(raw)
+    return loadedCheckInFormFrom(raw)
   },
 
-  saveCheckInForm: async (form, signal?: AbortSignal): Promise<CheckInFormSnapshot> => {
+  saveCheckInForm: async (
+    form,
+    baseRevision: number | null,
+    signal?: AbortSignal,
+  ): Promise<Loaded<CheckInFormSnapshot>> => {
     // PUT: a form is not versioned, so submitting the same body twice leaves it in the same
     // state. That is what makes a retry safe here without a client-generated request id.
-    const body = checkInFormBodyFrom(form)
-    return checkInFormFrom(
+    //
+    // `baseRevision` is what stops that replace from being last-write-wins now that a coach and
+    // an athlete can both reach it. A stale one, or a missing one against a form that exists, is
+    // refused with 409 (BACKEND-CONTRACT §2.1a) — which the caller sees as a failed save rather
+    // than as work that silently vanished.
+    const body = checkInFormBodyFrom(form, baseRevision)
+    return loadedCheckInFormFrom(
       await http.request(`/check-in-forms/${form.id}`, {
         method: 'PUT',
         body,

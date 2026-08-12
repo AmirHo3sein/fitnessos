@@ -1,6 +1,6 @@
 import { subjectScope, type SubjectId } from '@fitnessos/kernel'
 import type { ReportSnapshot } from '../../editor/schema'
-import type { ReportPorts } from '../ports/index'
+import type { Loaded, ReportPorts } from '../ports/index'
 
 export const reportKeys = {
   all: (subject: SubjectId) => [...subjectScope(subject), 'report'] as const,
@@ -16,7 +16,9 @@ export interface QueryDefinition<T> {
 export const currentReportQuery = (
   ports: ReportPorts,
   subject: SubjectId,
-): QueryDefinition<ReportSnapshot | null> => ({
+  // The ENVELOPE is what is cached, not the snapshot: the revision a save must quote is only
+  // valid for the document it was read with, so caching them apart lets them drift.
+): QueryDefinition<Loaded<ReportSnapshot> | null> => ({
   queryKey: reportKeys.current(subject),
   queryFn: ({ signal }) => ports.report.current(signal),
   // Long: a report changes when a coach edits one, and the editor sets the cache from the save

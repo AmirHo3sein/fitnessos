@@ -197,3 +197,112 @@ describe('§3.3 · 403 and 404 are different answers', () => {
     ).toBe(true)
   })
 })
+
+describe('§2.1a · the other six artefacts refuse a save that did not read what it replaces', () => {
+  it('answers 409 with the artefact as it now stands, and does not overwrite', async () => {
+    /**
+     * §2.1 was written for programme versions, because a programme was the only artefact two people
+     * could plausibly edit when it was written. The other six were PUT with no precondition — safe
+     * while there is exactly one author, and last-write-wins the moment there are two.
+     *
+     * ADR-0033 already rejected that resolution: neither available clock can decide which write is
+     * last. So a coach and an athlete editing one nutrition plan would have had one silently overwrite
+     * the other, with nothing recorded that it happened.
+     *
+     * Checked on `/plans` because it is the artefact with the least nested body — what is under test
+     * is the precondition, and a validation failure would look like a violation while being a badly
+     * built request.
+     */
+    /*
+     * Reads BEFORE it writes, and that is not tidiness.
+     *
+     * The first version of this check assumed a fresh account and opened with a create. Against a
+     * reused one — which is the normal case, since the suite is pointed at a disposable account rather
+     * than a new one each run — the create answered 409 and the failure read as a violation of the
+     * requirement rather than as the check making an assumption. Same trap as the stub's
+     * seeded-programme phone.
+     */
+    const before = await request<{ id?: string; revision?: number }>('/plans/current')
+    expect(
+      [200, 204].includes(before.status),
+      `could not read the current plan; got ${String(before.status)}: ${before.text}`,
+    ).toBe(true)
+
+    const id = before.body?.id ?? newId()
+    const plan = {
+      id,
+      title: 'Conformance season',
+      epoch: '2026-01-05',
+      phases: [{ id: newId(), label: 'Base', start: 0, length: 28 }],
+    }
+
+    // Establish a known state: create if there is nothing, otherwise save onto what is there. A first
+    // save carries no baseRevision, because there is nothing to collide with (§4.9 requires PUT to an
+    // unknown id to create).
+    const established = await request(`/plans/${id}`, {
+      method: 'PUT',
+      body:
+        before.status === 204
+          ? plan
+          : { ...plan, baseRevision: before.body?.revision },
+    })
+    expect(
+      established.status,
+      `a save on the current revision should be accepted; got ${String(established.status)}: ${established.text}`,
+    ).toBe(200)
+
+    /*
+     * A SECOND accepted save, so the revision is at least 2.
+     *
+     * Without it a fresh account sits at revision 1, and the stale case below would have to send
+     * `baseRevision: 0` — which the schema refuses with 400 before the precondition is ever consulted.
+     * The check would then report "expected 409, got 400" and read as a violation of §2.1a when it is
+     * an invalid request. Found exactly that way.
+     */
+    const first = await request<{ revision?: number }>('/plans/current')
+    await request(`/plans/${id}`, {
+      method: 'PUT',
+      body: { ...plan, baseRevision: first.body?.revision },
+    })
+
+    const stored = await request<{ revision?: number; title?: string }>('/plans/current')
+    const revision = stored.body?.revision
+    if (typeof revision !== 'number') {
+      // Reported rather than skipped: without a revision on the read there is nothing for a client to
+      // send back, and the requirement cannot be exercised at all.
+      expect.fail(
+        'GET /plans/current returned no `revision`, so §2.1a could not be exercised — the read must carry it',
+      )
+    }
+
+    // The commonest collision, and the one a naive client produces by default: a save that never read.
+    const blind = await request(`/plans/${id}`, {
+      method: 'PUT',
+      body: { ...plan, title: 'Written blind' },
+    })
+    expect(
+      blind.status,
+      'a save with no baseRevision against an existing artefact must answer 409, not overwrite',
+    ).toBe(409)
+
+    // …and one that read an older version.
+    const stale = await request(`/plans/${id}`, {
+      method: 'PUT',
+      body: { ...plan, title: 'Written from stale', baseRevision: revision - 1 },
+    })
+    expect(stale.status, 'a stale baseRevision must answer 409').toBe(409)
+
+    // Neither attempt changed anything. This is the assertion that actually matters — a 409 that
+    // still wrote would be worse than no 409 at all.
+    const now = await request<{ title?: string; revision?: number }>('/plans/current')
+    expect(now.body?.title, 'a refused save must not have written').toBe('Conformance season')
+    expect(now.body?.revision, 'a refused save must not move the revision').toBe(revision)
+
+    // The correct base is accepted, and the revision moves on.
+    const accepted = await request<{ revision?: number }>(`/plans/${id}`, {
+      method: 'PUT',
+      body: { ...plan, title: 'Written correctly', baseRevision: revision },
+    })
+    expect(accepted.status, 'the current baseRevision must be accepted').toBe(200)
+  })
+})

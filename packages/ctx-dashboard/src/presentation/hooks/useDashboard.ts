@@ -33,16 +33,21 @@ export const useDashboard = (): UseDashboard => {
   const query = useQuery(currentDashboardQuery(ports, subject))
 
   const mutation = useMutation({
-    mutationFn: (dashboard: DashboardSnapshot) => ports.dashboard.save(dashboard),
-    // Set, not invalidate: the response IS the new state, and refetching would leave a window
-    // where the grid and the cache disagree about where a widget is.
+    // The base revision comes from the query cache, never from the editor: the document is
+    // undoable and the precondition must not be (ADR-0035). `null` is a first save — there is
+    // nothing on the server to collide with.
+    mutationFn: (dashboard: DashboardSnapshot) =>
+      ports.dashboard.save(dashboard, query.data?.revision ?? null),
+    // Set, not invalidate: the response IS the new state — including the revision the NEXT save
+    // must send — and refetching would leave a window where the grid and the cache disagree about
+    // where a widget is.
     onSuccess: (saved) => {
       queryClient.setQueryData(dashboardKeys.current(subject), saved)
     },
   })
 
   return {
-    dashboard: query.data ?? null,
+    dashboard: query.data?.artefact ?? null,
     isLoading: query.isPending,
     loadFailed: query.isError,
     retry: () => {

@@ -95,9 +95,28 @@ export interface FormFieldSnapshot {
   readonly order: number
 }
 
+/**
+ * An artefact as the server holds it: the document, and the revision to send back when saving it.
+ *
+ * The revision is deliberately OUTSIDE the snapshot. `CheckInFormSnapshot` is what the editor
+ * hydrates into a draft, so a revision inside it would be undoable — undo would restore a stale
+ * precondition and the next save would answer 409 for a reason the author cannot see (ADR-0035).
+ *
+ * Declared locally rather than shared: the artefact contexts must not import each other, and two
+ * fields are cheaper to repeat than a cross-context dependency.
+ *
+ * `revision` is nullable because the contract marks it optional (§2.1a). Null means the server did
+ * not tell us one, and the save that follows carries no precondition rather than a guessed number —
+ * a fabricated base would be the silent overwrite the precondition exists to prevent.
+ */
+export interface Loaded<T> {
+  readonly artefact: T
+  readonly revision: number | null
+}
+
 export interface MeasurementReadPort {
   /** The athlete's current check-in form, or null when a coach has not authored one. */
-  readonly checkInForm: (signal?: AbortSignal) => Promise<CheckInFormSnapshot | null>
+  readonly checkInForm: (signal?: AbortSignal) => Promise<Loaded<CheckInFormSnapshot> | null>
   /** The athlete's recorded observations. Filtering and windowing are the server's business. */
   readonly observations: (signal?: AbortSignal) => Promise<readonly ObservationSnapshot[]>
   /**
@@ -116,13 +135,17 @@ export interface MeasurementWritePort {
    *
    * A replace rather than a revision: a form is not versioned, because observations reference an
    * indicator kind rather than a field id, so editing one cannot make an existing observation
-   * unreadable. That is the whole reason this needs no client-generated id and no conflict
-   * handling, and a programme revision needs both.
+   * unreadable. That is why this needs no client-generated id where a programme revision does.
+   *
+   * Unversioned is not unguarded, though. `baseRevision` is the revision last read, and `null`
+   * means "I believe nothing is here" — correct only for a first save. Getting it wrong is refused
+   * with 409 rather than quietly overwriting whoever wrote in between (BACKEND-CONTRACT §2.1a).
    */
   readonly saveCheckInForm: (
     form: CheckInFormSnapshot,
+    baseRevision: number | null,
     signal?: AbortSignal,
-  ) => Promise<CheckInFormSnapshot>
+  ) => Promise<Loaded<CheckInFormSnapshot>>
   /**
    * Record a measurement.
    *

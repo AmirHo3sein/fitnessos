@@ -2,6 +2,7 @@ import type {
   AcquisitionSnapshot,
   CheckInFormSnapshot,
   IndicatorSeriesSnapshot,
+  Loaded,
   ObservationSnapshot,
   RecordObservationInput,
 } from '@fitnessos/ctx-measurement'
@@ -159,23 +160,37 @@ const answerShapeFrom = (raw: ValidatedForm['fields'][number]['answer']) => {
   return { kind: 'number' as const }
 }
 
-export const checkInFormFrom = (raw: unknown): CheckInFormSnapshot => {
+/**
+ * The form AND the revision to send back when saving it (§2.1a).
+ *
+ * The envelope is what the wire actually carries, so it is what the mapper returns. `revision`
+ * stays OUT of the snapshot: the snapshot is the editor's document, and a revision inside it would
+ * be undoable — undo would restore a stale precondition and the next save would answer 409 for a
+ * reason the author cannot see (ADR-0035).
+ *
+ * Absent `revision` becomes null, not 1. The contract marks it optional, and inventing a base would
+ * turn the one write the precondition exists to refuse into one the server accepts.
+ */
+export const loadedCheckInFormFrom = (raw: unknown): Loaded<CheckInFormSnapshot> => {
   const c = parseContract(CheckInFormSchema, raw, 'CheckInForm')
   return {
-    id: c.id,
-    title: c.title,
-    // Sorted here as well as in the aggregate. The contract promises no order, and a form
-    // rendered in arrival order asks its questions in a sequence nobody chose.
-    fields: [...c.fields]
-      .sort((a, b) => a.order - b.order)
-      .map((field) => ({
-        id: field.id,
-        label: field.label,
-        records: field.records,
-        unit: field.unit,
-        answer: answerShapeFrom(field.answer),
-        order: field.order,
-      })),
+    artefact: {
+      id: c.id,
+      title: c.title,
+      // Sorted here as well as in the aggregate. The contract promises no order, and a form
+      // rendered in arrival order asks its questions in a sequence nobody chose.
+      fields: [...c.fields]
+        .sort((a, b) => a.order - b.order)
+        .map((field) => ({
+          id: field.id,
+          label: field.label,
+          records: field.records,
+          unit: field.unit,
+          answer: answerShapeFrom(field.answer),
+          order: field.order,
+        })),
+    },
+    revision: c.revision ?? null,
   }
 }
 
@@ -184,11 +199,20 @@ export const checkInFormFrom = (raw: unknown): CheckInFormSnapshot => {
  *
  * The `absent, not null` direction again: `min`, `max` and `options` are constrained, so sending
  * them as null for a variant that has none would be refused for fields the coach never filled in.
+ * `baseRevision` follows the same rule for a different reason — the schema has no null for it, and
+ * a first save legitimately has none to send.
+ *
+ * `revision` is never sent. It is the server's answer, and echoing it as if it were ours would put
+ * a client in the position of asserting the value it is supposed to be quoting.
  */
-export const checkInFormBodyFrom = (form: CheckInFormSnapshot): ValidatedForm => {
+export const checkInFormBodyFrom = (
+  form: CheckInFormSnapshot,
+  baseRevision: number | null,
+): ValidatedForm => {
   const body = {
     id: form.id,
     title: form.title,
+    ...(baseRevision === null ? {} : { baseRevision }),
     fields: form.fields.map((field) => ({
       id: field.id,
       label: field.label,
@@ -210,6 +234,10 @@ export const CHECK_IN_FORM_COVERAGE: Record<keyof ContractForm, true> = {
   id: true,
   title: true,
   fields: true,
+  // Both directions of the precondition, and neither is a field of the form: `revision` is read
+  // and carried beside the document, `baseRevision` is written and never read back.
+  revision: true,
+  baseRevision: true,
 }
 
 const _formAgrees: FieldsAgree<ContractForm, ValidatedForm> = true

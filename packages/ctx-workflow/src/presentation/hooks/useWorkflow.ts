@@ -2,7 +2,7 @@
 
 import { useSubject } from '@fitnessos/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { currentWorkflowQuery, workflowKeys } from '../../application/index'
+import { currentWorkflowQuery, workflowKeys, type Loaded } from '../../application/index'
 import type { WorkflowSnapshot } from '../../editor/schema'
 import { useWorkflowPorts } from '../di'
 
@@ -20,7 +20,12 @@ export interface UseWorkflow {
   readonly loadFailed: boolean
   /** Refetch, so the answer to a failed load is one press rather than a full reload. */
   readonly retry: () => void
-  /** TRUE when the save reached the server — what moves the editor's commit boundary. */
+  /**
+   * TRUE when the save reached the server — what moves the editor's commit boundary.
+   *
+   * Unchanged signature: the base revision is the hook's business, not the editor's. A caller that
+   * had to supply one would be a caller holding a concurrency token inside a document (ADR-0035).
+   */
   readonly save: (workflow: WorkflowSnapshot) => Promise<boolean>
   readonly isSaving: boolean
   readonly error: Error | null
@@ -33,15 +38,31 @@ export const useWorkflow = (): UseWorkflow => {
   const query = useQuery(currentWorkflowQuery(ports, subject))
 
   const mutation = useMutation({
-    mutationFn: (workflow: WorkflowSnapshot) => ports.workflow.save(workflow),
-    // Set, not invalidate: the response IS the new state.
+    mutationFn: (workflow: WorkflowSnapshot) =>
+      /*
+        The base revision is read from the CACHE at save time, not closed over from this render.
+        Two saves in quick succession do not necessarily re-render between them, and the second one
+        must quote the revision the FIRST one returned — quoting the one it rendered with would be
+        stale on arrival and answer 409 for a change nobody else made.
+
+        Null on a first save, where there is nothing to collide with, and null against an older
+        server that sends no revision at all; both leave the decision where it belongs.
+      */
+      ports.workflow.save(
+        workflow,
+        queryClient.getQueryData<Loaded<WorkflowSnapshot> | null>(workflowKeys.current(subject))
+          ?.revision ?? null,
+      ),
+    // Set, not invalidate: the response IS the new state — including its new revision.
     onSuccess: (saved) => {
       queryClient.setQueryData(workflowKeys.current(subject), saved)
     },
   })
 
   return {
-    workflow: query.data ?? null,
+    // The envelope is unwrapped here and goes no further: the editor receives the document and
+    // never learns a revision exists.
+    workflow: query.data?.artefact ?? null,
     isLoading: query.isPending,
     loadFailed: query.isError,
     retry: () => {

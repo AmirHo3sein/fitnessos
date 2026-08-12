@@ -6,6 +6,7 @@ import {
   checkInFormQuery,
   measurementKeys,
   type CheckInFormSnapshot,
+  type Loaded,
 } from '../../application/index'
 import { useMeasurementPorts } from '../di'
 
@@ -23,7 +24,14 @@ export interface UseCheckInForm {
   readonly loadFailed: boolean
   /** Refetch, so the answer to a failed load is one press rather than a full reload. */
   readonly retry: () => void
-  /** Resolves TRUE when the save reached the server — what moves the editor's commit boundary. */
+  /**
+   * Resolves TRUE when the save reached the server — what moves the editor's commit boundary.
+   *
+   * FALSE now also means "someone else wrote in between": a stale precondition is refused with 409
+   * (§2.1a), and the editor must keep its unsaved work rather than believe it was stored. The
+   * signature is unchanged because the caller's question is unchanged; the revision is supplied
+   * here, from what was last read.
+   */
   readonly save: (form: CheckInFormSnapshot) => Promise<boolean>
   readonly isSaving: boolean
   readonly error: Error | null
@@ -39,6 +47,10 @@ export interface UseCheckInForm {
  * `save` returns a boolean rather than rejecting, because the caller's remaining question is only
  * whether to move its commit boundary — the failure is already reported through `error`, and
  * rejecting as well would make every call site write a `catch` that discards what it caught.
+ *
+ * The revision travels here and no further. The cache holds the envelope; the editor is handed
+ * `.artefact` and never learns a revision exists, which is what keeps it out of the undo stack
+ * (ADR-0035).
  */
 export const useCheckInForm = (): UseCheckInForm => {
   const ports = useMeasurementPorts()
@@ -48,14 +60,30 @@ export const useCheckInForm = (): UseCheckInForm => {
   const query = useQuery(checkInFormQuery(ports, subject))
 
   const mutation = useMutation({
-    mutationFn: (form: CheckInFormSnapshot) => ports.measurement.saveCheckInForm(form),
+    mutationFn: (form: CheckInFormSnapshot) => {
+      /*
+       * Read from the cache at call time rather than closing over `query.data`, so two saves in
+       * succession send the revision the FIRST one returned. A closure captured at render would
+       * still hold the pre-save revision if the second save fires before React re-renders, and
+       * the second write would 409 against a revision this very client replaced.
+       *
+       * Null when nothing has been read: a first save, which carries no precondition because
+       * there is nothing yet to collide with (BACKEND-CONTRACT §2.1a).
+       */
+      const loaded = queryClient.getQueryData<Loaded<CheckInFormSnapshot> | null>(
+        measurementKeys.checkInForm(subject),
+      )
+      return ports.measurement.saveCheckInForm(form, loaded?.revision ?? null)
+    },
     onSuccess: (saved) => {
+      // The ENVELOPE, not the form. The response is the new state including its new revision, and
+      // storing the form alone would leave the next save sending the revision it just superseded.
       queryClient.setQueryData(measurementKeys.checkInForm(subject), saved)
     },
   })
 
   return {
-    form: query.data ?? null,
+    form: query.data?.artefact ?? null,
     isLoading: query.isPending,
     loadFailed: query.isError,
     retry: () => {

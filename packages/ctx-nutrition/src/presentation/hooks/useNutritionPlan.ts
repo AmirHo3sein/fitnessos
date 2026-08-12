@@ -33,15 +33,23 @@ export const useNutritionPlan = (): UseNutritionPlan => {
   const query = useQuery(currentNutritionPlanQuery(ports, subject))
 
   const mutation = useMutation({
-    mutationFn: (plan: NutritionSnapshot) => ports.nutrition.save(plan),
-    // Set, not invalidate: the response IS the new state.
+    /*
+      The base revision comes from the envelope this render was drawn from — the plan the author
+      actually edited — and never from the editor, which is not told a revision exists (ADR-0035).
+      `null` only where nothing was read, which is the first save and the one case with nothing to
+      collide with; sent against a plan that exists it answers 409 rather than overwriting it.
+    */
+    mutationFn: (plan: NutritionSnapshot) =>
+      ports.nutrition.save(plan, query.data?.revision ?? null),
+    // Set, not invalidate: the response IS the new state — the ENVELOPE, so the next save carries
+    // the revision this one produced instead of the stale one it replaced.
     onSuccess: (saved) => {
       queryClient.setQueryData(nutritionKeys.current(subject), saved)
     },
   })
 
   return {
-    plan: query.data ?? null,
+    plan: query.data?.artefact ?? null,
     isLoading: query.isPending,
     loadFailed: query.isError,
     retry: () => {

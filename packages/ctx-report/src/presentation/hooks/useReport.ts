@@ -2,7 +2,7 @@
 
 import { useSubject } from '@fitnessos/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { currentReportQuery, reportKeys } from '../../application/index'
+import { currentReportQuery, reportKeys, type Loaded } from '../../application/index'
 import type { ReportSnapshot } from '../../editor/schema'
 import { useReportPorts } from '../di'
 
@@ -34,17 +34,30 @@ export const useReport = (): UseReport => {
   const query = useQuery(currentReportQuery(ports, subject))
 
   const mutation = useMutation({
-    mutationFn: (report: ReportSnapshot) => ports.report.save(report),
-    // Set rather than invalidate: the response IS the new state, so refetching would spend a
-    // round trip on data already in hand and leave a window where the canvas and the cache
-    // disagree about where a tile is.
+    /*
+      The base revision comes from the CACHE at the moment of the save, not from `query.data` in
+      this render's closure. Two saves in quick succession are the case: the first stores a new
+      revision below, and a closure captured before it would quote the one it replaced — a 409 the
+      coach caused by typing fast. The editor never sees any of this; `save` still takes a snapshot.
+    */
+    mutationFn: (report: ReportSnapshot) => {
+      const loaded = queryClient.getQueryData<Loaded<ReportSnapshot> | null>(
+        reportKeys.current(subject),
+      )
+      return ports.report.save(report, loaded?.revision ?? null)
+    },
+    // Set rather than invalidate: the response IS the new state — including its new revision — so
+    // refetching would spend a round trip on data already in hand and leave a window where the
+    // canvas and the cache disagree about where a tile is.
     onSuccess: (saved) => {
       queryClient.setQueryData(reportKeys.current(subject), saved)
     },
   })
 
   return {
-    report: query.data ?? null,
+    // `.artefact`, so components keep receiving the document. The revision stays in the cache,
+    // where the save path reads it and nothing else can.
+    report: query.data?.artefact ?? null,
     isLoading: query.isPending,
     loadFailed: query.isError,
     retry: () => {

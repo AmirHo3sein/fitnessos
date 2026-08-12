@@ -1,4 +1,4 @@
-import type { Phase, PlanSnapshot } from '@fitnessos/ctx-timeline'
+import type { Loaded, Phase, PlanSnapshot } from '@fitnessos/ctx-timeline'
 import { PlanSchema, type components } from '@fitnessos/contracts'
 import { idFrom, type PlainDate } from '@fitnessos/kernel'
 import type { z } from 'zod'
@@ -23,8 +23,7 @@ const plainDateFrom = (iso: string): PlainDate => {
 const isoFrom = (d: PlainDate): string =>
   `${String(d.year).padStart(4, '0')}-${String(d.month).padStart(2, '0')}-${String(d.day).padStart(2, '0')}`
 
-export const planFrom = (raw: unknown): PlanSnapshot => {
-  const c = parseContract(PlanSchema, raw, 'Plan')
+const snapshotFrom = (c: ValidatedPlan): PlanSnapshot => {
   return {
     id: c.id,
     title: c.title,
@@ -46,7 +45,25 @@ export const planFrom = (raw: unknown): PlanSnapshot => {
   }
 }
 
-export const planBodyFrom = (plan: PlanSnapshot): ValidatedPlan => {
+/**
+ * The plan, and the revision to send back when saving it (§2.1a).
+ *
+ * `revision` is read here and left OUT of the snapshot on purpose: the snapshot is the editor's
+ * document, and a revision inside an undoable document is restored by undo — the next save then
+ * answers 409 for a reason the author cannot see (ADR-0035). It travels beside the document.
+ *
+ * Absent means a server older than §2.1a. That becomes `null` — no base — rather than a default,
+ * because any invented number would satisfy the precondition and overwrite whatever is stored.
+ */
+export const planLoadedFrom = (raw: unknown): Loaded<PlanSnapshot> => {
+  const c = parseContract(PlanSchema, raw, 'Plan')
+  return { artefact: snapshotFrom(c), revision: c.revision ?? null }
+}
+
+export const planBodyFrom = (
+  plan: PlanSnapshot,
+  baseRevision: number | null = null,
+): ValidatedPlan => {
   const body = {
     id: plan.id,
     title: plan.title,
@@ -61,6 +78,9 @@ export const planBodyFrom = (plan: PlanSnapshot): ValidatedPlan => {
       ...(p.programId === null ? {} : { programId: p.programId }),
       ...(p.servesGoal === null ? {} : { servesGoal: p.servesGoal }),
     })),
+    // Omitted entirely on a first save: absent means "nothing is stored yet", and a null on the
+    // wire would be a claim about a revision rather than the absence of one.
+    ...(baseRevision === null ? {} : { baseRevision }),
   }
   return parseContract(PlanSchema, body, 'Plan (request)')
 }
@@ -70,6 +90,10 @@ export const PLAN_COVERAGE: Record<keyof ContractPlan, true> = {
   title: true,
   epoch: true,
   phases: true,
+  // Accounted for beside the document rather than in it: read into `Loaded`, sent back as
+  // `baseRevision`. Covered, and deliberately absent from `PlanSnapshot`.
+  revision: true,
+  baseRevision: true,
 }
 
 const _agrees: FieldsAgree<ContractPlan, ValidatedPlan> = true

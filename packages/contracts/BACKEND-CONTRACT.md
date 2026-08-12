@@ -121,8 +121,13 @@ was rejected because neither available clock can decide which write is last"*.
 the other. Nothing anywhere records that it happened, and the athlete follows a plan their coach did
 not write — §2.1's stated worst outcome, arriving through the six endpoints §2.1 did not cover.
 
-**A first save carries no `baseRevision`**, because there is nothing to collide with. §4.9's rule that
-PUT to an unknown id CREATES is unaffected.
+**A first save carries no `baseRevision`**, because there is nothing to collide with.
+
+**§4.9 and this rule meet, and the interaction is not obvious.** "PUT to an unknown id CREATES" is
+about there being nothing CURRENT — not about the id being new. When an artefact is already current, a
+PUT with a new id REPLACES it (that is §4.9's own data-loss path), and replacing still needs the
+revision being replaced. So: no `baseRevision` is correct only against a 204, and a new id against an
+existing artefact is a collision like any other.
 
 `GET /{artefact}/current` therefore returns `revision` alongside `id`, and an accepted `PUT` returns
 the new one — so a client can save twice in succession without re-reading.

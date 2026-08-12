@@ -2,7 +2,7 @@
 
 import { useSubject } from '@fitnessos/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { currentPlanQuery, timelineKeys } from '../../application/index'
+import { currentPlanQuery, timelineKeys, type Loaded } from '../../application/index'
 import type { PlanSnapshot } from '../../editor/schema'
 import { useTimelinePorts } from '../di'
 
@@ -33,15 +33,29 @@ export const usePlan = (): UsePlan => {
   const query = useQuery(currentPlanQuery(ports, subject))
 
   const mutation = useMutation({
-    mutationFn: (plan: PlanSnapshot) => ports.timeline.save(plan),
-    // Set, not invalidate: the response IS the new state.
+    /*
+      The revision comes from the CACHE at mutate time, not from `query.data` closed over by this
+      render. Two saves in a row would otherwise both assert the revision read before the first,
+      and the second would 409 against a plan this client itself had just written.
+
+      The editor never sees it: `save` still takes a snapshot, and the precondition is supplied
+      here, beside the document rather than inside it (ADR-0035).
+    */
+    mutationFn: (plan: PlanSnapshot) =>
+      ports.timeline.save(
+        plan,
+        queryClient.getQueryData<Loaded<PlanSnapshot> | null>(timelineKeys.current(subject))
+          ?.revision ?? null,
+      ),
+    // Set, not invalidate: the response IS the new state — including the revision the next save
+    // must assert, which is why the envelope is stored rather than the plan alone.
     onSuccess: (saved) => {
       queryClient.setQueryData(timelineKeys.current(subject), saved)
     },
   })
 
   return {
-    plan: query.data ?? null,
+    plan: query.data?.artefact ?? null,
     isLoading: query.isPending,
     loadFailed: query.isError,
     retry: () => {

@@ -2,6 +2,7 @@ import { subjectScope, type SubjectId } from '@fitnessos/kernel'
 import type {
   CheckInFormSnapshot,
   IndicatorSeriesSnapshot,
+  Loaded,
   MeasurementPorts,
   ObservationSnapshot,
 } from '../ports/index'
@@ -43,7 +44,9 @@ export const indicatorsQuery = (
 export const checkInFormQuery = (
   ports: MeasurementPorts,
   subject: SubjectId,
-): QueryDefinition<CheckInFormSnapshot | null> => ({
+): QueryDefinition<Loaded<CheckInFormSnapshot> | null> => ({
+  // The ENVELOPE is what is cached, not the form. The revision a save must send back is a
+  // property of the read that produced it, so it has to live wherever that read is remembered.
   queryKey: measurementKeys.checkInForm(subject),
   queryFn: ({ signal }) => ports.measurement.checkInForm(signal),
   // Long. A form changes when a coach authors one, which is rare, and the editor sets the cache

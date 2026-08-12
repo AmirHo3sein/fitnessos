@@ -180,8 +180,19 @@ describe('§4.9 · a failed read must be distinguishable from "nothing authored"
   })
 
   it('PUT with an unknown id CREATES rather than 404ing', async () => {
-    // ADR-0010 requires client-generated ids, so a first save is always a PUT to an id the server has
-    // never seen. A 404 here would make every create impossible.
+    /*
+     * ADR-0010 requires client-generated ids, so a first save is always a PUT to an id the server has
+     * never seen. A 404 here would make every create impossible.
+     *
+     * **§4.9 and §2.1a meet here**, and the interaction is worth stating because it is not obvious.
+     * "PUT to an unknown id creates" is about there being nothing CURRENT — not about the id being
+     * new. When an artefact is already current, a PUT with a new id REPLACES it, and replacing still
+     * needs the revision being replaced. So this reads first and carries the base; without that it
+     * would be asserting the blind-overwrite §2.1a exists to refuse.
+     */
+    const before = await request<{ revision?: number }>('/workflows/current')
+    const base = before.status === 204 ? undefined : before.body?.revision
+
     const id = newId()
     const created = await request(`/workflows/${id}`, {
       method: 'PUT',
@@ -191,6 +202,7 @@ describe('§4.9 · a failed read must be distinguishable from "nothing authored"
         enabled: false,
         nodes: [{ id: newId(), kind: 'trigger', detail: 'conformance', x: 0, y: 0 }],
         edges: [],
+        ...(base === undefined ? {} : { baseRevision: base }),
       },
     })
     expect(

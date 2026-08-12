@@ -133,6 +133,40 @@ const revisions = new Map<string, { current: unknown; versions: Map<string, unkn
 const observations = new Map<string, Map<string, unknown>>()
 
 /** Check-in forms, one per phone. Replaced wholesale by PUT — a form is not versioned. */
+/*
+ * Artefact revisions (BACKEND-CONTRACT §2.1a).
+ *
+ * Kept BESIDE the stored documents rather than inside them, mirroring the client and the real server:
+ * a revision is a precondition on a write, not content of the artefact. Storing it in the document
+ * would put a concurrency token inside the thing the editor hydrates (ADR-0035).
+ *
+ * Keyed by `${phone}:${kind}` — the stub's whole isolation model is per phone, and "current" is per
+ * athlete per kind.
+ */
+// `artefactRevisions`, not `revisions` — that name is already taken by the programme-version store
+// above, and a programme's lineage and an artefact's precondition counter are different things.
+const artefactRevisions = new Map<string, number>()
+
+/**
+ * Decide whether a save may proceed, and what the new revision is.
+ *
+ * The stub implements this in its own code rather than importing the server's, deliberately: a check
+ * that agrees with the implementation by construction proves nothing, which is the same reason
+ * `tools/stub-api` re-implements the workflow reachability rule.
+ */
+const nextRevision = (
+  key: string,
+  baseRevision: unknown,
+): { readonly ok: true; readonly revision: number } | { readonly ok: false; readonly current: number } => {
+  const current = artefactRevisions.get(key)
+  // Nothing stored: a first save, which carries no base because there is nothing to collide with.
+  if (current === undefined) return { ok: true, revision: 1 }
+  // Absent base against an existing artefact IS a collision — the commonest one, an author who never
+  // read what they are about to replace.
+  if (typeof baseRevision !== 'number' || baseRevision !== current) return { ok: false, current }
+  return { ok: true, revision: current + 1 }
+}
+
 const checkInForms = new Map<string, unknown>()
 
 /** Reports, one per phone. Same reasoning: a report owns a layout and nothing references it. */
@@ -1049,8 +1083,26 @@ const handlers: Record<string, (req: IncomingMessage, res: ServerResponse) => Pr
 
     // A wholesale replace. Submitting the same body twice leaves the form in the same state,
     // which is what makes PUT correct here and a retry safe with no client-generated id.
+    /*
+     * §2.1a. A save that did not read what it replaces is refused, and the 409 carries the artefact
+     * AS IT NOW STANDS so the author can see what they collided with rather than only that they did.
+     *
+     * Without this the stub would model last-write-wins — the resolution ADR-0033 rejected — and the
+     * e2e suite would prove the client safe against a server that is not.
+     */
+    const key = `${phone}:check-in-form`
+    const next = nextRevision(key, (body.data as { baseRevision?: unknown }).baseRevision)
+    if (!next.ok) {
+      send(res, 409, CheckInFormSchema, {
+        ...(checkInForms.get(phone) as object),
+        revision: next.current,
+      })
+      return
+    }
+
+    artefactRevisions.set(key, next.revision)
     checkInForms.set(phone, body.data)
-    send(res, 200, CheckInFormSchema, body.data)
+    send(res, 200, CheckInFormSchema, { ...body.data, revision: next.revision })
   },
 
   'GET /api/v1/reports/current': async (req, res) => {
@@ -1064,7 +1116,8 @@ const handlers: Record<string, (req: IncomingMessage, res: ServerResponse) => Pr
       res.writeHead(204).end()
       return
     }
-    send(res, 200, ReportSchema, stored)
+    // §2.1a — the revision travels with every read, because the next save has to send it back.
+    send(res, 200, ReportSchema, { ...(stored as object), revision: artefactRevisions.get(`${phone}:report`) ?? 1 })
   },
 
   'PUT /api/v1/reports/:reportId': async (req, res) => {
@@ -1082,8 +1135,26 @@ const handlers: Record<string, (req: IncomingMessage, res: ServerResponse) => Pr
 
     // Stored verbatim, tile order included — it is PAINT order, and reordering it here would
     // rearrange what the coach composed.
+    /*
+     * §2.1a. A save that did not read what it replaces is refused, and the 409 carries the artefact
+     * AS IT NOW STANDS so the author can see what they collided with rather than only that they did.
+     *
+     * Without this the stub would model last-write-wins — the resolution ADR-0033 rejected — and the
+     * e2e suite would prove the client safe against a server that is not.
+     */
+    const key = `${phone}:report`
+    const next = nextRevision(key, (body.data as { baseRevision?: unknown }).baseRevision)
+    if (!next.ok) {
+      send(res, 409, ReportSchema, {
+        ...(reports.get(phone) as object),
+        revision: next.current,
+      })
+      return
+    }
+
+    artefactRevisions.set(key, next.revision)
     reports.set(phone, body.data)
-    send(res, 200, ReportSchema, body.data)
+    send(res, 200, ReportSchema, { ...body.data, revision: next.revision })
   },
 
   'GET /api/v1/dashboards/current': async (req, res) => {
@@ -1097,7 +1168,8 @@ const handlers: Record<string, (req: IncomingMessage, res: ServerResponse) => Pr
       res.writeHead(204).end()
       return
     }
-    send(res, 200, DashboardSchema, stored)
+    // §2.1a — the revision travels with every read, because the next save has to send it back.
+    send(res, 200, DashboardSchema, { ...(stored as object), revision: artefactRevisions.get(`${phone}:dashboard`) ?? 1 })
   },
 
   'PUT /api/v1/dashboards/:dashboardId': async (req, res) => {
@@ -1111,8 +1183,26 @@ const handlers: Record<string, (req: IncomingMessage, res: ServerResponse) => Pr
       problem(res, 400, 'invalid_request', body.error.issues[0]?.message ?? 'invalid')
       return
     }
+    /*
+     * §2.1a. A save that did not read what it replaces is refused, and the 409 carries the artefact
+     * AS IT NOW STANDS so the author can see what they collided with rather than only that they did.
+     *
+     * Without this the stub would model last-write-wins — the resolution ADR-0033 rejected — and the
+     * e2e suite would prove the client safe against a server that is not.
+     */
+    const key = `${phone}:dashboard`
+    const next = nextRevision(key, (body.data as { baseRevision?: unknown }).baseRevision)
+    if (!next.ok) {
+      send(res, 409, DashboardSchema, {
+        ...(dashboards.get(phone) as object),
+        revision: next.current,
+      })
+      return
+    }
+
+    artefactRevisions.set(key, next.revision)
     dashboards.set(phone, body.data)
-    send(res, 200, DashboardSchema, body.data)
+    send(res, 200, DashboardSchema, { ...body.data, revision: next.revision })
   },
 
   'GET /api/v1/plans/current': async (req, res) => {
@@ -1126,7 +1216,8 @@ const handlers: Record<string, (req: IncomingMessage, res: ServerResponse) => Pr
       res.writeHead(204).end()
       return
     }
-    send(res, 200, PlanSchema, stored)
+    // §2.1a — the revision travels with every read, because the next save has to send it back.
+    send(res, 200, PlanSchema, { ...(stored as object), revision: artefactRevisions.get(`${phone}:plan`) ?? 1 })
   },
 
   'PUT /api/v1/plans/:planId': async (req, res) => {
@@ -1140,8 +1231,26 @@ const handlers: Record<string, (req: IncomingMessage, res: ServerResponse) => Pr
       problem(res, 400, 'invalid_request', body.error.issues[0]?.message ?? 'invalid')
       return
     }
+    /*
+     * §2.1a. A save that did not read what it replaces is refused, and the 409 carries the artefact
+     * AS IT NOW STANDS so the author can see what they collided with rather than only that they did.
+     *
+     * Without this the stub would model last-write-wins — the resolution ADR-0033 rejected — and the
+     * e2e suite would prove the client safe against a server that is not.
+     */
+    const key = `${phone}:plan`
+    const next = nextRevision(key, (body.data as { baseRevision?: unknown }).baseRevision)
+    if (!next.ok) {
+      send(res, 409, PlanSchema, {
+        ...(plans.get(phone) as object),
+        revision: next.current,
+      })
+      return
+    }
+
+    artefactRevisions.set(key, next.revision)
     plans.set(phone, body.data)
-    send(res, 200, PlanSchema, body.data)
+    send(res, 200, PlanSchema, { ...body.data, revision: next.revision })
   },
 
   'GET /api/v1/nutrition-plans/current': async (req, res) => {
@@ -1155,7 +1264,8 @@ const handlers: Record<string, (req: IncomingMessage, res: ServerResponse) => Pr
       res.writeHead(204).end()
       return
     }
-    send(res, 200, NutritionPlanSchema, stored)
+    // §2.1a — the revision travels with every read, because the next save has to send it back.
+    send(res, 200, NutritionPlanSchema, { ...(stored as object), revision: artefactRevisions.get(`${phone}:nutrition-plan`) ?? 1 })
   },
 
   'PUT /api/v1/nutrition-plans/:planId': async (req, res) => {
@@ -1169,8 +1279,26 @@ const handlers: Record<string, (req: IncomingMessage, res: ServerResponse) => Pr
       problem(res, 400, 'invalid_request', body.error.issues[0]?.message ?? 'invalid')
       return
     }
+    /*
+     * §2.1a. A save that did not read what it replaces is refused, and the 409 carries the artefact
+     * AS IT NOW STANDS so the author can see what they collided with rather than only that they did.
+     *
+     * Without this the stub would model last-write-wins — the resolution ADR-0033 rejected — and the
+     * e2e suite would prove the client safe against a server that is not.
+     */
+    const key = `${phone}:nutrition-plan`
+    const next = nextRevision(key, (body.data as { baseRevision?: unknown }).baseRevision)
+    if (!next.ok) {
+      send(res, 409, NutritionPlanSchema, {
+        ...(nutritionPlans.get(phone) as object),
+        revision: next.current,
+      })
+      return
+    }
+
+    artefactRevisions.set(key, next.revision)
     nutritionPlans.set(phone, body.data)
-    send(res, 200, NutritionPlanSchema, body.data)
+    send(res, 200, NutritionPlanSchema, { ...body.data, revision: next.revision })
   },
 
   'GET /api/v1/workflows/current': async (req, res) => {
@@ -1184,7 +1312,8 @@ const handlers: Record<string, (req: IncomingMessage, res: ServerResponse) => Pr
       res.writeHead(204).end()
       return
     }
-    send(res, 200, WorkflowSchema, stored)
+    // §2.1a — the revision travels with every read, because the next save has to send it back.
+    send(res, 200, WorkflowSchema, { ...(stored as object), revision: artefactRevisions.get(`${phone}:workflow`) ?? 1 })
   },
 
   'PUT /api/v1/workflows/:workflowId': async (req, res) => {
@@ -1214,8 +1343,26 @@ const handlers: Record<string, (req: IncomingMessage, res: ServerResponse) => Pr
       return
     }
 
+    /*
+     * §2.1a. A save that did not read what it replaces is refused, and the 409 carries the artefact
+     * AS IT NOW STANDS so the author can see what they collided with rather than only that they did.
+     *
+     * Without this the stub would model last-write-wins — the resolution ADR-0033 rejected — and the
+     * e2e suite would prove the client safe against a server that is not.
+     */
+    const key = `${phone}:workflow`
+    const next = nextRevision(key, (body.data as { baseRevision?: unknown }).baseRevision)
+    if (!next.ok) {
+      send(res, 409, WorkflowSchema, {
+        ...(workflows.get(phone) as object),
+        revision: next.current,
+      })
+      return
+    }
+
+    artefactRevisions.set(key, next.revision)
     workflows.set(phone, body.data)
-    send(res, 200, WorkflowSchema, body.data)
+    send(res, 200, WorkflowSchema, { ...body.data, revision: next.revision })
   },
 
   'GET /api/v1/proposals': async (req, res) => {

@@ -4,6 +4,7 @@ export type {
   FormFieldSnapshot,
   IndicatorPoint,
   IndicatorSeriesSnapshot,
+  Loaded,
   MeasurementPorts,
   MeasurementReadPort,
   MeasurementWritePort,
