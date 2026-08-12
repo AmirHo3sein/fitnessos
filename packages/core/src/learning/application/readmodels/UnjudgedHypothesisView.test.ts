@@ -12,6 +12,8 @@ const proposal = (over: Partial<ProposalSnapshot> = {}): ProposalSnapshot => ({
     targetId: 'prog-1',
     summary: 'Raise week three to 5% linear progression',
     rationale: 'Both blocks finished at the top of the range',
+    // The default, and what every proposal was before a coach could suggest one.
+    proposedBy: { kind: 'assistant' },
     hypothesis: {
       indicatorKind: 'estimated-1rm',
       claim: 'Back squat estimate rises by 5kg',

@@ -2127,7 +2127,8 @@
           "summary",
           "rationale",
           "hypothesis",
-          "proposedOn"
+          "proposedOn",
+          "proposedBy"
         ],
         "properties": {
           "id": {
@@ -2172,6 +2173,9 @@
           "accepted": {
             "type": "boolean",
             "description": "Absent while undecided."
+          },
+          "proposedBy": {
+            "$ref": "#/components/schemas/Proposer"
           }
         }
       },
@@ -2875,6 +2879,27 @@
           }
         },
         "description": "A coaching automation: a directed acyclic graph of triggers, conditions and actions. The only GRAPH-shaped document in this API -- every other authored artefact is a list or a list of lists. Nodes carry no order because a graph has none; execution order is derived from the edges."
+      },
+      "Proposer": {
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "assistant",
+              "human"
+            ]
+          },
+          "personId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Required when kind=human. A human proposer names WHICH human \u2014 without it the record answers \"a person suggested this\" to the question \"who suggested this\", which is the question it exists to answer."
+          }
+        },
+        "description": "Who suggested this. CLOSED, unlike an observation kind (ADR-0020 exception): the variants differ in required structure. Mirrors AuthoringDecision.proposedBy, which already distinguishes exactly this -- an AI-proposed programme accepted by a coach was DECIDED by the coach, and collapsing the two loses the only fact that makes ADR-0003 auditable. One Proposal aggregate rather than two (ADR-0022): a coach proposal and an assistant proposal have identical invariants and identical transition authority, and differ only in who spoke."
       }
     }
   }

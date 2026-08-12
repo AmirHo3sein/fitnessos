@@ -26,6 +26,19 @@ export interface ProposalSnapshot {
   readonly summary: string
   readonly rationale: string
   readonly hypothesis: HypothesisSnapshot
+  /**
+   * Who suggested it.
+   *
+   * CLOSED, unlike an observation's kind (ADR-0020's exception): the variants differ in required
+   * structure, so an unrecognised one cannot be handled as data. A human proposer names WHICH human —
+   * a bare `human` would answer "a person suggested this" to the question "who suggested this".
+   *
+   * One `Proposal` rather than a second aggregate for coach suggestions (ADR-0022): the two have
+   * identical invariants and identical transition authority, and differ only in who spoke.
+   */
+  readonly proposedBy:
+    | { readonly kind: 'assistant' }
+    | { readonly kind: 'human'; readonly personId: string }
   readonly proposedOn: PlainDate
   /**
    * Whether the human acted on it, and when — the moment of change, which is recorded in the

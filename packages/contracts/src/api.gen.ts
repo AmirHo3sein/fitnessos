@@ -856,6 +856,7 @@ export interface components {
             decidedOn?: string;
             /** @description Absent while undecided. */
             accepted?: boolean;
+            proposedBy: components["schemas"]["Proposer"];
         };
         DecisionOutcome: {
             /** Format: uuid */
@@ -1136,6 +1137,16 @@ export interface components {
              * @description The `revision` this save is replacing (§2.1a). Absent only on a FIRST save, where there is nothing to collide with. Absent against an artefact that already exists is itself a collision — the commonest one, an author who never read what they are about to replace — and answers 409 with the artefact as it now stands.
              */
             baseRevision?: number;
+        };
+        /** @description Who suggested this. CLOSED, unlike an observation kind (ADR-0020 exception): the variants differ in required structure. Mirrors AuthoringDecision.proposedBy, which already distinguishes exactly this -- an AI-proposed programme accepted by a coach was DECIDED by the coach, and collapsing the two loses the only fact that makes ADR-0003 auditable. One Proposal aggregate rather than two (ADR-0022): a coach proposal and an assistant proposal have identical invariants and identical transition authority, and differ only in who spoke. */
+        Proposer: {
+            /** @enum {string} */
+            kind: "assistant" | "human";
+            /**
+             * Format: uuid
+             * @description Required when kind=human. A human proposer names WHICH human — without it the record answers "a person suggested this" to the question "who suggested this", which is the question it exists to answer.
+             */
+            personId?: string;
         };
     };
     responses: {

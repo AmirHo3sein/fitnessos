@@ -11,6 +11,7 @@ import {
 } from '@fitnessos/contracts'
 import { idFrom, type PlainDate } from '@fitnessos/kernel'
 import type { z } from 'zod'
+import { ContractViolationError } from '../http/errors'
 import { parseContract, type FieldsAgree } from './parse'
 
 /**
@@ -37,6 +38,16 @@ const plainDateFrom = (iso: string): PlainDate => {
   return { year: year ?? 0, month: month ?? 1, day: day ?? 1 }
 }
 
+/** A human proposer without a name is a contract violation, not a proposer to be guessed at. */
+const mustBeNamed = (personId: string | undefined): string => {
+  if (personId === undefined || personId.trim() === '') {
+    throw new ContractViolationError('Proposal', [
+      { path: 'proposedBy.personId', code: 'custom', message: 'a human proposer must be named' },
+    ])
+  }
+  return personId
+}
+
 export const proposalFrom = (raw: unknown): ProposalSnapshot => {
   const c = parseContract(ProposalSchema, raw, 'Proposal')
   return {
@@ -50,6 +61,18 @@ export const proposalFrom = (raw: unknown): ProposalSnapshot => {
       claim: c.hypothesis.claim,
       horizon: plainDateFrom(c.hypothesis.horizon),
     },
+    /*
+     * A `human` with no `personId` is REFUSED rather than narrowed to `assistant`.
+     *
+     * Narrowing is the tolerant-reader instinct (ADR-0031) applied where it does not belong: the two
+     * variants are different claims about who spoke, and quietly turning an unnamed human into an
+     * assistant would attribute a coach's suggestion to the machine — in the one record whose whole
+     * purpose is provenance.
+     */
+    proposedBy:
+      c.proposedBy.kind === 'human'
+        ? { kind: 'human', personId: mustBeNamed(c.proposedBy.personId) }
+        : { kind: 'assistant' },
     proposedOn: plainDateFrom(c.proposedOn),
     decidedOn: c.decidedOn === undefined ? null : plainDateFrom(c.decidedOn),
     accepted: c.accepted ?? null,
@@ -89,6 +112,7 @@ export const renderVerdictBodyFrom = (input: RenderVerdictInput): ValidatedVerdi
 
 export const PROPOSAL_COVERAGE: Record<keyof ContractProposal, true> = {
   id: true,
+  proposedBy: true,
   targetKind: true,
   targetId: true,
   summary: true,
