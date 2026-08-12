@@ -469,7 +469,22 @@ the seventh never opens and ordinary requests queue behind it. The client theref
 stream per tab regardless of how many contexts want events. Plan for concurrency on that basis: an
 athlete with three tabs open is three streams, not three per context.
 
-### 5.6 Events name what happened, and carry nothing else
+### 5.6 Events name what happened and whose, and carry nothing else
+
+```
+id: 1428
+data: {"kind":"session-logged","subject":"019ff…"}
+```
+
+**`subject` is required, and it is ADDRESSING rather than entity state.** It names whose cache to
+invalidate and carries no value that could disagree with what the cache holds — which is the property
+this section actually protects. Without it a coach watching thirty athletes receives
+`{"kind":"session-logged"}` and cannot tell whose, leaving two options and both are worse: a stream per
+athlete, which breaks §5.5's six-connections-per-origin budget at n=6, or invalidating every subject on
+every event, which is the thundering herd this section exists to prevent.
+
+The client falls back to its own subject when a frame omits it, which is correct for a single-subject
+stream and is what every stream was before coaching existed.
 
 The client's response to any event is to invalidate a query key and refetch. Do not put entity state
 in a frame: it would be a second source of truth for everything it touched, and the first

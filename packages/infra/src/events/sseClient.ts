@@ -39,6 +39,19 @@ export type EventKind = string
 
 export interface StreamEvent {
   readonly kind: EventKind
+  /**
+   * Whose data changed (BACKEND-CONTRACT §5.6).
+   *
+   * ADDRESSING, not entity state: it says whose cache to invalidate and carries no value that could
+   * disagree with what the cache holds — which is the property §5.6 protects. Without it a coach
+   * watching thirty athletes receives `{"kind":"session-logged"}` and cannot tell whose, leaving only
+   * a stream per athlete (which breaks the six-connections-per-origin budget at n=6) or invalidating
+   * every subject on every event (the thundering herd §5.6 exists to prevent).
+   *
+   * `null` when a frame omits it — an older server. The consumer then falls back to its own subject,
+   * which is exactly right for a single-subject stream and is what every stream was until now.
+   */
+  readonly subject: string | null
   /** The id the server assigned. Held only for diagnostics — the browser tracks resume itself. */
   readonly id: string
 }
@@ -150,7 +163,11 @@ export const openEventStream = (options: SseOptions): SseHandle => {
       failures = 0
       // Recorded BEFORE the callback, so a throw in a consumer cannot lose the position.
       if (message.lastEventId !== '') lastEventId = message.lastEventId
-      options.onEvent({ kind: readKind(message), id: message.lastEventId })
+      options.onEvent({
+        kind: readKind(message),
+        subject: readSubject(message),
+        id: message.lastEventId,
+      })
     }
 
     es.onerror = () => {
@@ -248,6 +265,26 @@ const readKind = (message: MessageEvent<string>): string => {
     // case of an unrecognised one is a refetch that finds nothing changed.
   }
   return message.type
+}
+
+/**
+ * The subject a frame concerns, or null when it does not say.
+ *
+ * Deliberately separate from `readKind` rather than one parse returning both: a frame with a kind and
+ * no subject is legitimate (an older server), and a combined reader would have to invent a subject or
+ * discard the kind. Null is a real answer here, not a parse failure.
+ */
+const readSubject = (message: MessageEvent<string>): string | null => {
+  try {
+    const parsed: unknown = JSON.parse(message.data)
+    if (typeof parsed === 'object' && parsed !== null && 'subject' in parsed) {
+      const { subject } = parsed
+      if (typeof subject === 'string' && subject !== '') return subject
+    }
+  } catch {
+    // Same reasoning as `readKind`: a malformed frame costs a refetch, not a throw.
+  }
+  return null
 }
 
 const timeNow = (): number => Date.now()

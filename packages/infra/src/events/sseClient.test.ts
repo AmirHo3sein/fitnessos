@@ -11,8 +11,14 @@ class FakeSource {
   close() {
     this.closed = true
   }
-  emit(kind: string, id = '1') {
-    this.onmessage?.({ data: JSON.stringify({ kind }), lastEventId: id, type: 'message' } as MessageEvent<string>)
+  emit(kind: string, id = '1', subject?: string) {
+    // `subject` omitted by default, because a frame without one is legitimate — an older server — and
+    // the client must still deliver the event rather than discarding it.
+    this.onmessage?.({
+      data: JSON.stringify(subject === undefined ? { kind } : { kind, subject }),
+      lastEventId: id,
+      type: 'message',
+    } as MessageEvent<string>)
   }
   fail() {
     this.onerror?.()
@@ -76,7 +82,26 @@ describe('what the client does with a stream', () => {
      */
     const { latest, events } = harness()
     latest().emit('programme-revised', '7')
-    expect(events).toEqual([{ kind: 'programme-revised', id: '7' }])
+    expect(events).toEqual([{ kind: 'programme-revised', subject: null, id: '7' }])
+  })
+
+  it('carries the subject a frame names, and null when it names none', () => {
+    /**
+     * §5.6. The subject is ADDRESSING rather than entity state: it says whose cache to invalidate and
+     * carries no value that could disagree with what the cache holds.
+     *
+     * `null` is a real answer, not a parse failure — a frame from an older server has no subject, and
+     * the consumer falls back to its own. Discarding such an event instead would make every screen
+     * stop updating the moment a server was rolled back.
+     */
+    const { latest, events } = harness()
+    latest().emit('session-logged', '1', '019ff600-0000-7000-8000-00000000000a')
+    latest().emit('session-logged', '2')
+
+    expect(events).toEqual([
+      { kind: 'session-logged', subject: '019ff600-0000-7000-8000-00000000000a', id: '1' },
+      { kind: 'session-logged', subject: null, id: '2' },
+    ])
   })
 
   it('does NOT reconnect by itself after a drop', () => {

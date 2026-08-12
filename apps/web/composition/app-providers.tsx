@@ -201,9 +201,21 @@ export const AppProviders = ({ children, liveInvalidation, subject }: AppProvide
          * thundering herd this whole handler is written to avoid, only worse: a coach with thirty
          * athletes would refetch all thirty every time any one of them logged a session.
          */
-        if (subject === null) return
+        /*
+         * The frame's OWN subject decides whose cache to drop, falling back to this surface's subject
+         * when a frame does not say (§5.6, and an older server).
+         *
+         * Using this surface's subject unconditionally would be wrong the moment a coach is watching
+         * more than one athlete: every event from any of them would invalidate the one currently on
+         * screen — refetching the wrong athlete and leaving the right one stale, which is the same
+         * silent wrongness the subject-scoped keys were introduced to prevent.
+         */
+        const target = event.subject ?? subject
+        if (target === null) return
         for (const segment of keysFor(event.kind)) {
-          void queryClient.invalidateQueries({ queryKey: [...subjectScope(subject as SubjectId), segment] })
+          void queryClient.invalidateQueries({
+            queryKey: [...subjectScope(target as SubjectId), segment],
+          })
         }
       },
 
