@@ -1,5 +1,6 @@
 'use client'
 
+import { useSubject } from '@fitnessos/ui'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { systemClock } from '@fitnessos/kernel'
 import { logSession, sessionKeys, type LogSessionDraft } from '../../application/index'
@@ -24,6 +25,7 @@ export interface UseLogSession {
  */
 export const useLogSession = (onLogged: () => void): UseLogSession => {
   const ports = useExecutionPorts()
+  const subject = useSubject()
   const queryClient = useQueryClient()
   const zone = Intl.DateTimeFormat().resolvedOptions().timeZone
 
@@ -68,7 +70,7 @@ export const useLogSession = (onLogged: () => void): UseLogSession => {
       // The session is logged, so the upcoming list is stale. Invalidate rather than set: the
       // server decides what is still upcoming, and guessing would leave a completed session on the
       // list or remove one that is repeated.
-      void queryClient.invalidateQueries({ queryKey: sessionKeys.all })
+      void queryClient.invalidateQueries({ queryKey: sessionKeys.all(subject) })
       onLogged()
     },
   })

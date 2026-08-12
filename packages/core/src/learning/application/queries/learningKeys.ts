@@ -1,9 +1,10 @@
+import { subjectScope, type SubjectId } from '@fitnessos/kernel'
 import type { DecisionOutcomeSnapshot, LearningPorts, ProposalSnapshot } from '../ports/index'
 
 export const learningKeys = {
-  all: ['learning'] as const,
-  proposals: () => [...learningKeys.all, 'proposals'] as const,
-  outcomes: () => [...learningKeys.all, 'outcomes'] as const,
+  all: (subject: SubjectId) => [...subjectScope(subject), 'learning'] as const,
+  proposals: (subject: SubjectId) => [...learningKeys.all(subject), 'proposals'] as const,
+  outcomes: (subject: SubjectId) => [...learningKeys.all(subject), 'outcomes'] as const,
 } as const
 
 export interface QueryDefinition<T> {
@@ -14,16 +15,18 @@ export interface QueryDefinition<T> {
 
 export const proposalsQuery = (
   ports: LearningPorts,
+  subject: SubjectId,
 ): QueryDefinition<readonly ProposalSnapshot[]> => ({
-  queryKey: learningKeys.proposals(),
+  queryKey: learningKeys.proposals(subject),
   queryFn: ({ signal }) => ports.learning.proposals(signal),
   staleTime: 60_000,
 })
 
 export const outcomesQuery = (
   ports: LearningPorts,
+  subject: SubjectId,
 ): QueryDefinition<readonly DecisionOutcomeSnapshot[]> => ({
-  queryKey: learningKeys.outcomes(),
+  queryKey: learningKeys.outcomes(subject),
   queryFn: ({ signal }) => ports.learning.outcomes(signal),
   staleTime: 5 * 60_000,
 })
@@ -42,7 +45,7 @@ export interface Invalidator {
  * proposal sitting in the pending list.
  */
 export const learningInvalidations = {
-  onVerdictRendered: (qc: Invalidator) => qc.invalidateQueries({ queryKey: learningKeys.all }),
-  onProgramRevised: (qc: Invalidator) =>
-    qc.invalidateQueries({ queryKey: learningKeys.proposals() }),
+  onVerdictRendered: (qc: Invalidator, subject: SubjectId) => qc.invalidateQueries({ queryKey: learningKeys.all(subject) }),
+  onProgramRevised: (qc: Invalidator, subject: SubjectId) =>
+    qc.invalidateQueries({ queryKey: learningKeys.proposals(subject) }),
 } as const

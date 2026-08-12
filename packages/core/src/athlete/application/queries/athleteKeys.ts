@@ -1,3 +1,4 @@
+import { subjectScope, type SubjectId } from '@fitnessos/kernel'
 import type { AthleteId } from '@fitnessos/kernel'
 import type { AthletePorts, AthleteSnapshot } from '../ports/index'
 
@@ -17,16 +18,21 @@ import type { AthletePorts, AthleteSnapshot } from '../ports/index'
  */
 
 export const athleteKeys = {
-  all: ['athlete'] as const,
+  all: (subject: SubjectId) => [...subjectScope(subject), 'athlete'] as const,
   /**
    * The authenticated person's own athlete.
    *
-   * Deliberately NOT keyed by athlete id. The id is unknown until the response
-   * arrives, and keying by it would mean the cache entry could not be warmed
-   * before the first fetch — which is exactly what the RSC prefetch needs to do.
+   * Deliberately NOT keyed by athlete id, and therefore **the one query that cannot be
+   * subject-scoped**: the id is unknown until the response arrives, and keying by it would mean the
+   * cache entry could not be warmed before the first fetch — which is exactly what the RSC prefetch
+   * needs to do.
+   *
+   * It is also not a subject question. "Who am I" is asked of the PERSON (ADR-0005), before any
+   * subject exists — the athlete surface resolves this first and then provides its own id as the
+   * subject for everything else. Hence the `me` root rather than a subject prefix.
    */
-  mine: () => [...athleteKeys.all, 'mine'] as const,
-  byId: (id: AthleteId) => [...athleteKeys.all, 'byId', id] as const,
+  mine: () => ['me', 'athlete'] as const,
+  byId: (id: AthleteId) => [...athleteKeys.all(id), 'byId', id] as const,
 } as const
 
 export interface QueryDefinition<T> {

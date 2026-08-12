@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { subjectScope, UNSCOPED_KEY_ROOTS, type AthleteId } from '@fitnessos/kernel'
 import { INVALIDATIONS, isKnownKind, keysFor, RESUME_IMPOSSIBLE } from '@fitnessos/infra'
 import { athleteKeys } from '@fitnessos/core/athlete'
 import { goalKeys } from '@fitnessos/core/goal'
@@ -29,20 +30,33 @@ import { timelineKeys } from '@fitnessos/ctx-timeline'
  * prevent it.
  */
 
-/** Every key root the app actually uses, from the factories that own them. */
+/** A subject to build keys against. Any id will do — what is asserted is the SHAPE. */
+const SUBJECT = '019000ff-0000-7000-8000-00000000fea7' as AthleteId
+
+/**
+ * Every subject-scoped key factory, called the way the app calls it.
+ *
+ * A function per factory rather than a pre-built array, so the test exercises the real call signature:
+ * a factory that stopped requiring a subject would not compile here.
+ */
+const SCOPED_FACTORIES: readonly { readonly name: string; readonly key: readonly unknown[] }[] = [
+  { name: 'athlete', key: athleteKeys.all(SUBJECT) },
+  { name: 'goal', key: goalKeys.all(SUBJECT) },
+  { name: 'learning', key: learningKeys.all(SUBJECT) },
+  { name: 'session', key: sessionKeys.all(SUBJECT) },
+  { name: 'measurement', key: measurementKeys.all(SUBJECT) },
+  { name: 'program', key: programKeys.all(SUBJECT) },
+  { name: 'nutrition', key: nutritionKeys.all(SUBJECT) },
+  { name: 'workflow', key: workflowKeys.all(SUBJECT) },
+  { name: 'report', key: reportKeys.all(SUBJECT) },
+  { name: 'dashboard', key: dashboardKeys.all(SUBJECT) },
+  { name: 'timeline', key: timelineKeys.all(SUBJECT) },
+]
+
+/** The roots the invalidation map may name — the segment after the subject prefix. */
 const REAL_ROOTS: readonly string[] = [
-  athleteKeys.all[0],
-  goalKeys.all[0],
-  learningKeys.all[0],
-  sessionKeys.all[0],
-  sessionKeys.syncIssues()[0],
-  measurementKeys.all[0],
-  programKeys.all[0],
-  nutritionKeys.all[0],
-  workflowKeys.all[0],
-  reportKeys.all[0],
-  dashboardKeys.all[0],
-  timelineKeys.all[0],
+  ...SCOPED_FACTORIES.map((f) => String(f.key[f.key.length - 1])),
+  ...UNSCOPED_KEY_ROOTS,
 ]
 
 describe('every invalidation targets a key that exists', () => {
@@ -79,5 +93,51 @@ describe('resume-impossible is known, and answered differently', () => {
   it('yields no key segments, because it is not an entity event', () => {
     expect(keysFor(RESUME_IMPOSSIBLE)).toEqual([])
     expect(Object.keys(INVALIDATIONS)).not.toContain(RESUME_IMPOSSIBLE)
+  })
+})
+
+describe('no query key can be built without a subject', () => {
+  /*
+   * The guard this whole change exists for.
+   *
+   * Until a coach existed, `['program']` was unambiguous — one client could see one programme. The
+   * moment a viewer can switch between athletes, that key is a CACHE COLLISION: TanStack Query serves
+   * athlete A's programme for a read made while looking at athlete B. No error, no contract violation,
+   * nothing in telemetry, and what the coach sees is one athlete's training under another's name.
+   *
+   * There is no runtime check that can catch that — by the time it happens the data looks fine. So the
+   * check is here, on the shape of every key, before any coach route exists to trigger it.
+   */
+  it('puts the subject first in every scoped key', () => {
+    const prefix = subjectScope(SUBJECT)
+    const wrong = SCOPED_FACTORIES.filter(
+      (f) => f.key[0] !== prefix[0] || f.key[1] !== prefix[1],
+    ).map((f) => `${f.name} → ${JSON.stringify(f.key)}`)
+
+    expect(wrong, 'every scoped key must begin with the subject prefix').toEqual([])
+  })
+
+  it('makes two subjects produce disjoint keys', () => {
+    // The property that actually matters. Prefix-first is only useful if it separates.
+    const other = '019000ff-0000-7000-8000-00000000beef' as AthleteId
+    for (const factory of SCOPED_FACTORIES) {
+      expect(JSON.stringify(factory.key)).not.toBe(
+        JSON.stringify(subjectScope(other).concat(factory.key.slice(2) as never[])),
+      )
+    }
+  })
+
+  it('has exactly two deliberately unscoped roots, and says why in the kernel', () => {
+    /*
+     * `me` — "who is the authenticated person's athlete" (ADR-0005), asked BEFORE a subject exists and
+     *   answered by the response that supplies one.
+     * `sync-issues` — the offline queue is DEVICE-local; only an athlete logs their own sessions.
+     *
+     * Asserted as an exact list rather than a minimum, so a third exception is a decision somebody
+     * makes on purpose instead of a shortcut that ships.
+     */
+    expect(UNSCOPED_KEY_ROOTS).toEqual(['me', 'sync-issues'])
+    expect(athleteKeys.mine()[0]).toBe('me')
+    expect(sessionKeys.syncIssues()[0]).toBe('sync-issues')
   })
 })

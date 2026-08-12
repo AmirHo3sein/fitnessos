@@ -1,9 +1,10 @@
+import { subjectScope, type SubjectId } from '@fitnessos/kernel'
 import type { DashboardSnapshot } from '../../editor/schema'
 import type { DashboardPorts } from '../ports/index'
 
 export const dashboardKeys = {
-  all: ['dashboard-layout'] as const,
-  current: () => [...dashboardKeys.all, 'current'] as const,
+  all: (subject: SubjectId) => [...subjectScope(subject), 'dashboard-layout'] as const,
+  current: (subject: SubjectId) => [...dashboardKeys.all(subject), 'current'] as const,
 } as const
 
 export interface QueryDefinition<T> {
@@ -14,8 +15,9 @@ export interface QueryDefinition<T> {
 
 export const currentDashboardQuery = (
   ports: DashboardPorts,
+  subject: SubjectId,
 ): QueryDefinition<DashboardSnapshot | null> => ({
-  queryKey: dashboardKeys.current(),
+  queryKey: dashboardKeys.current(subject),
   queryFn: ({ signal }) => ports.dashboard.current(signal),
   staleTime: 5 * 60_000,
 })

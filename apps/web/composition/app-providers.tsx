@@ -12,6 +12,8 @@ import { TimelinePortsProvider } from '@fitnessos/ctx-timeline/presentation'
 import { NutritionPortsProvider } from '@fitnessos/ctx-nutrition/presentation'
 import { WorkflowPortsProvider } from '@fitnessos/ctx-workflow/presentation'
 import { keysFor, openEventStream, RESUME_IMPOSSIBLE } from '@fitnessos/infra'
+import { subjectScope, type SubjectId } from '@fitnessos/kernel'
+import { SubjectProvider } from '@fitnessos/ui'
 import { useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useRef, type ReactNode } from 'react'
@@ -56,6 +58,13 @@ import { createHttp } from './container'
 export interface AppProvidersProps {
   readonly children: ReactNode
   /**
+   * The athlete every key below is scoped to.
+   *
+   * Null only before onboarding, when there is no athlete yet — the onboarding route is the one
+   * surface with no subject, and it reads nothing that needs one.
+   */
+  readonly subject: string | null
+  /**
    * Flags, evaluated on the SERVER and handed down as plain booleans — the same way labels are.
    *
    * Not read in here: this is a client component, so reading `process.env` would either be
@@ -65,7 +74,7 @@ export interface AppProvidersProps {
   readonly liveInvalidation: boolean
 }
 
-export const AppProviders = ({ children, liveInvalidation }: AppProvidersProps) => {
+export const AppProviders = ({ children, liveInvalidation, subject }: AppProvidersProps) => {
   const router = useRouter()
   // Stable for the life of the provider above, so it can go in the memo's deps without rebuilding
   // the container — unlike `router`, whose identity changes on navigation.
@@ -183,8 +192,18 @@ export const AppProviders = ({ children, liveInvalidation }: AppProvidersProps) 
          * will publish kinds this build has never heard of and "refetch everything" would turn each
          * one into a thundering herd from every open tab.
          */
+        /*
+         * SUBJECT-SCOPED. The map's segments are relative — `'program'`, `'session'` — and the subject
+         * prefix is applied here, because `infra` may not import a context and therefore cannot know
+         * whose data a key belongs to.
+         *
+         * Without the prefix an event would invalidate every subject's cache at once, which is the
+         * thundering herd this whole handler is written to avoid, only worse: a coach with thirty
+         * athletes would refetch all thirty every time any one of them logged a session.
+         */
+        if (subject === null) return
         for (const segment of keysFor(event.kind)) {
-          void queryClient.invalidateQueries({ queryKey: [segment] })
+          void queryClient.invalidateQueries({ queryKey: [...subjectScope(subject as SubjectId), segment] })
         }
       },
 
@@ -232,9 +251,20 @@ export const AppProviders = ({ children, liveInvalidation }: AppProvidersProps) 
     return () => {
       stream.close()
     }
-  }, [liveInvalidation, ports, queryClient])
+  }, [liveInvalidation, ports, queryClient, subject])
 
-  return (
+  /*
+   * The subject wraps the port tree rather than sitting inside it, because it is the same kind of
+   * fact: ADR-0031 has ports provided by the route group that uses them, and the subject arrives from
+   * exactly the same place. The coach route group will supply the id from its URL; this one supplies
+   * the signed-in athlete's own.
+   *
+   * Onboarding is the single surface with no subject — the athlete does not exist until it completes.
+   * It reads nothing subject-scoped, so the tree renders without a provider, and `createDiContext`
+   * throws if anything below it reads one. A loud failure is what we want here: the alternative is a
+   * silent read of somebody else's id, which is the whole class of bug this change exists to close.
+   */
+  const tree = (
     <AthletePortsProvider value={ports.athlete}>
       <GoalPortsProvider value={ports.goal}>
         <PrescriptionPortsProvider value={ports.prescription}>
@@ -259,4 +289,8 @@ export const AppProviders = ({ children, liveInvalidation }: AppProvidersProps) 
       </GoalPortsProvider>
     </AthletePortsProvider>
   )
+
+  if (subject === null) return tree
+
+  return <SubjectProvider value={subject as SubjectId}>{tree}</SubjectProvider>
 }

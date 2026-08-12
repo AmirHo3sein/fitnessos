@@ -1,3 +1,4 @@
+import { subjectScope, type SubjectId } from '@fitnessos/kernel'
 import type { AthleteId } from '@fitnessos/kernel'
 import type { GoalPorts, GoalSnapshot } from '../ports/index'
 
@@ -10,9 +11,9 @@ import type { GoalPorts, GoalSnapshot } from '../ports/index'
  */
 
 export const goalKeys = {
-  all: ['goal'] as const,
-  mine: () => [...goalKeys.all, 'mine'] as const,
-  byAthlete: (athleteId: AthleteId) => [...goalKeys.all, 'athlete', athleteId] as const,
+  all: (subject: SubjectId) => [...subjectScope(subject), 'goal'] as const,
+  mine: (subject: SubjectId) => [...goalKeys.all(subject), 'mine'] as const,
+  byAthlete: (athleteId: AthleteId) => [...goalKeys.all(athleteId), 'athlete', athleteId] as const,
 } as const
 
 export interface QueryDefinition<T> {
@@ -23,8 +24,9 @@ export interface QueryDefinition<T> {
 
 export const myGoalsQuery = (
   ports: GoalPorts,
+  subject: SubjectId,
 ): QueryDefinition<readonly GoalSnapshot[]> => ({
-  queryKey: goalKeys.mine(),
+  queryKey: goalKeys.mine(subject),
   queryFn: ({ signal }) => ports.goal.listMine(signal),
   // A goal changes on the order of weeks. Note this is about the GOAL, not about whether
   // it is overdue — overdue-ness is derived from a date at render time (ADR-0006), so a
@@ -41,6 +43,6 @@ export interface Invalidator {
  * the same event reuses the rule instead of duplicating it.
  */
 export const goalInvalidations = {
-  onGoalDeclared: (qc: Invalidator) => qc.invalidateQueries({ queryKey: goalKeys.mine() }),
-  onGoalRetired: (qc: Invalidator) => qc.invalidateQueries({ queryKey: goalKeys.mine() }),
+  onGoalDeclared: (qc: Invalidator, subject: SubjectId) => qc.invalidateQueries({ queryKey: goalKeys.mine(subject) }),
+  onGoalRetired: (qc: Invalidator, subject: SubjectId) => qc.invalidateQueries({ queryKey: goalKeys.mine(subject) }),
 } as const

@@ -1,5 +1,6 @@
 'use client'
 
+import { useSubject } from '@fitnessos/ui'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { systemClock, type AthleteId } from '@fitnessos/kernel'
 import {
@@ -36,6 +37,7 @@ export const useDeclareGoal = (
   onDeclared: (goal: GoalSnapshot) => void,
 ): UseDeclareGoal => {
   const ports = useGoalPorts()
+  const subject = useSubject()
   const queryClient = useQueryClient()
   const zone = Intl.DateTimeFormat().resolvedOptions().timeZone
 
@@ -43,7 +45,7 @@ export const useDeclareGoal = (
     mutationFn: (draft: GoalDraft) =>
       declareGoal(ports, athleteId, draft, systemClock, zone),
     onSuccess: (goal) => {
-      void queryClient.invalidateQueries({ queryKey: goalKeys.mine() })
+      void queryClient.invalidateQueries({ queryKey: goalKeys.mine(subject) })
       onDeclared(goal)
     },
   })

@@ -1,3 +1,4 @@
+import { subjectScope, type SubjectId } from '@fitnessos/kernel'
 import type { AthleteId } from '@fitnessos/kernel'
 
 /**
@@ -12,8 +13,8 @@ import type { AthleteId } from '@fitnessos/kernel'
  */
 
 export const developmentKeys = {
-  all: ['development'] as const,
-  byAthlete: (athleteId: AthleteId) => [...developmentKeys.all, 'athlete', athleteId] as const,
+  all: (subject: SubjectId) => [...subjectScope(subject), 'development'] as const,
+  byAthlete: (athleteId: AthleteId) => [...developmentKeys.all(athleteId), 'athlete', athleteId] as const,
 } as const
 
 /**

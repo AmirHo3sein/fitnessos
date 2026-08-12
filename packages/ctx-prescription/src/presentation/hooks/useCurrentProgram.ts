@@ -1,5 +1,6 @@
 'use client'
 
+import { useSubject } from '@fitnessos/ui'
 import { useQuery, type UseQueryResult } from '@tanstack/react-query'
 import { currentProgramQuery, type ProgramSnapshot } from '../../application/index'
 import { usePrescriptionPorts } from '../di'
@@ -12,4 +13,4 @@ import { usePrescriptionPorts } from '../di'
  * spinner that never resolves.
  */
 export const useCurrentProgram = (): UseQueryResult<ProgramSnapshot | null> =>
-  useQuery(currentProgramQuery(usePrescriptionPorts()))
+  useQuery(currentProgramQuery(usePrescriptionPorts(), useSubject()))

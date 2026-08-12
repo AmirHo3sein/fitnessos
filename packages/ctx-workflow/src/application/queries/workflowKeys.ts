@@ -1,9 +1,10 @@
+import { subjectScope, type SubjectId } from '@fitnessos/kernel'
 import type { WorkflowSnapshot } from '../../editor/schema'
 import type { WorkflowPorts } from '../ports/index'
 
 export const workflowKeys = {
-  all: ['workflow'] as const,
-  current: () => [...workflowKeys.all, 'current'] as const,
+  all: (subject: SubjectId) => [...subjectScope(subject), 'workflow'] as const,
+  current: (subject: SubjectId) => [...workflowKeys.all(subject), 'current'] as const,
 } as const
 
 export interface QueryDefinition<T> {
@@ -14,8 +15,9 @@ export interface QueryDefinition<T> {
 
 export const currentWorkflowQuery = (
   ports: WorkflowPorts,
+  subject: SubjectId,
 ): QueryDefinition<WorkflowSnapshot | null> => ({
-  queryKey: workflowKeys.current(),
+  queryKey: workflowKeys.current(subject),
   queryFn: ({ signal }) => ports.workflow.current(signal),
   staleTime: 5 * 60_000,
 })

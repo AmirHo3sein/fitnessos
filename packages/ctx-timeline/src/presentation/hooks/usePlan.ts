@@ -1,5 +1,6 @@
 'use client'
 
+import { useSubject } from '@fitnessos/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { currentPlanQuery, timelineKeys } from '../../application/index'
 import type { PlanSnapshot } from '../../editor/schema'
@@ -27,14 +28,15 @@ export interface UsePlan {
 
 export const usePlan = (): UsePlan => {
   const ports = useTimelinePorts()
+  const subject = useSubject()
   const queryClient = useQueryClient()
-  const query = useQuery(currentPlanQuery(ports))
+  const query = useQuery(currentPlanQuery(ports, subject))
 
   const mutation = useMutation({
     mutationFn: (plan: PlanSnapshot) => ports.timeline.save(plan),
     // Set, not invalidate: the response IS the new state.
     onSuccess: (saved) => {
-      queryClient.setQueryData(timelineKeys.current(), saved)
+      queryClient.setQueryData(timelineKeys.current(subject), saved)
     },
   })
 

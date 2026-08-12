@@ -29,3 +29,4 @@ export { Skeleton, type SkeletonProps } from './primitives/skeleton'
 
 export { SafeHtml, sanitizeHtml, type SafeHtmlProps } from './patterns/safe-html'
 export { RefChip, type RefChipProps, type RefChipState } from './patterns/ref-chip'
+export { SubjectProvider, useSubject } from './di/subject'

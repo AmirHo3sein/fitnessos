@@ -1,5 +1,7 @@
 'use client'
 
+import { subjectScope } from '@fitnessos/kernel'
+import { useSubject } from '@fitnessos/ui'
 import { useQuery } from '@tanstack/react-query'
 import { refKey, type DocumentRef, type RefResolution } from '@fitnessos/editor-engine'
 import { usePrescriptionPorts } from '../di'
@@ -22,10 +24,20 @@ export const useResolvedRefs = (
   refs: readonly DocumentRef[],
 ): ReadonlyMap<string, RefResolution> | null => {
   const ports = usePrescriptionPorts()
+  const subject = useSubject()
   const keys = refs.map(refKey).sort()
 
   const { data } = useQuery({
-    queryKey: ['references', keys],
+    /*
+     * Subject-scoped, and this one is an ad-hoc key rather than a factory — which is exactly why it
+     * was nearly missed. A D-08 reference resolves to a LABEL for a named thing: a goal's title, a
+     * movement's name. Those belong to the subject, so a coach who opened athlete A and then athlete B
+     * would see A's goal titles rendered against B's programme blocks.
+     *
+     * The lint found it, not the sweep: every other key comes from a factory whose signature changed,
+     * and this one had no signature to change.
+     */
+    queryKey: [...subjectScope(subject), 'references', keys],
     queryFn: ({ signal }) => ports.references.resolve(refs, signal),
     // Resolution is a label and a link. It changes when someone renames a goal, which is rare and
     // not worth a refetch on every mount.

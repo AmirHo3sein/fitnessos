@@ -1,5 +1,6 @@
 'use client'
 
+import { useSubject } from '@fitnessos/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { currentReportQuery, reportKeys } from '../../application/index'
 import type { ReportSnapshot } from '../../editor/schema'
@@ -27,9 +28,10 @@ export interface UseReport {
 
 export const useReport = (): UseReport => {
   const ports = useReportPorts()
+  const subject = useSubject()
   const queryClient = useQueryClient()
 
-  const query = useQuery(currentReportQuery(ports))
+  const query = useQuery(currentReportQuery(ports, subject))
 
   const mutation = useMutation({
     mutationFn: (report: ReportSnapshot) => ports.report.save(report),
@@ -37,7 +39,7 @@ export const useReport = (): UseReport => {
     // round trip on data already in hand and leave a window where the canvas and the cache
     // disagree about where a tile is.
     onSuccess: (saved) => {
-      queryClient.setQueryData(reportKeys.current(), saved)
+      queryClient.setQueryData(reportKeys.current(subject), saved)
     },
   })
 

@@ -1,3 +1,4 @@
+import { subjectScope, type SubjectId } from '@fitnessos/kernel'
 import type {
   CheckInFormSnapshot,
   IndicatorSeriesSnapshot,
@@ -6,10 +7,10 @@ import type {
 } from '../ports/index'
 
 export const measurementKeys = {
-  all: ['measurement'] as const,
-  observations: () => [...measurementKeys.all, 'observations'] as const,
-  indicators: () => [...measurementKeys.all, 'indicators'] as const,
-  checkInForm: () => [...measurementKeys.all, 'check-in-form'] as const,
+  all: (subject: SubjectId) => [...subjectScope(subject), 'measurement'] as const,
+  observations: (subject: SubjectId) => [...measurementKeys.all(subject), 'observations'] as const,
+  indicators: (subject: SubjectId) => [...measurementKeys.all(subject), 'indicators'] as const,
+  checkInForm: (subject: SubjectId) => [...measurementKeys.all(subject), 'check-in-form'] as const,
 } as const
 
 export interface QueryDefinition<T> {
@@ -20,16 +21,18 @@ export interface QueryDefinition<T> {
 
 export const observationsQuery = (
   ports: MeasurementPorts,
+  subject: SubjectId,
 ): QueryDefinition<readonly ObservationSnapshot[]> => ({
-  queryKey: measurementKeys.observations(),
+  queryKey: measurementKeys.observations(subject),
   queryFn: ({ signal }) => ports.measurement.observations(signal),
   staleTime: 5 * 60_000,
 })
 
 export const indicatorsQuery = (
   ports: MeasurementPorts,
+  subject: SubjectId,
 ): QueryDefinition<readonly IndicatorSeriesSnapshot[]> => ({
-  queryKey: measurementKeys.indicators(),
+  queryKey: measurementKeys.indicators(subject),
   queryFn: ({ signal }) => ports.measurement.indicators(signal),
   // Shorter than observations. An indicator is DERIVED from performed sessions as well as
   // observations, so it moves when a session is logged — without the athlete recording anything
@@ -39,8 +42,9 @@ export const indicatorsQuery = (
 
 export const checkInFormQuery = (
   ports: MeasurementPorts,
+  subject: SubjectId,
 ): QueryDefinition<CheckInFormSnapshot | null> => ({
-  queryKey: measurementKeys.checkInForm(),
+  queryKey: measurementKeys.checkInForm(subject),
   queryFn: ({ signal }) => ports.measurement.checkInForm(signal),
   // Long. A form changes when a coach authors one, which is rare, and the editor sets the cache
   // from the save response rather than waiting for a refetch.
@@ -60,8 +64,8 @@ export interface Invalidator {
  * a stale estimated 1RM immediately after the session that moved it.
  */
 export const measurementInvalidations = {
-  onObservationRecorded: (qc: Invalidator) =>
-    qc.invalidateQueries({ queryKey: measurementKeys.all }),
-  onSessionPerformed: (qc: Invalidator) =>
-    qc.invalidateQueries({ queryKey: measurementKeys.indicators() }),
+  onObservationRecorded: (qc: Invalidator, subject: SubjectId) =>
+    qc.invalidateQueries({ queryKey: measurementKeys.all(subject) }),
+  onSessionPerformed: (qc: Invalidator, subject: SubjectId) =>
+    qc.invalidateQueries({ queryKey: measurementKeys.indicators(subject) }),
 } as const

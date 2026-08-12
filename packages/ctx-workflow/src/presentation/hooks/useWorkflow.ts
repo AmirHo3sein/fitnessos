@@ -1,5 +1,6 @@
 'use client'
 
+import { useSubject } from '@fitnessos/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { currentWorkflowQuery, workflowKeys } from '../../application/index'
 import type { WorkflowSnapshot } from '../../editor/schema'
@@ -27,14 +28,15 @@ export interface UseWorkflow {
 
 export const useWorkflow = (): UseWorkflow => {
   const ports = useWorkflowPorts()
+  const subject = useSubject()
   const queryClient = useQueryClient()
-  const query = useQuery(currentWorkflowQuery(ports))
+  const query = useQuery(currentWorkflowQuery(ports, subject))
 
   const mutation = useMutation({
     mutationFn: (workflow: WorkflowSnapshot) => ports.workflow.save(workflow),
     // Set, not invalidate: the response IS the new state.
     onSuccess: (saved) => {
-      queryClient.setQueryData(workflowKeys.current(), saved)
+      queryClient.setQueryData(workflowKeys.current(subject), saved)
     },
   })
 

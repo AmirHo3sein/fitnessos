@@ -1,5 +1,6 @@
 'use client'
 
+import { useSubject } from '@fitnessos/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   checkInFormQuery,
@@ -41,14 +42,15 @@ export interface UseCheckInForm {
  */
 export const useCheckInForm = (): UseCheckInForm => {
   const ports = useMeasurementPorts()
+  const subject = useSubject()
   const queryClient = useQueryClient()
 
-  const query = useQuery(checkInFormQuery(ports))
+  const query = useQuery(checkInFormQuery(ports, subject))
 
   const mutation = useMutation({
     mutationFn: (form: CheckInFormSnapshot) => ports.measurement.saveCheckInForm(form),
     onSuccess: (saved) => {
-      queryClient.setQueryData(measurementKeys.checkInForm(), saved)
+      queryClient.setQueryData(measurementKeys.checkInForm(subject), saved)
     },
   })
 

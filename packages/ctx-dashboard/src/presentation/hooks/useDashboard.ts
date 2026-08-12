@@ -1,5 +1,6 @@
 'use client'
 
+import { useSubject } from '@fitnessos/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { currentDashboardQuery, dashboardKeys } from '../../application/index'
 import type { DashboardSnapshot } from '../../editor/schema'
@@ -27,15 +28,16 @@ export interface UseDashboard {
 
 export const useDashboard = (): UseDashboard => {
   const ports = useDashboardPorts()
+  const subject = useSubject()
   const queryClient = useQueryClient()
-  const query = useQuery(currentDashboardQuery(ports))
+  const query = useQuery(currentDashboardQuery(ports, subject))
 
   const mutation = useMutation({
     mutationFn: (dashboard: DashboardSnapshot) => ports.dashboard.save(dashboard),
     // Set, not invalidate: the response IS the new state, and refetching would leave a window
     // where the grid and the cache disagree about where a widget is.
     onSuccess: (saved) => {
-      queryClient.setQueryData(dashboardKeys.current(), saved)
+      queryClient.setQueryData(dashboardKeys.current(subject), saved)
     },
   })
 

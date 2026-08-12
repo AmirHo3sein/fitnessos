@@ -68,7 +68,15 @@ export default async function AppLayout({
   ])
 
   const queryClient = createQueryClient()
+  /*
+   * The athlete surface resolves its OWN subject, and the order is forced rather than chosen.
+   *
+   * `myAthleteQuery` is the one query that cannot be subject-scoped (ADR-0005): "who is the
+   * authenticated person's athlete" is asked before any subject exists and is answered by the response
+   * that supplies one. Everything below this line is keyed by the id it returns.
+   */
   await queryClient.prefetchQuery(myAthleteQuery(athletePorts))
+  const me = queryClient.getQueryData<{ id: string }>(myAthleteQuery(athletePorts).queryKey)
 
   // Only routes that exist. A shell that links to unbuilt pages hands the user a 404 for a
   // link the product itself rendered — and it makes tests pass for the wrong reason, since a
@@ -123,7 +131,10 @@ export default async function AppLayout({
             `force-dynamic` for the CSP nonce, so this costs nothing extra and is evaluated per
             request — which is what lets an operator change a flag without a rebuild.
           */}
-          <AppProviders liveInvalidation={createFlags().isEnabled('live-invalidation')}>
+          <AppProviders
+            liveInvalidation={createFlags().isEnabled('live-invalidation')}
+            subject={me?.id ?? null}
+          >
             {children}
           </AppProviders>
         </HydrationBoundary>

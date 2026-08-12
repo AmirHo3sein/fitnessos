@@ -1,5 +1,6 @@
 'use client'
 
+import { useSubject } from '@fitnessos/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { newDecisionOutcomeId, type PlainDate } from '@fitnessos/kernel'
 import {
@@ -36,10 +37,11 @@ export interface UseUnjudged {
  */
 export const useUnjudged = (asOf: PlainDate): UseUnjudged => {
   const ports = useLearningPorts()
+  const subject = useSubject()
   const queryClient = useQueryClient()
 
-  const proposals = useQuery(proposalsQuery(ports))
-  const outcomes = useQuery(outcomesQuery(ports))
+  const proposals = useQuery(proposalsQuery(ports, subject))
+  const outcomes = useQuery(outcomesQuery(ports, subject))
 
   const mutation = useMutation({
     mutationFn: (input: { proposalId: string; verdict: Verdict; rationale: string }) =>
@@ -53,7 +55,7 @@ export const useUnjudged = (asOf: PlainDate): UseUnjudged => {
         // than something this list offers by accident.
         supersedes: null,
       }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: learningKeys.all }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: learningKeys.all(subject) }),
   })
 
   return {

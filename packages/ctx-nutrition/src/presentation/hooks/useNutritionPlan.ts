@@ -1,5 +1,6 @@
 'use client'
 
+import { useSubject } from '@fitnessos/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { currentNutritionPlanQuery, nutritionKeys } from '../../application/index'
 import type { NutritionSnapshot } from '../../editor/schema'
@@ -27,14 +28,15 @@ export interface UseNutritionPlan {
 
 export const useNutritionPlan = (): UseNutritionPlan => {
   const ports = useNutritionPorts()
+  const subject = useSubject()
   const queryClient = useQueryClient()
-  const query = useQuery(currentNutritionPlanQuery(ports))
+  const query = useQuery(currentNutritionPlanQuery(ports, subject))
 
   const mutation = useMutation({
     mutationFn: (plan: NutritionSnapshot) => ports.nutrition.save(plan),
     // Set, not invalidate: the response IS the new state.
     onSuccess: (saved) => {
-      queryClient.setQueryData(nutritionKeys.current(), saved)
+      queryClient.setQueryData(nutritionKeys.current(subject), saved)
     },
   })
 

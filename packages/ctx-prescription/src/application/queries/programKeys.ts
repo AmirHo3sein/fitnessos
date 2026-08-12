@@ -1,8 +1,9 @@
+import { subjectScope, type SubjectId } from '@fitnessos/kernel'
 import type { PrescriptionPorts, ProgramSnapshot } from '../ports/index'
 
 export const programKeys = {
-  all: ['program'] as const,
-  current: () => [...programKeys.all, 'current'] as const,
+  all: (subject: SubjectId) => [...subjectScope(subject), 'program'] as const,
+  current: (subject: SubjectId) => [...programKeys.all(subject), 'current'] as const,
 } as const
 
 export interface QueryDefinition<T> {
@@ -13,8 +14,9 @@ export interface QueryDefinition<T> {
 
 export const currentProgramQuery = (
   ports: PrescriptionPorts,
+  subject: SubjectId,
 ): QueryDefinition<ProgramSnapshot | null> => ({
-  queryKey: programKeys.current(),
+  queryKey: programKeys.current(subject),
   queryFn: ({ signal }) => ports.prescription.currentProgram(signal),
   staleTime: 5 * 60_000,
 })
@@ -29,6 +31,6 @@ export interface Invalidator {
  * events rather than after the mutation that triggered them.
  */
 export const programInvalidations = {
-  onProgramRevised: (qc: Invalidator) => qc.invalidateQueries({ queryKey: programKeys.all }),
-  onProgramAssigned: (qc: Invalidator) => qc.invalidateQueries({ queryKey: programKeys.all }),
+  onProgramRevised: (qc: Invalidator, subject: SubjectId) => qc.invalidateQueries({ queryKey: programKeys.all(subject) }),
+  onProgramAssigned: (qc: Invalidator, subject: SubjectId) => qc.invalidateQueries({ queryKey: programKeys.all(subject) }),
 } as const

@@ -1,9 +1,10 @@
+import { subjectScope, type SubjectId } from '@fitnessos/kernel'
 import type { PlanSnapshot } from '../../editor/schema'
 import type { TimelinePorts } from '../ports/index'
 
 export const timelineKeys = {
-  all: ['plan'] as const,
-  current: () => [...timelineKeys.all, 'current'] as const,
+  all: (subject: SubjectId) => [...subjectScope(subject), 'plan'] as const,
+  current: (subject: SubjectId) => [...timelineKeys.all(subject), 'current'] as const,
 } as const
 
 export interface QueryDefinition<T> {
@@ -12,8 +13,11 @@ export interface QueryDefinition<T> {
   readonly staleTime?: number
 }
 
-export const currentPlanQuery = (ports: TimelinePorts): QueryDefinition<PlanSnapshot | null> => ({
-  queryKey: timelineKeys.current(),
+export const currentPlanQuery = (
+  ports: TimelinePorts,
+  subject: SubjectId,
+): QueryDefinition<PlanSnapshot | null> => ({
+  queryKey: timelineKeys.current(subject),
   queryFn: ({ signal }) => ports.timeline.current(signal),
   staleTime: 5 * 60_000,
 })

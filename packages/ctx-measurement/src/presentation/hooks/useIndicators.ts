@@ -1,5 +1,6 @@
 'use client'
 
+import { useSubject } from '@fitnessos/ui'
 import { useQuery } from '@tanstack/react-query'
 import type { PlainDate } from '@fitnessos/kernel'
 import {
@@ -18,6 +19,6 @@ import { useMeasurementPorts } from '../di'
  * mismatch that resolves in favour of whichever ran second.
  */
 export const useIndicators = (asOf: PlainDate): readonly IndicatorSeriesView[] => {
-  const { data } = useQuery(indicatorsQuery(useMeasurementPorts()))
+  const { data } = useQuery(indicatorsQuery(useMeasurementPorts(), useSubject()))
   return indicatorSeriesViews(data ?? [], asOf)
 }

@@ -1,3 +1,4 @@
+import { subjectScope, type SubjectId } from '@fitnessos/kernel'
 import type {
   ExecutionPorts,
   PrescribedSessionSnapshot,
@@ -5,8 +6,8 @@ import type {
 } from '../ports/index'
 
 export const sessionKeys = {
-  all: ['session'] as const,
-  upcoming: () => [...sessionKeys.all, 'upcoming'] as const,
+  all: (subject: SubjectId) => [...subjectScope(subject), 'session'] as const,
+  upcoming: (subject: SubjectId) => [...sessionKeys.all(subject), 'upcoming'] as const,
   /** Outside `all`, so invalidating the session list does not refetch the local issue log. */
   syncIssues: () => ['sync-issues'] as const,
 } as const
@@ -19,8 +20,9 @@ export interface QueryDefinition<T> {
 
 export const upcomingSessionsQuery = (
   ports: ExecutionPorts,
+  subject: SubjectId,
 ): QueryDefinition<readonly PrescribedSessionSnapshot[]> => ({
-  queryKey: sessionKeys.upcoming(),
+  queryKey: sessionKeys.upcoming(subject),
   queryFn: ({ signal }) => ports.execution.upcomingSessions(signal),
   // Shorter than the programme's. What is upcoming changes as sessions are performed, and a
   // list that still shows a session the athlete finished an hour ago reads as broken.
@@ -42,11 +44,11 @@ export interface Invalidator {
 }
 
 export const sessionInvalidations = {
-  onSessionPerformed: (qc: Invalidator) => qc.invalidateQueries({ queryKey: sessionKeys.all }),
+  onSessionPerformed: (qc: Invalidator, subject: SubjectId) => qc.invalidateQueries({ queryKey: sessionKeys.all(subject) }),
   /**
    * A revised programme regenerates upcoming sessions, so this list is stale even though
    * nothing in Execution changed. Naming the rule after the event rather than the mutation is
    * what makes that reachable from the Prescription side without a cross-context write.
    */
-  onProgramRevised: (qc: Invalidator) => qc.invalidateQueries({ queryKey: sessionKeys.all }),
+  onProgramRevised: (qc: Invalidator, subject: SubjectId) => qc.invalidateQueries({ queryKey: sessionKeys.all(subject) }),
 } as const

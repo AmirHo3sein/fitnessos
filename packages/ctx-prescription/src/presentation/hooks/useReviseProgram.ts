@@ -1,5 +1,6 @@
 'use client'
 
+import { useSubject } from '@fitnessos/ui'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   ProgramConflictError,
@@ -45,12 +46,13 @@ export interface UseReviseProgram {
  */
 export const useReviseProgram = (base: ProgramVersionSnapshot): UseReviseProgram => {
   const ports = usePrescriptionPorts()
+  const subject = useSubject()
   const queryClient = useQueryClient()
 
   const mutation = useMutation({
     mutationFn: (next: ProgramVersionSnapshot) => reviseProgram(ports, base, next),
     onSuccess: (program) => {
-      queryClient.setQueryData(programKeys.current(), program)
+      queryClient.setQueryData(programKeys.current(subject), program)
     },
   })
 
