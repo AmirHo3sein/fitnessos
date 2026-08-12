@@ -102,6 +102,31 @@ available outcome, because nothing anywhere records that it happened.
 they collided with (ADR-0033). Without a body it can only say that something went
 wrong, which is a conflict nobody can resolve.
 
+### 2.1a The same rule, for the other six artefacts
+
+**Required, and new (ADR-0035).** `PUT /{artefact}/{id}` — check-in forms, dashboards, nutrition
+plans, plans, reports, workflows — MUST carry `baseRevision`, the `revision` the client last read.
+A mismatch, or its absence against an artefact that already exists, MUST be refused with **409**
+carrying the artefact as it now stands.
+
+**Why this was missed.** §2.1 was written for programme versions because a programme was the only
+artefact two people could plausibly edit. The other six were `PUT` with no precondition, which is safe
+while there is exactly one author — you cannot collide with yourself — and becomes last-write-wins the
+moment there are two.
+
+ADR-0033 already rejected that resolution, for a reason that applies here unchanged: *"last-write-wins
+was rejected because neither available clock can decide which write is last"*.
+
+**What breaks without it.** A coach and an athlete edit one nutrition plan. One silently overwrites
+the other. Nothing anywhere records that it happened, and the athlete follows a plan their coach did
+not write — §2.1's stated worst outcome, arriving through the six endpoints §2.1 did not cover.
+
+**A first save carries no `baseRevision`**, because there is nothing to collide with. §4.9's rule that
+PUT to an unknown id CREATES is unaffected.
+
+`GET /{artefact}/current` therefore returns `revision` alongside `id`, and an accepted `PUT` returns
+the new one — so a client can save twice in succession without re-reading.
+
 ### 2.2 `POST /auth/refresh` — strict rotation, and what that obliges
 
 The spec already says rotation is strict: the presented token is revoked. Two
