@@ -8,7 +8,7 @@
   ],
   "observed": {
     "note": "Measured by tools/copy/register.mjs, not asserted. 339 strings, 7 informal, 20 formal.",
-    "pattern": "Sessions and the programme address the athlete as شما — decided by the product owner. Onboarding and goal declaration remain informal (تو): they are the first-run experience and read as a deliberately warmer voice. That split is now declared rather than accidental; converting those two as well is a one-line change here plus the strings the checker would then list."
+    "pattern": "Sessions and the programme address the athlete as شما — decided by the product owner. Onboarding and goal declaration remain informal (تو): they are the first-run experience and read as a deliberately warmer voice. That split is now declared rather than accidental; converting those two as well is a one-line change here plus the strings the checker would then list. The coach surface is formal for a reason of its own rather than by default: it addresses a coach ABOUT a third party, and an informal voice there would read as familiarity with someone the reader may barely know."
   },
   "sections": {
     "app": "formal",
@@ -28,7 +28,8 @@
     "programme": "formal",
     "public": "formal",
     "report": "formal",
-    "sessions": "formal"
+    "sessions": "formal",
+    "coach": "formal"
   },
   "undecided": {},
   "howToResolve": [

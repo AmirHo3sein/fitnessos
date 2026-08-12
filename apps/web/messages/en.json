@@ -431,5 +431,21 @@
     },
     "loadFailed": "The automation could not be loaded.",
     "retry": "Try again"
+  },
+  "coach": {
+    "name": "FitnessOS",
+    "nav": {
+      "roster": "Roster",
+      "myTraining": "My training"
+    },
+    "roster": {
+      "heading": "Your athletes",
+      "empty": "No athletes yet.",
+      "emptyHint": "An athlete appears here once they accept your invitation.",
+      "loading": "Loading…",
+      "failed": "Your athletes could not be loaded.",
+      "open": "Open programme",
+      "expires": "Access until"
+    }
   }
 }
