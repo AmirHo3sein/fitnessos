@@ -24,8 +24,26 @@ overrides:
   js-yaml: '>=4.3.1'
   vite: '>=6.4.3'
   esbuild: '>=0.25.0'
-  # Both from @lhci/cli's dependency tree, which is dev-only tooling and ships nothing —
-  # recorded here anyway, because "it is only a dev dependency" is how a supply-chain path into
-  # CI stays open. tmp: path traversal via unsanitised prefix. uuid: missing buffer bounds check.
+  # Both were reached through @lhci/cli, which is no longer a workspace dependency — see below.
+  # Kept because they cost nothing and would apply again the moment anything else pulls them in.
+  # tmp: path traversal via unsanitised prefix. uuid: missing buffer bounds check.
   tmp: '>=0.2.6'
   uuid: '>=11.1.1'
+
+# ─── why @lhci/cli is not a dependency ──────────────────────────────────────────────────────────
+#
+# It reached `extract-zip` (GHSA-jmr9-qjv8-65gv, high: unvalidated symlink path traversal) through
+# lighthouse -> puppeteer-core -> @puppeteer/browsers. There is NO fix: 2.0.1 is both the latest
+# published version and the vulnerable one, so an override cannot resolve it — and `pnpm audit` in the
+# `verify` job blocked every push for five consecutive runs while the local gate stayed green,
+# because `pnpm check` does not run the audit.
+#
+# The alternative was an audit exception, and it was rejected. `auditConfig.ignoreGhsas` is also
+# ignored by pnpm 9.12 in both package.json and this file, so it would have been dead config that read
+# as a decision — but the real objection is that it would carry a known-vulnerable path in the lockfile
+# for the convenience of a tool that runs on a schedule. This file already records the position that
+# "it is only a dev dependency" is how a supply-chain path into CI stays open.
+#
+# `pnpm lighthouse` now runs it through `npx --yes @lhci/cli@0.15.1`, pinned to the version that was
+# in use. The tool is unchanged; it is simply not resolved into this workspace, so nothing it depends
+# on reaches the lockfile.

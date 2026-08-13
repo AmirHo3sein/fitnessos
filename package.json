@@ -20,7 +20,7 @@
     "e2e:full": "pnpm --filter @fitnessos/web e2e:full",
     "gen": "plop --plopfile tools/generators/plopfile.mjs",
     "gen:context": "plop --plopfile tools/generators/plopfile.mjs context",
-    "lighthouse": "lhci autorun --config=lighthouserc.cjs",
+    "lighthouse": "npx --yes @lhci/cli@0.15.1 autorun --config=lighthouserc.cjs",
     "lint": "turbo run lint && pnpm lint:boundaries && pnpm color:lint",
     "lint:boundaries": "depcruise --config packages/config/dependency-cruiser.cjs packages apps",
     "test": "turbo run test",
@@ -32,7 +32,6 @@
     "typecheck": "turbo run typecheck"
   },
   "devDependencies": {
-    "@lhci/cli": "^0.15.1",
     "@types/node": "^22.9.0",
     "dependency-cruiser": "^16.5.0",
     "eslint": "^9.14.0",
