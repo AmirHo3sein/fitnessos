@@ -1,4 +1,9 @@
-import type { DashboardPorts, DashboardSnapshot, Loaded } from '@fitnessos/ctx-dashboard'
+import {
+  DashboardConflictError,
+  type DashboardPorts,
+  type DashboardSnapshot,
+  type Loaded,
+} from '@fitnessos/ctx-dashboard'
 import type { AuthContext, HttpClient } from '../http/client'
 import { dashboardBodyFrom, dashboardLoadedFrom } from '../mappers/dashboard'
 
@@ -16,18 +21,32 @@ export const createDashboardAdapter = (
     return dashboardLoadedFrom(raw)
   },
 
+  /**
+   * The two statuses that carry a dashboard (BACKEND-CONTRACT §2.1a):
+   *
+   *   200  saved. The body is the NEXT revision, so a second save needs no re-read.
+   *   409  `baseRevision` is no longer current — someone else saved in between. `allowStatus` keeps
+   *        the body, because the body is the dashboard as it now stands; `request` would turn the
+   *        status into an `ApiError` and discard it, leaving the author with "we could not store
+   *        your change" and no way to see what they collided with.
+   */
   save: async (
     dashboard,
     baseRevision,
     signal?: AbortSignal,
-  ): Promise<Loaded<DashboardSnapshot>> =>
-    // The accepted write returns the NEXT revision, so a second save needs no re-read (§2.1a).
-    dashboardLoadedFrom(
-      await http.request(`/dashboards/${dashboard.id}`, {
-        method: 'PUT',
-        body: dashboardBodyFrom(dashboard, baseRevision),
-        auth,
-        ...(signal ? { signal } : {}),
-      }),
-    ),
+  ): Promise<Loaded<DashboardSnapshot>> => {
+    const { status, body: raw } = await http.requestWithStatus(`/dashboards/${dashboard.id}`, {
+      method: 'PUT',
+      body: dashboardBodyFrom(dashboard, baseRevision),
+      auth,
+      allowStatus: [409],
+      ...(signal ? { signal } : {}),
+    })
+
+    // Mapped before the status is inspected: a 409 body is a Dashboard too, and a malformed one is a
+    // contract violation whichever status carried it.
+    const loaded = dashboardLoadedFrom(raw)
+    if (status === 409) throw new DashboardConflictError(loaded)
+    return loaded
+  },
 })

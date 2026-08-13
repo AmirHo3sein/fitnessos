@@ -1,4 +1,9 @@
-import type { Loaded, PlanSnapshot, TimelinePorts } from '@fitnessos/ctx-timeline'
+import {
+  PlanConflictError,
+  type Loaded,
+  type PlanSnapshot,
+  type TimelinePorts,
+} from '@fitnessos/ctx-timeline'
 import type { AuthContext, HttpClient } from '../http/client'
 import { planBodyFrom, planLoadedFrom } from '../mappers/timeline'
 
@@ -16,18 +21,34 @@ export const createTimelineAdapter = (
     return planLoadedFrom(raw)
   },
 
+  /**
+   * The two statuses that carry a plan.
+   *
+   *   200  saved. The response carries the NEW revision, so a caller can save twice without
+   *        re-reading.
+   *   409  `baseRevision` is not the revision stored — another author saved while this one was
+   *        editing, or this save asserted no base at all against a plan that already exists
+   *        (§2.1a). `allowStatus` keeps the body, because the body is the plan as it now stands
+   *        and discarding it would leave the author with an error message and no way to see what
+   *        they collided with.
+   */
   save: async (
     plan: PlanSnapshot,
     baseRevision: number | null,
     signal?: AbortSignal,
-  ): Promise<Loaded<PlanSnapshot>> =>
-    // The response carries the NEW revision, so a caller can save twice without re-reading.
-    planLoadedFrom(
-      await http.request(`/plans/${plan.id}`, {
-        method: 'PUT',
-        body: planBodyFrom(plan, baseRevision),
-        auth,
-        ...(signal ? { signal } : {}),
-      }),
-    ),
+  ): Promise<Loaded<PlanSnapshot>> => {
+    const { status, body: raw } = await http.requestWithStatus(`/plans/${plan.id}`, {
+      method: 'PUT',
+      body: planBodyFrom(plan, baseRevision),
+      auth,
+      allowStatus: [409],
+      ...(signal ? { signal } : {}),
+    })
+
+    // Mapped before the status is inspected: a 409 body is a Plan too, and a malformed one is a
+    // contract violation whichever status carried it.
+    const loaded = planLoadedFrom(raw)
+    if (status === 409) throw new PlanConflictError(loaded)
+    return loaded
+  },
 })

@@ -1,10 +1,11 @@
-import type {
-  CheckInFormSnapshot,
-  Loaded,
-  MeasurementReadPort,
-  MeasurementWritePort,
-  ObservationSnapshot,
-  RecordObservationInput,
+import {
+  CheckInFormConflictError,
+  type CheckInFormSnapshot,
+  type Loaded,
+  type MeasurementReadPort,
+  type MeasurementWritePort,
+  type ObservationSnapshot,
+  type RecordObservationInput,
 } from '@fitnessos/ctx-measurement'
 import type { AuthContext, HttpClient } from '../http/client'
 import {
@@ -61,15 +62,24 @@ export const createMeasurementAdapter = (
     // an athlete can both reach it. A stale one, or a missing one against a form that exists, is
     // refused with 409 (BACKEND-CONTRACT §2.1a) — which the caller sees as a failed save rather
     // than as work that silently vanished.
+    //
+    // `allowStatus` keeps the 409's BODY, because that body is the form as it now stands. Without
+    // it the collision arrives as a bare `ApiError`, and the author is told the save failed with no
+    // way to see what they collided with — an unresolvable conflict (ADR-0033).
     const body = checkInFormBodyFrom(form, baseRevision)
-    return loadedCheckInFormFrom(
-      await http.request(`/check-in-forms/${form.id}`, {
-        method: 'PUT',
-        body,
-        auth,
-        ...(signal ? { signal } : {}),
-      }),
-    )
+    const { status, body: raw } = await http.requestWithStatus(`/check-in-forms/${form.id}`, {
+      method: 'PUT',
+      body,
+      auth,
+      allowStatus: [409],
+      ...(signal ? { signal } : {}),
+    })
+
+    // Mapped before the status is inspected: a 409 body is a CheckInForm too, and a malformed one
+    // is a contract violation whichever status carried it.
+    const loaded = loadedCheckInFormFrom(raw)
+    if (status === 409) throw new CheckInFormConflictError(loaded)
+    return loaded
   },
 
   record: async (

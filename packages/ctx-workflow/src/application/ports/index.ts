@@ -39,12 +39,37 @@ export interface WorkflowWritePort {
    * `baseRevision` is the revision the author last read (§2.1a). `null` means "I believe nothing is
    * here", which is only true of a first save; sending it against a workflow that already exists is
    * itself a collision and answers 409 — an author replacing something they never read.
+   *
+   * A collision rejects with `WorkflowConflictError`, which carries the server's copy; every other
+   * failure rejects with whatever the transport raised.
    */
   readonly save: (
     workflow: WorkflowSnapshot,
     baseRevision: number | null,
     signal?: AbortSignal,
   ) => Promise<Loaded<WorkflowSnapshot>>
+}
+
+/**
+ * Someone else saved this workflow while it was open here.
+ *
+ * Carries it as the server now holds it, because a conflict the author cannot see is a conflict they
+ * cannot resolve (ADR-0033, ADR-0035). Both sides survive: the local document is still in the editor,
+ * and `current` is what it collided with.
+ *
+ * Declared beside the port that throws it rather than in a use case, because the package has none —
+ * `save` is a straight write, and the 409 is part of its contract (BACKEND-CONTRACT §2.1a), not a
+ * rule some later use case might add.
+ *
+ * `current` keeps its envelope: whoever resolves the collision has to save again, and that save must
+ * quote the revision it collided with. Unwrapping it here would discard the one field that makes the
+ * conflict resolvable.
+ */
+export class WorkflowConflictError extends Error {
+  override readonly name = 'WorkflowConflictError'
+  constructor(readonly current: Loaded<WorkflowSnapshot>) {
+    super('the workflow was saved elsewhere')
+  }
 }
 
 export interface WorkflowPorts {

@@ -2,7 +2,12 @@
 
 import { useSubject } from '@fitnessos/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { currentWorkflowQuery, workflowKeys, type Loaded } from '../../application/index'
+import {
+  currentWorkflowQuery,
+  WorkflowConflictError,
+  workflowKeys,
+  type Loaded,
+} from '../../application/index'
 import type { WorkflowSnapshot } from '../../editor/schema'
 import { useWorkflowPorts } from '../di'
 
@@ -25,10 +30,21 @@ export interface UseWorkflow {
    *
    * Unchanged signature: the base revision is the hook's business, not the editor's. A caller that
    * had to supply one would be a caller holding a concurrency token inside a document (ADR-0035).
+   *
+   * FALSE on a collision too, because a collision did not save. The caller reads `conflict` to learn
+   * that is why.
    */
   readonly save: (workflow: WorkflowSnapshot) => Promise<boolean>
   readonly isSaving: boolean
   readonly error: Error | null
+  /**
+   * The workflow as the server holds it, when a save collided with another author.
+   *
+   * Surfaced separately from `error` because it is not a failure the user should see as one —
+   * nothing broke, someone else got there first, and the two versions both exist. The local document
+   * is untouched in the editor; this is what it collided with.
+   */
+  readonly conflict: WorkflowSnapshot | null
 }
 
 export const useWorkflow = (): UseWorkflow => {
@@ -77,6 +93,19 @@ export const useWorkflow = (): UseWorkflow => {
       }
     },
     isSaving: mutation.isPending,
-    error: mutation.error,
+    // A conflict is reported through `conflict`, so it must not also arrive as an error — a
+    // component rendering both would show "something went wrong" beside the resolution UI.
+    error: mutation.error instanceof WorkflowConflictError ? null : mutation.error,
+    /*
+      Unwrapped here, like `workflow` above: the editor is shown a document and never learns a
+      revision exists. The envelope is not lost — it stays on the error the mutation still holds,
+      which is where a resolution flow will find the revision its retry has to quote.
+
+      Deliberately NOT written into the query cache. The cache is what the editor hydrates from, so
+      seeding it with the other author's copy would replace the local draft with the very thing it
+      collided with — the collision resolved by discarding one side, silently, without asking.
+    */
+    conflict:
+      mutation.error instanceof WorkflowConflictError ? mutation.error.current.artefact : null,
   }
 }

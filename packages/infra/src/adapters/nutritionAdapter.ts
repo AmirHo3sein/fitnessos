@@ -1,4 +1,9 @@
-import type { Loaded, NutritionPorts, NutritionSnapshot } from '@fitnessos/ctx-nutrition'
+import {
+  NutritionConflictError,
+  type Loaded,
+  type NutritionPorts,
+  type NutritionSnapshot,
+} from '@fitnessos/ctx-nutrition'
 import type { AuthContext, HttpClient } from '../http/client'
 import { nutritionPlanBodyFrom, nutritionPlanLoadedFrom } from '../mappers/nutrition'
 
@@ -17,18 +22,31 @@ export const createNutritionAdapter = (
     return nutritionPlanLoadedFrom(raw)
   },
 
-  // The response IS the new state, revision included, so two saves in a row need no re-read (§2.1a).
+  /*
+    The response IS the new state, revision included, so two saves in a row need no re-read (§2.1a).
+
+    A 409 says the stored revision is no longer the one `baseRevision` named — someone else saved
+    while this plan was open. `allowStatus` keeps that body: it is the plan as the server now holds
+    it, and `request` would have turned the status into an `ApiError` that records the code and
+    throws the plan away, which is how a collision used to reach the coach as a bare "save failed".
+  */
   save: async (
     plan: NutritionSnapshot,
     baseRevision: number | null,
     signal?: AbortSignal,
-  ): Promise<Loaded<NutritionSnapshot>> =>
-    nutritionPlanLoadedFrom(
-      await http.request(`/nutrition-plans/${plan.id}`, {
-        method: 'PUT',
-        body: nutritionPlanBodyFrom(plan, baseRevision),
-        auth,
-        ...(signal ? { signal } : {}),
-      }),
-    ),
+  ): Promise<Loaded<NutritionSnapshot>> => {
+    const { status, body: raw } = await http.requestWithStatus(`/nutrition-plans/${plan.id}`, {
+      method: 'PUT',
+      body: nutritionPlanBodyFrom(plan, baseRevision),
+      auth,
+      allowStatus: [409],
+      ...(signal ? { signal } : {}),
+    })
+
+    // Mapped before the status is inspected: a 409 body is a NutritionPlan too, and a malformed one
+    // is a contract violation whichever status carried it.
+    const loaded = nutritionPlanLoadedFrom(raw)
+    if (status === 409) throw new NutritionConflictError(loaded)
+    return loaded
+  },
 })

@@ -1,3 +1,4 @@
+export { NutritionConflictError } from './ports/index'
 export type {
   Loaded,
   NutritionPorts,

@@ -2,7 +2,11 @@
 
 import { useSubject } from '@fitnessos/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { currentDashboardQuery, dashboardKeys } from '../../application/index'
+import {
+  currentDashboardQuery,
+  dashboardKeys,
+  DashboardConflictError,
+} from '../../application/index'
 import type { DashboardSnapshot } from '../../editor/schema'
 import { useDashboardPorts } from '../di'
 
@@ -20,10 +24,23 @@ export interface UseDashboard {
   readonly loadFailed: boolean
   /** Refetch, so the answer to a failed load is one press rather than a full reload. */
   readonly retry: () => void
-  /** TRUE when the save reached the server — what moves the editor's commit boundary. */
+  /**
+   * TRUE when the save reached the server — what moves the editor's commit boundary.
+   *
+   * FALSE on a conflict too, because a refused save did not save. The caller reads `conflict` to
+   * learn that the reason was another author rather than a broken request.
+   */
   readonly save: (dashboard: DashboardSnapshot) => Promise<boolean>
   readonly isSaving: boolean
   readonly error: Error | null
+  /**
+   * The dashboard as the server holds it, when a save collided with another author.
+   *
+   * Surfaced separately from `error` because it is not a failure the reader should see as one —
+   * nothing broke, someone else saved first, and both arrangements exist. The local one is still in
+   * the grid; this is what it met.
+   */
+  readonly conflict: DashboardSnapshot | null
 }
 
 export const useDashboard = (): UseDashboard => {
@@ -62,6 +79,11 @@ export const useDashboard = (): UseDashboard => {
       }
     },
     isSaving: mutation.isPending,
-    error: mutation.error,
+    // A conflict is reported through `conflict`, so it must not also arrive as an error — a
+    // workspace rendering both would show "we could not store your change" beside the two
+    // arrangements it is asking the author to choose between.
+    error: mutation.error instanceof DashboardConflictError ? null : mutation.error,
+    conflict:
+      mutation.error instanceof DashboardConflictError ? mutation.error.current.artefact : null,
   }
 }

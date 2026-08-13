@@ -56,3 +56,21 @@ export interface ReportWritePort {
 export interface ReportPorts {
   readonly report: ReportReadPort & ReportWritePort
 }
+
+/**
+ * Someone else saved this report while it was open here.
+ *
+ * Carries it as the server now holds it, because a conflict the author cannot see is a conflict
+ * they cannot resolve (ADR-0033, ADR-0035). Both sides survive: the local document is still in the
+ * editor, and `current` is what it collided with.
+ *
+ * `Loaded`, not the bare snapshot: the server's revision arrives with the document it belongs to,
+ * and separating them here would leave any resolution holding a document it cannot quote a
+ * precondition for.
+ */
+export class ReportConflictError extends Error {
+  override readonly name = 'ReportConflictError'
+  constructor(readonly current: Loaded<ReportSnapshot>) {
+    super('the report was saved elsewhere')
+  }
+}

@@ -44,3 +44,24 @@ export interface DashboardWritePort {
 export interface DashboardPorts {
   readonly dashboard: DashboardReadPort & DashboardWritePort
 }
+
+/**
+ * Someone else saved this dashboard while it was open here.
+ *
+ * Carries it as the server now holds it, because a conflict the author cannot see is a conflict they
+ * cannot resolve (ADR-0033, ADR-0035). Both sides survive: the local document is still in the editor,
+ * and `current` is what it collided with.
+ *
+ * A `Loaded`, not a bare snapshot: the revision arrives with the read it belongs to, and the one the
+ * refused save carried is now stale by definition. Dropping it here would leave the only correct base
+ * for a resolving write nowhere to be found.
+ *
+ * Declared beside the port because the port's 409 is the only thing that raises it — the adapter
+ * implementing `save` throws it, and nothing else may.
+ */
+export class DashboardConflictError extends Error {
+  override readonly name = 'DashboardConflictError'
+  constructor(readonly current: Loaded<DashboardSnapshot>) {
+    super('the dashboard was saved elsewhere')
+  }
+}

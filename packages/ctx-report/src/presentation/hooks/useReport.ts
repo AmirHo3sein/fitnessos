@@ -2,7 +2,12 @@
 
 import { useSubject } from '@fitnessos/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { currentReportQuery, reportKeys, type Loaded } from '../../application/index'
+import {
+  currentReportQuery,
+  ReportConflictError,
+  reportKeys,
+  type Loaded,
+} from '../../application/index'
 import type { ReportSnapshot } from '../../editor/schema'
 import { useReportPorts } from '../di'
 
@@ -20,10 +25,22 @@ export interface UseReport {
   readonly loadFailed: boolean
   /** Refetch, so the answer to a failed load is one press rather than a full reload. */
   readonly retry: () => void
-  /** Resolves TRUE when the save reached the server — what moves the editor's commit boundary. */
+  /**
+   * Resolves TRUE when the save reached the server — what moves the editor's commit boundary.
+   *
+   * A collision resolves FALSE like any other unsuccessful save, because nothing was stored. The
+   * caller reads `conflict` to find out that this failure has another document behind it.
+   */
   readonly save: (report: ReportSnapshot) => Promise<boolean>
   readonly isSaving: boolean
   readonly error: Error | null
+  /**
+   * The report as the server holds it, when a save collided with another author.
+   *
+   * Surfaced separately from `error` because it is not a failure the user should see as one —
+   * nothing broke, someone else got there first, and both documents still exist.
+   */
+  readonly conflict: ReportSnapshot | null
 }
 
 export const useReport = (): UseReport => {
@@ -72,6 +89,13 @@ export const useReport = (): UseReport => {
       }
     },
     isSaving: mutation.isPending,
-    error: mutation.error,
+    // A conflict is reported through `conflict`, so it must not also arrive as an error — a
+    // workspace rendering both would show "we could not store your change" beside the two versions
+    // it is asking the coach to choose between.
+    error: mutation.error instanceof ReportConflictError ? null : mutation.error,
+    // The document only. The server's revision stays inside the error, alongside the cache, which
+    // is the one place the save path reads a base from.
+    conflict:
+      mutation.error instanceof ReportConflictError ? mutation.error.current.artefact : null,
   }
 }

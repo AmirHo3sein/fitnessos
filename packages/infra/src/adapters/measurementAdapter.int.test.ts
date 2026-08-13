@@ -1,12 +1,49 @@
-import type { RecordObservationInput } from '@fitnessos/ctx-measurement'
+import {
+  CheckInFormConflictError,
+  type CheckInFormSnapshot,
+  type RecordObservationInput,
+} from '@fitnessos/ctx-measurement'
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { createHttpClient } from '../http/client'
-import { ContractViolationError } from '../http/errors'
+import { ApiError, ContractViolationError } from '../http/errors'
 import { createMeasurementAdapter } from './measurementAdapter'
 
 const BASE = 'http://api.test/api/v1'
+
+const FORM_ID = '018f2c8a-0009-7000-8000-000000000001'
+const FORM_PATH = `${BASE}/check-in-forms/${FORM_ID}`
+
+const FORM = {
+  id: FORM_ID,
+  title: 'Weekly check-in',
+  fields: [
+    {
+      id: '018f2c8a-0009-7000-8000-000000000002',
+      label: 'Morning bodyweight',
+      records: 'bodyweight',
+      unit: 'kg',
+      answer: { kind: 'number' },
+      order: 0,
+    },
+  ],
+}
+
+const SNAPSHOT = {
+  id: FORM_ID,
+  title: 'Weekly check-in',
+  fields: [
+    {
+      id: '018f2c8a-0009-7000-8000-000000000002',
+      label: 'Morning bodyweight',
+      records: 'bodyweight',
+      unit: 'kg',
+      answer: { kind: 'number' },
+      order: 0,
+    },
+  ],
+} as unknown as CheckInFormSnapshot
 
 const OBSERVATION = {
   id: '018f2c8a-0008-7000-8000-000000000001',
@@ -111,6 +148,58 @@ describe('reading indicators', () => {
     )
     const [series] = await adapter().indicators()
     expect(series!.movementName).toBeNull()
+  })
+})
+
+describe('saving the check-in form', () => {
+  it('sends the revision it read and returns the new one', async () => {
+    let body: { baseRevision?: unknown } = {}
+    server.use(
+      http.put(FORM_PATH, async ({ request }) => {
+        body = (await request.json()) as { baseRevision?: unknown }
+        return HttpResponse.json({ ...FORM, revision: 8 })
+      }),
+    )
+
+    const saved = await adapter().saveCheckInForm(SNAPSHOT, 7)
+    expect(body.baseRevision).toBe(7)
+    expect(saved.revision).toBe(8)
+  })
+
+  it('409 carries the form as it now stands', async () => {
+    // The body is the whole value of the conflict. `request` would have turned this into an
+    // ApiError and discarded it, leaving the author told they collided but not with what.
+    server.use(
+      http.put(FORM_PATH, () =>
+        HttpResponse.json({ ...FORM, title: 'Weekly check-in (v2)', revision: 9 }, { status: 409 }),
+      ),
+    )
+
+    await expect(adapter().saveCheckInForm(SNAPSHOT, 7)).rejects.toBeInstanceOf(
+      CheckInFormConflictError,
+    )
+    await expect(adapter().saveCheckInForm(SNAPSHOT, 7)).rejects.toMatchObject({
+      current: { artefact: { title: 'Weekly check-in (v2)' }, revision: 9 },
+    })
+  })
+
+  it('a 409 body that is not a CheckInForm is a contract violation, not a conflict', async () => {
+    // Mapped before the status is inspected, so a malformed body is reported as what it is — a
+    // disagreement between the API and the spec — rather than reaching the conflict UI as a form
+    // with no fields, which the author would read as "they deleted everything".
+    server.use(http.put(FORM_PATH, () => HttpResponse.json({ nope: true }, { status: 409 })))
+    await expect(adapter().saveCheckInForm(SNAPSHOT, 7)).rejects.toBeInstanceOf(
+      ContractViolationError,
+    )
+  })
+
+  it('other failures still throw ApiError', async () => {
+    server.use(
+      http.put(FORM_PATH, () =>
+        HttpResponse.json({ code: 'forbidden', detail: 'not your athlete' }, { status: 403 }),
+      ),
+    )
+    await expect(adapter().saveCheckInForm(SNAPSHOT, 7)).rejects.toBeInstanceOf(ApiError)
   })
 })
 

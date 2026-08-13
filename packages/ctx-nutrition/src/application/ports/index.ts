@@ -42,3 +42,22 @@ export interface NutritionWritePort {
 export interface NutritionPorts {
   readonly nutrition: NutritionReadPort & NutritionWritePort
 }
+
+/**
+ * Someone else saved this plan while it was open here.
+ *
+ * Carries it as the server now holds it, because a conflict the author cannot see is a conflict
+ * they cannot resolve (ADR-0033, ADR-0035). Both sides survive: the local document is still in the
+ * editor, and `current` is what it collided with. Discarding the 409 body instead — which is what
+ * the adapter did — left the coach with "something went wrong" and no way to learn what changed,
+ * so the only move available was to save again with the same stale precondition and collide again.
+ *
+ * `Loaded`, not the bare snapshot: the revision travels beside the document it belongs to, and
+ * splitting them here would hand any resolution a plan it cannot quote a precondition for.
+ */
+export class NutritionConflictError extends Error {
+  override readonly name = 'NutritionConflictError'
+  constructor(readonly current: Loaded<NutritionSnapshot>) {
+    super('the nutrition plan was saved elsewhere')
+  }
+}

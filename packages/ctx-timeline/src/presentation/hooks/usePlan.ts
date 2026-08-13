@@ -2,7 +2,12 @@
 
 import { useSubject } from '@fitnessos/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { currentPlanQuery, timelineKeys, type Loaded } from '../../application/index'
+import {
+  currentPlanQuery,
+  PlanConflictError,
+  timelineKeys,
+  type Loaded,
+} from '../../application/index'
 import type { PlanSnapshot } from '../../editor/schema'
 import { useTimelinePorts } from '../di'
 
@@ -20,10 +25,26 @@ export interface UsePlan {
   readonly loadFailed: boolean
   /** Refetch, so the answer to a failed load is one press rather than a full reload. */
   readonly retry: () => void
-  /** TRUE when the save reached the server — what moves the editor's commit boundary. */
+  /**
+   * TRUE when the save reached the server — what moves the editor's commit boundary.
+   *
+   * FALSE also covers a collision, because a refused save did not save. The caller reads `conflict`
+   * to learn which of the two it was.
+   */
   readonly save: (plan: PlanSnapshot) => Promise<boolean>
   readonly isSaving: boolean
   readonly error: Error | null
+  /**
+   * The plan as the server holds it, when a save collided with another author (§2.1a).
+   *
+   * Surfaced separately from `error` because it is not a failure the reader should see as one —
+   * nothing broke, someone else got there first, and both versions still exist.
+   *
+   * The envelope, not the snapshot: resolving a collision ends in a save, and that save must assert
+   * the revision it is replacing. Without it the author could see what they collided with and still
+   * not keep their own work.
+   */
+  readonly conflict: Loaded<PlanSnapshot> | null
 }
 
 export const usePlan = (): UsePlan => {
@@ -70,6 +91,15 @@ export const usePlan = (): UsePlan => {
       }
     },
     isSaving: mutation.isPending,
-    error: mutation.error,
+    // A collision is reported through `conflict`, so it must not also arrive as an error — a
+    // workspace rendering both would show "we could not store your change" beside the resolution UI.
+    error: mutation.error instanceof PlanConflictError ? null : mutation.error,
+    /*
+      Deliberately NOT written into the cache. The cache is what the builder hydrates from, so
+      storing the server's plan here would swap the document out from under an author mid-edit —
+      losing exactly the work this exists to protect. It stays beside the editor until the author
+      decides, and the revision it carries is what makes deciding "keep mine" possible.
+    */
+    conflict: mutation.error instanceof PlanConflictError ? mutation.error.current : null,
   }
 }

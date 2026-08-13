@@ -3,6 +3,7 @@
 import { useSubject } from '@fitnessos/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
+  CheckInFormConflictError,
   checkInFormQuery,
   measurementKeys,
   type CheckInFormSnapshot,
@@ -31,10 +32,25 @@ export interface UseCheckInForm {
    * (§2.1a), and the editor must keep its unsaved work rather than believe it was stored. The
    * signature is unchanged because the caller's question is unchanged; the revision is supplied
    * here, from what was last read.
+   *
+   * `false` on a conflict too, because a conflict did not save. WHY it was false is read from
+   * `conflict`.
    */
   readonly save: (form: CheckInFormSnapshot) => Promise<boolean>
   readonly isSaving: boolean
   readonly error: Error | null
+  /**
+   * The form as the server holds it, when a save collided with another author.
+   *
+   * Surfaced separately from `error` because it is not a failure the user should see as one —
+   * nothing broke, someone else got there first, and both versions exist. The two are mutually
+   * exclusive for the same reason: a conflict reported twice is a screen showing "something went
+   * wrong" beside the resolution UI.
+   *
+   * The form, not the envelope. The editor hydrates snapshots, so handing it one carrying a
+   * revision would put a precondition into the undo stack (ADR-0035).
+   */
+  readonly conflict: CheckInFormSnapshot | null
 }
 
 /**
@@ -98,6 +114,16 @@ export const useCheckInForm = (): UseCheckInForm => {
       }
     },
     isSaving: mutation.isPending,
-    error: mutation.error,
+    // A conflict is reported through `conflict`, so it must not also arrive as an error.
+    error: mutation.error instanceof CheckInFormConflictError ? null : mutation.error,
+    /*
+     * The colliding form is NOT written into the cache, deliberately. The cache is what the
+     * workspace reads and hydrates from, so storing the server's version would replace the
+     * author's open document with the one that beat it — the unsaved work this refusal exists to
+     * protect. It stays here, beside the editor's own copy, until something is built to resolve
+     * the two.
+     */
+    conflict:
+      mutation.error instanceof CheckInFormConflictError ? mutation.error.current.artefact : null,
   }
 }

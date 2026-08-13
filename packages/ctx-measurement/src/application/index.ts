@@ -12,6 +12,8 @@ export type {
   RecordObservationInput,
 } from './ports/index'
 
+export { CheckInFormConflictError } from './checkInFormConflict'
+
 export {
   ObservationValidationError,
   recordObservation,
