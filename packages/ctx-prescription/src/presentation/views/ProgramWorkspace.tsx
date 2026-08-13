@@ -2,7 +2,7 @@
 
 import { Button, Card, CardDescription, CardTitle, Skeleton } from '@fitnessos/ui'
 import type { Locale } from '@fitnessos/kernel'
-import { Suspense, lazy, useState } from 'react'
+import { Suspense, lazy, useRef, useState } from 'react'
 import type { ProgramVersionSnapshot } from '../../application/index'
 import { useCurrentProgram } from '../hooks/useCurrentProgram'
 import { useReviseProgram } from '../hooks/useReviseProgram'
@@ -29,6 +29,17 @@ export interface WorkspaceLabels extends ProgramLabels {
   readonly conflictBody: string
   readonly conflictDiscard: string
   readonly conflictKeep: string
+  /**
+   * Close the panel and decide later.
+   *
+   * A fifth string, added when "keep" stopped meaning "dismiss". It used to: the button cleared the
+   * error and left the draft open, which read as a resolution and was not one — the base was still
+   * the version the server had refused, so the next Save produced the same conflict. Now "keep"
+   * stores the draft, and closing without deciding needs a name of its own. The same five the six
+   * artefact workspaces use, because a coach meets this situation in seven places and it should
+   * read as one situation.
+   */
+  readonly conflictDismiss: string
   readonly builder: BuilderLabels
 }
 
@@ -99,7 +110,21 @@ const EditingSession = ({
   labels: WorkspaceLabels
   onDone: () => void
 }) => {
-  const { save, isSaving, error, conflict, reset } = useReviseProgram(version)
+  const { save, isSaving, error, conflict, keepMine, takeTheirs, reset } = useReviseProgram(version)
+
+  /*
+    The document the last save attempt carried — what "keep mine" sends again.
+
+    The workspace holds no draft of its own: it lives in the builder's editor store and surfaces
+    here only as the argument to `onSave`. A ref rather than state, because nothing renders
+    differently for it and re-rendering the canvas on every save would be work for no picture.
+  */
+  const attempted = useRef<ProgramVersionSnapshot | null>(null)
+
+  const attempt = (next: ProgramVersionSnapshot) => {
+    attempted.current = next
+    return save(next)
+  }
 
   return (
     <div className="space-y-4">
@@ -108,17 +133,43 @@ const EditingSession = ({
           <CardTitle>{labels.conflictTitle}</CardTitle>
           <CardDescription>{labels.conflictBody}</CardDescription>
           {/*
-            Both options preserve something, and neither is destructive by default (ADR-0033).
-            "Keep editing" leaves the local document exactly as it is — the coach's work is still
-            in the editor, and dismissing the banner does not discard it. "Discard" is the
-            explicit choice to take the other author's version instead.
+            Three options, and nothing here is destructive by default (ADR-0033). The local blocks
+            stay in the editor until the coach says otherwise, and the other author's version is
+            never replaced without having been quoted back to us first.
+
+            There used to be two, and neither resolved anything: "keep" cleared the error and left
+            the base the server had already refused, so pressing Save produced the identical 409 for
+            ever; "discard" left the editing session, and versions are immutable (ADR-0008), so the
+            work it dropped was gone.
           */}
           <div className="mt-4 flex flex-wrap gap-2">
-            <Button type="button" variant="secondary" size="sm" onPress={reset}>
+            <Button
+              type="button"
+              size="sm"
+              isDisabled={isSaving}
+              onPress={() => {
+                const mine = attempted.current
+                if (mine === null) return
+                void keepMine(mine)
+              }}
+            >
               {labels.conflictKeep}
             </Button>
-            <Button type="button" variant="ghost" size="sm" onPress={onDone}>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onPress={() => {
+                // No `onDone()`: the builder re-keys on the adopted version and shows what the coach
+                // chose. Closing the editor instead would leave them looking at a read view with no
+                // sign that their own blocks are gone.
+                takeTheirs()
+              }}
+            >
               {labels.conflictDiscard}
+            </Button>
+            <Button type="button" variant="ghost" size="sm" onPress={reset}>
+              {labels.conflictDismiss}
             </Button>
           </div>
         </Card>
@@ -135,7 +186,7 @@ const EditingSession = ({
           version={version}
           locale={locale}
           labels={labels.builder}
-          onSave={save}
+          onSave={attempt}
           isSaving={isSaving}
         />
       </Suspense>

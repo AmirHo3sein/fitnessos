@@ -42,6 +42,7 @@ export const programmeLabels = (t: T) => ({
           conflictBody: t('conflictBody'),
           conflictKeep: t('conflictKeep'),
           conflictDiscard: t('conflictDiscard'),
+          conflictDismiss: t('conflictDismiss'),
           builder: {
             heading: t('builder.heading'),
             addBlock: t('builder.addBlock'),
