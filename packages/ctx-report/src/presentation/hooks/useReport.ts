@@ -40,7 +40,15 @@ export interface UseReport {
    * Surfaced separately from `error` because it is not a failure the user should see as one —
    * nothing broke, someone else got there first, and both documents still exist.
    */
-  readonly conflict: ReportSnapshot | null
+  /**
+   * The artefact as the server holds it, WITH its revision.
+   *
+   * `Loaded`, not the bare snapshot: the revision is what a resolution needs. Without it the query
+   * cache still holds the base the server just refused, so every subsequent save quotes the same dead
+   * precondition and conflicts again — the author is stuck until a refetch replaces their document,
+   * which is the work they were trying not to lose.
+   */
+  readonly conflict: Loaded<ReportSnapshot> | null
 }
 
 export const useReport = (): UseReport => {
@@ -96,6 +104,6 @@ export const useReport = (): UseReport => {
     // The document only. The server's revision stays inside the error, alongside the cache, which
     // is the one place the save path reads a base from.
     conflict:
-      mutation.error instanceof ReportConflictError ? mutation.error.current.artefact : null,
+      mutation.error instanceof ReportConflictError ? mutation.error.current : null,
   }
 }

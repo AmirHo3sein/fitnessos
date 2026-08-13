@@ -11,8 +11,8 @@ import { createReportAdapter } from './reportAdapter'
  * job: a conflict the author cannot see is a conflict they cannot resolve.
  */
 const stubHttp = (status: number, body: unknown) => ({
-  request: async () => body,
-  requestWithStatus: async () => ({ status, body }),
+  request: () => Promise.resolve(body),
+  requestWithStatus: () => Promise.resolve({ status, body }),
 })
 
 const REPORT = {
@@ -24,32 +24,24 @@ const REPORT = {
 
 describe('an artefact save conflict', () => {
   it('arrives as a conflict carrying the server’s copy, not a generic failure', async () => {
-    const adapter = createReportAdapter(
-      stubHttp(409, REPORT) as never,
-      { onSessionLost: () => {} } as never,
-    )
+    const adapter = createReportAdapter(stubHttp(409, REPORT) as never, {})
+    const mine = { id: REPORT.id, title: 'mine', tiles: [] } as never
 
-    await expect(adapter.save({ id: REPORT.id, title: 'mine', tiles: [] } as never, 6)).rejects.toThrow(
-      ReportConflictError,
-    )
+    await expect(adapter.save(mine, 6)).rejects.toThrow(ReportConflictError)
 
     // The copy survives, and with its revision — which is what the author needs in order to decide
     // whether to re-save on top of it.
-    await adapter
-      .save({ id: REPORT.id, title: 'mine', tiles: [] } as never, 6)
-      .catch((error: unknown) => {
-        expect(error).toBeInstanceOf(ReportConflictError)
-        expect((error as ReportConflictError).current.artefact.title).toBe('As the server holds it')
-        expect((error as ReportConflictError).current.revision).toBe(7)
-      })
+    await adapter.save(mine, 6).catch((error: unknown) => {
+      expect(error).toBeInstanceOf(ReportConflictError)
+      expect((error as ReportConflictError).current.artefact.title).toBe('As the server holds it')
+      expect((error as ReportConflictError).current.revision).toBe(7)
+    })
   })
 
   it('does not treat an accepted save as a conflict', async () => {
-    const adapter = createReportAdapter(
-      stubHttp(200, REPORT) as never,
-      { onSessionLost: () => {} } as never,
-    )
-    const saved = await adapter.save({ id: REPORT.id, title: 'mine', tiles: [] } as never, 6)
+    const adapter = createReportAdapter(stubHttp(200, REPORT) as never, {})
+    const mine = { id: REPORT.id, title: 'mine', tiles: [] } as never
+    const saved = await adapter.save(mine, 6)
     expect(saved.revision).toBe(7)
   })
 })

@@ -5,8 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   currentDashboardQuery,
   dashboardKeys,
-  DashboardConflictError,
-} from '../../application/index'
+  DashboardConflictError, type Loaded } from '../../application/index'
 import type { DashboardSnapshot } from '../../editor/schema'
 import { useDashboardPorts } from '../di'
 
@@ -40,7 +39,15 @@ export interface UseDashboard {
    * nothing broke, someone else saved first, and both arrangements exist. The local one is still in
    * the grid; this is what it met.
    */
-  readonly conflict: DashboardSnapshot | null
+  /**
+   * The artefact as the server holds it, WITH its revision.
+   *
+   * `Loaded`, not the bare snapshot: the revision is what a resolution needs. Without it the query
+   * cache still holds the base the server just refused, so every subsequent save quotes the same dead
+   * precondition and conflicts again — the author is stuck until a refetch replaces their document,
+   * which is the work they were trying not to lose.
+   */
+  readonly conflict: Loaded<DashboardSnapshot> | null
 }
 
 export const useDashboard = (): UseDashboard => {
@@ -84,6 +91,6 @@ export const useDashboard = (): UseDashboard => {
     // arrangements it is asking the author to choose between.
     error: mutation.error instanceof DashboardConflictError ? null : mutation.error,
     conflict:
-      mutation.error instanceof DashboardConflictError ? mutation.error.current.artefact : null,
+      mutation.error instanceof DashboardConflictError ? mutation.error.current : null,
   }
 }

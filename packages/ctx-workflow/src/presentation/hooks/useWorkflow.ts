@@ -44,7 +44,15 @@ export interface UseWorkflow {
    * nothing broke, someone else got there first, and the two versions both exist. The local document
    * is untouched in the editor; this is what it collided with.
    */
-  readonly conflict: WorkflowSnapshot | null
+  /**
+   * The artefact as the server holds it, WITH its revision.
+   *
+   * `Loaded`, not the bare snapshot: the revision is what a resolution needs. Without it the query
+   * cache still holds the base the server just refused, so every subsequent save quotes the same dead
+   * precondition and conflicts again — the author is stuck until a refetch replaces their document,
+   * which is the work they were trying not to lose.
+   */
+  readonly conflict: Loaded<WorkflowSnapshot> | null
 }
 
 export const useWorkflow = (): UseWorkflow => {
@@ -106,6 +114,6 @@ export const useWorkflow = (): UseWorkflow => {
       collided with — the collision resolved by discarding one side, silently, without asking.
     */
     conflict:
-      mutation.error instanceof WorkflowConflictError ? mutation.error.current.artefact : null,
+      mutation.error instanceof WorkflowConflictError ? mutation.error.current : null,
   }
 }

@@ -39,7 +39,7 @@ export interface ReportWorkspaceProps {
  * click before every use with nobody on the other side of it.
  */
 export const ReportWorkspace = ({ locale, labels }: ReportWorkspaceProps) => {
-  const { report, isLoading, save, isSaving, error, loadFailed, retry } = useReport()
+  const { report, isLoading, save, isSaving, error, loadFailed, retry, conflict } = useReport()
 
   if (isLoading) {
     return (
@@ -89,7 +89,16 @@ export const ReportWorkspace = ({ locale, labels }: ReportWorkspaceProps) => {
 
   return (
     <div className="space-y-4">
-      {error !== null && (
+      {/*
+        A conflict is a failure the author must SEE. It stopped populating `error` when it became its
+        own field, and for a window that meant a collided save showed nothing at all — worse than the
+        generic banner it replaced, because the work silently did not happen.
+
+        This is the banner, not the resolution. A proper dialog — "keep mine" against "take theirs",
+        as the Program Builder already has — needs `conflict.artefact` and `conflict.revision`, both of
+        which are now on the hook.
+      */}
+      {(error !== null || conflict !== null) && (
         <Card>
           <CardDescription>{labels.saveFailed}</CardDescription>
         </Card>

@@ -50,7 +50,15 @@ export interface UseCheckInForm {
    * The form, not the envelope. The editor hydrates snapshots, so handing it one carrying a
    * revision would put a precondition into the undo stack (ADR-0035).
    */
-  readonly conflict: CheckInFormSnapshot | null
+  /**
+   * The artefact as the server holds it, WITH its revision.
+   *
+   * `Loaded`, not the bare snapshot: the revision is what a resolution needs. Without it the query
+   * cache still holds the base the server just refused, so every subsequent save quotes the same dead
+   * precondition and conflicts again — the author is stuck until a refetch replaces their document,
+   * which is the work they were trying not to lose.
+   */
+  readonly conflict: Loaded<CheckInFormSnapshot> | null
 }
 
 /**
@@ -124,6 +132,6 @@ export const useCheckInForm = (): UseCheckInForm => {
      * the two.
      */
     conflict:
-      mutation.error instanceof CheckInFormConflictError ? mutation.error.current.artefact : null,
+      mutation.error instanceof CheckInFormConflictError ? mutation.error.current : null,
   }
 }

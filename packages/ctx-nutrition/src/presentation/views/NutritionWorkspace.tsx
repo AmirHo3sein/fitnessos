@@ -35,7 +35,7 @@ export interface NutritionWorkspaceProps {
 
 /** Authoring the nutrition plan. */
 export const NutritionWorkspace = ({ locale, labels }: NutritionWorkspaceProps) => {
-  const { plan, isLoading, save, isSaving, error, loadFailed, retry } = useNutritionPlan()
+  const { plan, isLoading, save, isSaving, error, loadFailed, retry, conflict } = useNutritionPlan()
 
   if (isLoading) {
     return (
@@ -85,7 +85,16 @@ export const NutritionWorkspace = ({ locale, labels }: NutritionWorkspaceProps) 
 
   return (
     <div className="space-y-4">
-      {error !== null && (
+      {/*
+        A conflict is a failure the author must SEE. It stopped populating `error` when it became its
+        own field, and for a window that meant a collided save showed nothing at all — worse than the
+        generic banner it replaced, because the work silently did not happen.
+
+        This is the banner, not the resolution. A proper dialog — "keep mine" against "take theirs",
+        as the Program Builder already has — needs `conflict.artefact` and `conflict.revision`, both of
+        which are now on the hook.
+      */}
+      {(error !== null || conflict !== null) && (
         <Card>
           <CardDescription>{labels.saveFailed}</CardDescription>
         </Card>
