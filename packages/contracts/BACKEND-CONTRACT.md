@@ -502,6 +502,18 @@ forever, so an expired session becomes an endless reconnect loop from every open
 detects this by inference and closes the stream itself, which works only if refusal is prompt and
 consistent. Do not hold an unauthenticated stream open, and do not accept it and then send nothing.
 
+**And a stream must not outlive the session it opened on.** Authenticating once, at connect, is the
+easy reading of the paragraph above and it leaves the stream as the one place a revocation does not
+reach: signing out refused every other request within 25ms while the open stream went on delivering
+that person's events until the tab was closed — indefinitely, since a stream has no maximum lifetime.
+Re-check the session at least once per poll interval and END the stream when it is gone. Nothing needs
+to be said on the way out: `EventSource` reconnects by itself, meets the prompt 401 above, and the
+client's existing auth-loss path refreshes and reopens.
+
+A consequence worth stating rather than discovering: a refresh issues a new access token the open
+connection never sees, so a stream ends when the token it opened on expires. That is correct. A stream
+that outlived its token would be a token with no expiry.
+
 ### 5.5 Budget one stream per tab
 
 A browser allows six connections per origin on HTTP/1.1, and a stream holds one for its whole life;
