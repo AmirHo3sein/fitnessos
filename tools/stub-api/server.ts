@@ -662,6 +662,14 @@ const handlers: Record<string, (req: IncomingMessage, res: ServerResponse) => Pr
     telemetry.clear()
     events.clear()
     faults.clear()
+    /*
+     * `artefactRevisions` was missed when §2.1a's precondition arrived, and the omission is worse
+     * than it looks: clearing an artefact while KEEPING its revision leaves a stub that answers 409
+     * to a first save, because the counter says there is something to collide with and the document
+     * says there is not. Every map holding per-phone state has to be listed here — that is what this
+     * endpoint IS.
+     */
+    artefactRevisions.clear()
     res.writeHead(204).end()
     return Promise.resolve()
   },
