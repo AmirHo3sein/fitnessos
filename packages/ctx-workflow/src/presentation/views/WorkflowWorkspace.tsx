@@ -96,7 +96,7 @@ export const WorkflowWorkspace = ({ locale, labels }: WorkflowWorkspaceProps) =>
   */
   if (loadFailed) {
     return (
-      <Card>
+      <Card role="alert">
         <CardTitle>{labels.title}</CardTitle>
         <CardDescription>{labels.loadFailed}</CardDescription>
         <Button type="button" variant="secondary" className="mt-4" onPress={retry}>
@@ -138,7 +138,7 @@ export const WorkflowWorkspace = ({ locale, labels }: WorkflowWorkspaceProps) =>
         contents only once the author has said so. Dismissing does neither and keeps both.
       */}
       {conflict !== null && (
-        <Card>
+        <Card role="alert">
           <CardTitle>{labels.conflictTitle}</CardTitle>
           <CardDescription>{labels.conflictBody}</CardDescription>
           <div className="mt-4 flex flex-wrap gap-2">
@@ -173,7 +173,7 @@ export const WorkflowWorkspace = ({ locale, labels }: WorkflowWorkspaceProps) =>
       )}
 
       {error !== null && (
-        <Card>
+        <Card role="alert">
           <CardDescription>{labels.saveFailed}</CardDescription>
         </Card>
       )}

@@ -88,7 +88,7 @@ export const PlanWorkspace = ({ locale, labels, today }: PlanWorkspaceProps) => 
   */
   if (loadFailed) {
     return (
-      <Card>
+      <Card role="alert">
         <CardTitle>{labels.title}</CardTitle>
         <CardDescription>{labels.loadFailed}</CardDescription>
         <Button type="button" variant="secondary" className="mt-4" onPress={retry}>
@@ -128,7 +128,7 @@ export const PlanWorkspace = ({ locale, labels, today }: PlanWorkspaceProps) => 
         move is a decision rather than another press of Save.
       */}
       {conflict !== null && (
-        <Card>
+        <Card role="alert">
           <CardTitle>{labels.conflictTitle}</CardTitle>
           <CardDescription>{labels.conflictBody}</CardDescription>
           {/*
@@ -167,7 +167,7 @@ export const PlanWorkspace = ({ locale, labels, today }: PlanWorkspaceProps) => 
       )}
 
       {error !== null && (
-        <Card>
+        <Card role="alert">
           <CardDescription>{labels.saveFailed}</CardDescription>
         </Card>
       )}

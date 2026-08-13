@@ -18,6 +18,15 @@ export interface UnjudgedLabels {
   readonly rationalePlaceholder: string
   readonly submit: string
   readonly rationaleRequired: string
+  /**
+   * A read failed, so we cannot say whether anything is owed.
+   *
+   * Rendered instead of nothing. Nothing is the correct output for "nothing is owed", and it is the
+   * worst possible output for "we could not find out" — the two are the same picture, and only one
+   * of them means the coach is up to date.
+   */
+  readonly loadFailed: string
+  readonly retry: string
 }
 
 export interface UnjudgedHypothesesProps {
@@ -39,7 +48,30 @@ export interface UnjudgedHypothesesProps {
  * appear.
  */
 export const UnjudgedHypotheses = ({ locale, labels, asOf }: UnjudgedHypothesesProps) => {
-  const { items, render, isRendering } = useUnjudged(asOf)
+  const { items, render, isRendering, loadFailed, retry } = useUnjudged(asOf)
+
+  /*
+    Checked BEFORE the empty case, and the ordering is the fix.
+
+    Rendering nothing when nothing is owed is deliberate and stays. But `?? []` on both queries
+    made a failed read produce an empty list, so the two decisions combined to hide the obligation
+    rather than show it — the "accepts every suggestion and never looks back" outcome this screen
+    exists to prevent, arriving through the screen built to prevent it.
+  */
+  if (loadFailed) {
+    return (
+      <section className="space-y-3">
+        <h2 className="text-display text-lg">{labels.title}</h2>
+        <Card role="alert">
+          <CardDescription>{labels.loadFailed}</CardDescription>
+          <Button type="button" variant="secondary" size="sm" className="mt-3" onPress={retry}>
+            {labels.retry}
+          </Button>
+        </Card>
+      </section>
+    )
+  }
+
   if (items.length === 0) return null
 
   return (

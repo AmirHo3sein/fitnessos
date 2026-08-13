@@ -195,7 +195,9 @@
       "theirs": "Recorded",
       "summary": "{count} sets on {date}",
       "unknownRecord": "details unavailable",
-      "dismiss": "Got it"
+      "dismiss": "Got it",
+      "loadFailed": "We could not check whether any logs are still waiting to be sent. Try again in a moment.",
+      "retry": "Try again"
     }
   },
   "notFound": {
@@ -213,7 +215,9 @@
     "kinds": {
       "bodyweight": "Bodyweight",
       "estimatedOneRepMax": "Estimated one-rep max"
-    }
+    },
+    "loadFailed": "We could not read your indicators just now. This is not a statement about your training — it means the request did not reach us.",
+    "retry": "Try again"
   },
   "learning": {
     "unjudged": {
@@ -227,7 +231,9 @@
       "rationaleLabel": "What happened?",
       "rationalePlaceholder": "What you observed, in your own words",
       "submit": "Record",
-      "rationaleRequired": "A verdict needs a reason."
+      "rationaleRequired": "A verdict needs a reason.",
+      "loadFailed": "We could not check whether anything is waiting for a verdict. Nothing has been lost — try again in a moment.",
+      "retry": "Try again"
     }
   },
   "checkIn": {

@@ -24,7 +24,13 @@ export {
   type ButtonSize,
   type ButtonVariant,
 } from './primitives/button'
-export { Card, CardDescription, CardTitle, type CardProps } from './primitives/card'
+export {
+  Card,
+  CardDescription,
+  CardTitle,
+  type CardContainerProps,
+  type CardProps,
+} from './primitives/card'
 export { Skeleton, type SkeletonProps } from './primitives/skeleton'
 
 export { SafeHtml, sanitizeHtml, type SafeHtmlProps } from './patterns/safe-html'

@@ -16,6 +16,15 @@ export interface SyncIssueLabels {
   readonly summary: string
   readonly unknownRecord: string
   readonly dismiss: string
+  /**
+   * The issue log could not be read.
+   *
+   * Rendered instead of nothing, because nothing is what this banner exists to stop. "We cannot
+   * tell whether anything is waiting" is a poor message and a far better one than silence, which is
+   * indistinguishable from "everything reached the server".
+   */
+  readonly loadFailed: string
+  readonly retry: string
 }
 
 export interface SyncIssuesProps {
@@ -46,7 +55,28 @@ export interface SyncIssuesProps {
  * about what happened in a gym, which is the athlete's to make — so this shows both and waits.
  */
 export const SyncIssues = ({ locale, labels }: SyncIssuesProps) => {
-  const { issues, dismiss } = useSyncIssues()
+  const { issues, dismiss, loadFailed, retry } = useSyncIssues()
+
+  /*
+    A failed read is SAID, not rendered as nothing.
+
+    `data ?? []` collapsed "could not read the log" into "nothing is waiting", and an empty list
+    renders null — so the failure recreated, exactly, the silence described above: the product said
+    "saved" and then quietly did not say otherwise.
+  */
+  if (loadFailed) {
+    return (
+      <section className="mb-6">
+        <Card role="alert" className="border-warning-border bg-warning-surface">
+          <CardDescription>{labels.loadFailed}</CardDescription>
+          <Button type="button" variant="secondary" size="sm" className="mt-3" onPress={retry}>
+            {labels.retry}
+          </Button>
+        </Card>
+      </section>
+    )
+  }
+
   if (issues.length === 0) return null
 
   return (

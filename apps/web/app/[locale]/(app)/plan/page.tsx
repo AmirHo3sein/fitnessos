@@ -4,6 +4,7 @@ import { hasLocale } from 'next-intl'
 import { PlanWorkspace } from '@fitnessos/ctx-timeline/presentation'
 import { routing } from '../../../../src/i18n/routing'
 import { enableStaticRendering } from '../../../../src/i18n/static'
+import { todayHere } from '../../../../composition/today'
 
 /** The Timeline Builder's route. */
 export const dynamic = 'force-dynamic'
@@ -32,9 +33,11 @@ export default async function PlanPage({
    *
    * A `new Date()` in the client component would differ between the server render and hydration,
    * and for an epoch that means every phase offset shifts by a day depending on which ran second.
+   *
+   * `todayHere()` rather than `new Date().getFullYear()`, which read the CONTAINER's zone rather
+   * than the athlete's — so a plan started just after local midnight began a day early.
    */
-  const now = new Date()
-  const today = { year: now.getFullYear(), month: now.getMonth() + 1, day: now.getDate() }
+  const today = todayHere()
 
   return (
     <main>

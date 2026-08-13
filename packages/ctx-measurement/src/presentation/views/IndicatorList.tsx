@@ -1,6 +1,6 @@
 'use client'
 
-import { Card, CardDescription, CardTitle } from '@fitnessos/ui'
+import { Button, Card, CardDescription, CardTitle } from '@fitnessos/ui'
 import { formatPlainDate, type Locale, type PlainDate } from '@fitnessos/kernel'
 import type { IndicatorSeriesView } from '../../application/index'
 import { useIndicators } from '../hooks/useIndicators'
@@ -9,6 +9,15 @@ export interface IndicatorLabels {
   readonly title: string
   readonly none: string
   readonly noneHint: string
+  /**
+   * Shown when the READ failed, and never shown alongside the empty state.
+   *
+   * A separate string on purpose. "You have not measured anything yet" and "we could not read your
+   * indicators" call for different actions, and the first — told to an athlete whose request merely
+   * failed — is a statement about their training that is not true.
+   */
+  readonly loadFailed: string
+  readonly retry: string
   readonly measuredOn: string
   readonly stale: string
   readonly notEnoughData: string
@@ -30,7 +39,26 @@ export interface IndicatorListProps {
  * session moves an estimated 1RM here, without the athlete recording a measurement at all.
  */
 export const IndicatorList = ({ locale, labels, asOf }: IndicatorListProps) => {
-  const series = useIndicators(asOf)
+  const { series, loadFailed, retry } = useIndicators(asOf)
+
+  /*
+    Reported BEFORE the empty state, because the two used to be the same picture from here.
+
+    `data ?? []` meant a 401, a dropped request and a genuinely empty account all arrived as an
+    empty array, and this rendered "nothing here yet" with a hint about logging a session — telling
+    an athlete whose read merely failed that their training has produced nothing.
+  */
+  if (loadFailed) {
+    return (
+      <Card role="alert">
+        <CardTitle>{labels.title}</CardTitle>
+        <CardDescription>{labels.loadFailed}</CardDescription>
+        <Button type="button" variant="secondary" className="mt-4" onPress={retry}>
+          {labels.retry}
+        </Button>
+      </Card>
+    )
+  }
 
   if (series.length === 0) {
     return (

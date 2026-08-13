@@ -100,7 +100,7 @@ export const NutritionWorkspace = ({ locale, labels }: NutritionWorkspaceProps) 
   */
   if (loadFailed) {
     return (
-      <Card>
+      <Card role="alert">
         <CardTitle>{labels.title}</CardTitle>
         <CardDescription>{labels.loadFailed}</CardDescription>
         <Button type="button" variant="secondary" className="mt-4" onPress={retry}>
@@ -141,7 +141,7 @@ export const NutritionWorkspace = ({ locale, labels }: NutritionWorkspaceProps) 
         Both choices are the author's, and neither is taken for them (ADR-0033).
       */}
       {conflict !== null && (
-        <Card>
+        <Card role="alert">
           <CardTitle>{labels.conflictTitle}</CardTitle>
           <CardDescription>{labels.conflictBody}</CardDescription>
           <div className="mt-4 flex flex-wrap gap-2">
@@ -186,7 +186,7 @@ export const NutritionWorkspace = ({ locale, labels }: NutritionWorkspaceProps) 
       )}
 
       {error !== null && (
-        <Card>
+        <Card role="alert">
           <CardDescription>{labels.saveFailed}</CardDescription>
         </Card>
       )}

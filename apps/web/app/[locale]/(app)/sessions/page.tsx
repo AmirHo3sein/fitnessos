@@ -89,6 +89,8 @@ export default async function SessionsPage({
           summary: t('syncIssues.summary'),
           unknownRecord: t('syncIssues.unknownRecord'),
           dismiss: t('syncIssues.dismiss'),
+          loadFailed: t('syncIssues.loadFailed'),
+          retry: t('syncIssues.retry'),
         }}
       />
     </main>

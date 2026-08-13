@@ -120,7 +120,7 @@ export const CheckInFormWorkspace = ({ locale, labels }: CheckInFormWorkspacePro
    */
   const conflictCard =
     conflict === null ? null : (
-      <Card>
+      <Card role="alert">
         <div className="flex items-start gap-2">
           <div className="flex-1">
             <CardTitle>{labels.conflictTitle}</CardTitle>
@@ -181,7 +181,7 @@ export const CheckInFormWorkspace = ({ locale, labels }: CheckInFormWorkspacePro
   */
   if (loadFailed) {
     return (
-      <Card>
+      <Card role="alert">
         <CardTitle>{labels.title}</CardTitle>
         <CardDescription>{labels.loadFailed}</CardDescription>
         <Button type="button" variant="secondary" className="mt-4" onPress={retry}>
@@ -228,7 +228,7 @@ export const CheckInFormWorkspace = ({ locale, labels }: CheckInFormWorkspacePro
     <div className="space-y-4">
       {conflictCard}
       {error !== null && (
-        <Card>
+        <Card role="alert">
           <CardDescription>{labels.saveFailed}</CardDescription>
         </Card>
       )}

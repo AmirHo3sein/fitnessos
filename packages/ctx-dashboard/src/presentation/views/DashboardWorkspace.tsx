@@ -96,7 +96,7 @@ export const DashboardWorkspace = ({ locale, labels }: DashboardWorkspaceProps) 
   */
   if (loadFailed) {
     return (
-      <Card>
+      <Card role="alert">
         <CardTitle>{labels.title}</CardTitle>
         <CardDescription>{labels.loadFailed}</CardDescription>
         <Button type="button" variant="secondary" className="mt-4" onPress={retry}>
@@ -138,7 +138,7 @@ export const DashboardWorkspace = ({ locale, labels }: DashboardWorkspaceProps) 
         without choosing is a third, honest answer, and the grid is still there behind this card.
       */}
       {conflict !== null && (
-        <Card>
+        <Card role="alert">
           <CardTitle>{labels.conflictTitle}</CardTitle>
           <CardDescription>{labels.conflictBody}</CardDescription>
           <div className="mt-4 flex flex-wrap gap-2">
@@ -176,7 +176,7 @@ export const DashboardWorkspace = ({ locale, labels }: DashboardWorkspaceProps) 
         card that says the opposite.
       */}
       {error !== null && (
-        <Card>
+        <Card role="alert">
           <CardDescription>{labels.saveFailed}</CardDescription>
         </Card>
       )}

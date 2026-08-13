@@ -16,6 +16,8 @@ const LABELS = {
   summary: '{count} sets on {date}',
   unknownRecord: 'details unavailable',
   dismiss: 'Got it',
+  loadFailed: 'We could not check whether any logs are still waiting to be sent.',
+  retry: 'Try again',
 }
 
 const conflict = (over: Partial<SyncIssueSnapshot> = {}): SyncIssueSnapshot => ({
@@ -27,13 +29,17 @@ const conflict = (over: Partial<SyncIssueSnapshot> = {}): SyncIssueSnapshot => (
   ...over,
 })
 
-const mount = (issues: readonly SyncIssueSnapshot[], dismiss = vi.fn(() => Promise.resolve())) => {
+const mount = (
+  issues: readonly SyncIssueSnapshot[] | Error,
+  dismiss = vi.fn(() => Promise.resolve()),
+) => {
   const ports = {
     execution: {
       upcomingSessions: vi.fn(),
       logSession: vi.fn(),
       pendingLogCount: vi.fn(),
-      syncIssues: () => Promise.resolve(issues),
+      syncIssues: () =>
+        issues instanceof Error ? Promise.reject(issues) : Promise.resolve(issues),
       dismissSyncIssue: dismiss,
     },
   } as unknown as ExecutionPorts
@@ -117,5 +123,23 @@ describe('dismissal', () => {
 
     expect(await screen.findByText(LABELS.conflictTitle)).toBeInTheDocument()
     expect(screen.getByText(LABELS.rejectedTitle)).toBeInTheDocument()
+  })
+})
+
+describe('a read that failed', () => {
+  it('says so rather than rendering nothing', async () => {
+    /*
+     * The silence this banner exists to break, recreated by the banner.
+     *
+     * `data ?? []` made "could not read the issue log" identical to "nothing is waiting", and an
+     * empty list renders null — so an athlete whose session was never sent saw exactly what an
+     * athlete with nothing outstanding sees. The product said "saved" and then quietly did not say
+     * otherwise.
+     */
+    mount(new Error('the store is unreadable'))
+
+    expect(await screen.findByText(LABELS.loadFailed)).toBeInTheDocument()
+    // Announced, not merely displayed. A screen-reader user has no other way to learn of it.
+    expect(screen.getByRole('alert')).toHaveTextContent(LABELS.loadFailed)
   })
 })

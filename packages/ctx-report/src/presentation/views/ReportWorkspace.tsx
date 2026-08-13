@@ -105,7 +105,7 @@ export const ReportWorkspace = ({ locale, labels }: ReportWorkspaceProps) => {
   */
   if (loadFailed) {
     return (
-      <Card>
+      <Card role="alert">
         <CardTitle>{labels.title}</CardTitle>
         <CardDescription>{labels.loadFailed}</CardDescription>
         <Button type="button" variant="secondary" className="mt-4" onPress={retry}>
@@ -145,7 +145,7 @@ export const ReportWorkspace = ({ locale, labels }: ReportWorkspaceProps) => {
         the revision that proves we saw it.
       */}
       {conflict !== null && (
-        <Card>
+        <Card role="alert">
           <CardTitle>{labels.conflictTitle}</CardTitle>
           <CardDescription>{labels.conflictBody}</CardDescription>
           <div className="mt-4 flex flex-wrap gap-2">
@@ -185,7 +185,7 @@ export const ReportWorkspace = ({ locale, labels }: ReportWorkspaceProps) => {
       {/* Narrowed back to `error`: a conflict has its own panel above, and a coach reading both at
           once would be told their work was lost beside the two versions of it. */}
       {error !== null && (
-        <Card>
+        <Card role="alert">
           <CardDescription>{labels.saveFailed}</CardDescription>
         </Card>
       )}

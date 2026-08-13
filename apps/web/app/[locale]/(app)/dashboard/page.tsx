@@ -6,6 +6,7 @@ import { UnjudgedHypotheses } from '@fitnessos/core/learning/presentation'
 import { hasLocale } from 'next-intl'
 import { routing } from '../../../../src/i18n/routing'
 import { enableStaticRendering } from '../../../../src/i18n/static'
+import { todayHere } from '../../../../composition/today'
 
 /**
  * A server component that renders a client leaf.
@@ -63,9 +64,12 @@ export default async function DashboardPage({
    * inside the component. A `new Date()` in the client would also differ between the server
    * render and hydration — a mismatch React resolves in favour of whichever ran second, which
    * means the warning flickers on for some athletes and not others.
+   *
+   * `todayHere()` rather than `new Date().getFullYear()`, which read the CONTAINER's zone: at
+   * 01:00 in Tehran a UTC process answered yesterday, so an indicator measured this morning was
+   * flagged stale for three and a half hours every day.
    */
-  const now = new Date()
-  const asOf = { year: now.getFullYear(), month: now.getMonth() + 1, day: now.getDate() }
+  const asOf = todayHere()
 
   return (
     <main>
@@ -110,6 +114,8 @@ export default async function DashboardPage({
             rationalePlaceholder: unjudged('rationalePlaceholder'),
             submit: unjudged('submit'),
             rationaleRequired: unjudged('rationaleRequired'),
+            loadFailed: unjudged('loadFailed'),
+            retry: unjudged('retry'),
           }}
         />
       </div>
@@ -122,6 +128,8 @@ export default async function DashboardPage({
             title: indicators('title'),
             none: indicators('none'),
             noneHint: indicators('noneHint'),
+            loadFailed: indicators('loadFailed'),
+            retry: indicators('retry'),
             measuredOn: indicators('measuredOn'),
             stale: indicators('stale'),
             notEnoughData: indicators('notEnoughData'),

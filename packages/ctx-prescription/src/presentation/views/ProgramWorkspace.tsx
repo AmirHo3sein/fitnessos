@@ -129,7 +129,7 @@ const EditingSession = ({
   return (
     <div className="space-y-4">
       {conflict !== null && (
-        <Card>
+        <Card role="alert">
           <CardTitle>{labels.conflictTitle}</CardTitle>
           <CardDescription>{labels.conflictBody}</CardDescription>
           {/*
@@ -176,7 +176,7 @@ const EditingSession = ({
       )}
 
       {error !== null && (
-        <Card>
+        <Card role="alert">
           <CardDescription>{labels.saveFailed}</CardDescription>
         </Card>
       )}

@@ -11,6 +11,17 @@ import { useExecutionPorts } from '../di'
 export interface UseSyncIssues {
   readonly issues: readonly SyncIssueSnapshot[]
   readonly dismiss: (id: string) => void
+  /**
+   * The issue log could not be READ.
+   *
+   * `data ?? []` made that indistinguishable from having no unsent logs, and the view renders
+   * nothing for an empty list — so a failed read recreated, exactly, the silence this banner exists
+   * to break: the product said "saved" and then quietly did not say otherwise. The store is on the
+   * device, so this is rare; it is also the case where the athlete has least reason to look.
+   */
+  readonly loadFailed: boolean
+  /** Re-read the local store. */
+  readonly retry: () => void
 }
 
 /**
@@ -28,12 +39,19 @@ export const useSyncIssues = (): UseSyncIssues => {
   const ports = useExecutionPorts()
   const queryClient = useQueryClient()
 
-  const { data } = useQuery(syncIssuesQuery(ports))
+  const query = useQuery(syncIssuesQuery(ports))
 
   const dismissal = useMutation({
     mutationFn: (id: string) => ports.execution.dismissSyncIssue(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: sessionKeys.syncIssues() }),
   })
 
-  return { issues: data ?? [], dismiss: dismissal.mutate }
+  return {
+    issues: query.data ?? [],
+    dismiss: dismissal.mutate,
+    loadFailed: query.isError,
+    retry: () => {
+      void query.refetch()
+    },
+  }
 }

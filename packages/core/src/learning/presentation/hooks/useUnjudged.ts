@@ -22,6 +22,18 @@ export interface UseUnjudged {
   }) => void
   readonly isRendering: boolean
   readonly error: Error | null
+  /**
+   * EITHER read failed — and this is the screen where that must not be silent.
+   *
+   * `?? []` on both queries meant a failure produced an empty list, and the view renders nothing
+   * for an empty list, deliberately: a permanent "all caught up" panel is noise, and noise teaches
+   * people to stop reading the place a real obligation will appear. Two defensible decisions, and
+   * together they produced exactly the product this screen exists to prevent — one that accepts
+   * every suggestion and never looks back — while looking identical to having nothing owed.
+   */
+  readonly loadFailed: boolean
+  /** Refetch both, so the answer to a failed read is one press rather than a full reload. */
+  readonly retry: () => void
 }
 
 /**
@@ -63,5 +75,13 @@ export const useUnjudged = (asOf: PlainDate): UseUnjudged => {
     render: mutation.mutate,
     isRendering: mutation.isPending,
     error: mutation.error,
+    // EITHER, not both: an outcomes read that failed leaves every accepted proposal looking
+    // unjudged, and a proposals read that failed leaves the list empty. Both are wrong answers
+    // rather than partial ones.
+    loadFailed: proposals.isError || outcomes.isError,
+    retry: () => {
+      void proposals.refetch()
+      void outcomes.refetch()
+    },
   }
 }
