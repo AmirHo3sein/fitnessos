@@ -8,7 +8,7 @@
   "scripts": {
     "build": "turbo run build",
     "bundle:budget": "node tools/bundle-budget.mjs",
-    "check": "pnpm typecheck && pnpm lint && pnpm tokens:check && pnpm color:contrast && pnpm copy:register && pnpm test:unit && pnpm test:integration && pnpm test:component",
+    "check": "pnpm typecheck && pnpm lint && pnpm audit && pnpm tokens:check && pnpm color:contrast && pnpm copy:register && pnpm test:unit && pnpm test:integration && pnpm test:component",
     "color:contrast": "node tools/color/contrast-report.mjs",
     "color:lint": "node tools/color/lint-usage.mjs",
     "conformance": "pnpm --filter @fitnessos/conformance test:conformance",
@@ -29,7 +29,9 @@
     "test:unit": "turbo run test:unit",
     "tokens:build": "node tools/color/emit.mjs",
     "tokens:check": "node tools/color/check-tokens.mjs",
-    "typecheck": "turbo run typecheck"
+    "typecheck": "turbo run typecheck",
+    "audit": "pnpm audit --audit-level=high",
+    "check:full": "pnpm check && pnpm e2e:critical"
   },
   "devDependencies": {
     "@types/node": "^22.9.0",

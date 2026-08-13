@@ -52,7 +52,19 @@ tools/copy            Persian register consistency — a ratchet, not a style op
 
 ```bash
 pnpm install
-pnpm check              # typecheck + lint + boundaries + unit + integration + component
+pnpm check              # typecheck + lint + boundaries + AUDIT + unit + integration + component
+pnpm check:full         # the above, plus the @critical e2e set (needs a browser, ~3 min)
+```
+
+**`pnpm check` now runs `pnpm audit`, and that is not housekeeping.** CI's `verify` job has always run it
+and the local gate never did, so for five consecutive pushes `pnpm check` said green while CI was red on
+a high advisory. Two definitions of green, and the local one was the one being quoted.
+
+The e2e suite is the same trap one level out: it runs nightly and in CI, not in `pnpm check`. A subject
+regression shipped through eight commits because of it. `pnpm check:full` is the honest gate before a
+push that touches routing, providers or query keys — it costs three minutes and a browser.
+
+```sh
 pnpm typecheck
 pnpm lint               # eslint + dependency-cruiser
 pnpm test:unit
