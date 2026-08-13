@@ -237,6 +237,11 @@
     "create": "Create one",
     "loading": "Loading the form",
     "saveFailed": "Your changes could not be saved. They are still here — try again.",
+    "conflictTitle": "This form was changed elsewhere",
+    "conflictBody": "Someone else saved this check-in form while you were editing. Your questions are still here and nothing has been lost — save them over the other version, or take that version instead and lose what you have not saved.",
+    "conflictKeep": "Keep mine and save",
+    "conflictDiscard": "Discard mine and take theirs",
+    "conflictDismiss": "Close",
     "newFormTitle": "Morning check-in",
     "builder": {
       "heading": "Questions",
@@ -267,6 +272,11 @@
     "create": "Create one",
     "loading": "Loading the report",
     "saveFailed": "Your changes could not be saved. They are still here — try again.",
+    "conflictTitle": "This report was changed elsewhere",
+    "conflictBody": "Someone else saved this report while you were editing. Both versions still exist — choose which one to keep.",
+    "conflictKeep": "Keep mine and save again",
+    "conflictDiscard": "Discard mine and load theirs",
+    "conflictDismiss": "Decide later",
     "newReportTitle": "Monthly review",
     "builder": {
       "heading": "Layout",
@@ -313,7 +323,12 @@
       "widgetMovable": "movable with the arrow keys"
     },
     "loadFailed": "The layout could not be loaded.",
-    "retry": "Try again"
+    "retry": "Try again",
+    "conflictTitle": "This layout was changed elsewhere",
+    "conflictBody": "Someone else saved a new arrangement while you were editing. Yours is still on the grid and nothing has been lost.",
+    "conflictKeep": "Keep mine and save again",
+    "conflictDiscard": "Discard mine and take the saved layout",
+    "conflictDismiss": "Decide later"
   },
   "plan": {
     "heading": "Plan",
@@ -323,6 +338,11 @@
     "create": "Create one",
     "loading": "Loading the plan",
     "saveFailed": "Your changes could not be saved. They are still here — try again.",
+    "conflictTitle": "This plan was changed elsewhere",
+    "conflictBody": "Someone else saved the plan while you were editing it. Nothing has been lost — both versions exist, and you choose which one stands.",
+    "conflictKeep": "Keep mine and save it",
+    "conflictDiscard": "Discard mine and take theirs",
+    "conflictDismiss": "Decide later",
     "newTitle": "This season",
     "firstPhase": "Accumulation",
     "builder": {
@@ -375,7 +395,12 @@
       "noItems": "Nothing in this meal yet."
     },
     "loadFailed": "The nutrition plan could not be loaded.",
-    "retry": "Try again"
+    "retry": "Try again",
+    "conflictTitle": "This plan was changed elsewhere",
+    "conflictBody": "Someone else saved this nutrition plan while you were editing it. Nothing has been lost — both versions exist, and yours is still here.",
+    "conflictKeep": "Keep mine and save it again",
+    "conflictDiscard": "Discard mine and use theirs",
+    "conflictDismiss": "Decide later"
   },
   "automation": {
     "heading": "Automation",
@@ -385,6 +410,11 @@
     "create": "Create an automation",
     "loading": "Loading the automation",
     "saveFailed": "Your changes were not saved. They are still here; try again.",
+    "conflictTitle": "This automation was changed elsewhere",
+    "conflictBody": "Someone else saved a new version while you were editing. Your changes are still here and nothing has been lost.",
+    "conflictKeep": "Keep mine and save again",
+    "conflictDiscard": "Discard mine and use theirs",
+    "conflictDismiss": "Decide later",
     "newTitle": "Automation",
     "firstTrigger": "check-in submitted",
     "builder": {

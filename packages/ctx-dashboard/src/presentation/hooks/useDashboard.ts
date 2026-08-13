@@ -48,6 +48,45 @@ export interface UseDashboard {
    * which is the work they were trying not to lose.
    */
   readonly conflict: Loaded<DashboardSnapshot> | null
+  /**
+   * Resolve the conflict in the author's favour: send the REFUSED document again, this time quoting
+   * the revision the server reported.
+   *
+   * The re-send lives here rather than in the workspace because the workspace does not hold the
+   * document — the editor store does, and the only copy the workspace can reach is the one the
+   * refused save carried. That copy is exactly what "keep mine" means.
+   *
+   * Quoting the server's revision is the whole mechanism. Retrying with the cached base would repeat
+   * the dead precondition and conflict forever, which is the state the author was stuck in before
+   * this existed.
+   *
+   * TRUE when it landed; FALSE when it did not, including when someone saved AGAIN in between — in
+   * which case a fresh `conflict` appears with the newer revision and the same choice is offered.
+   */
+  readonly keepMine: () => Promise<boolean>
+  /**
+   * Resolve it the other way: adopt the server's arrangement and abandon the local one.
+   *
+   * Nothing is sent. The conflict already carried the artefact AND the revision it belongs to, so
+   * seeding the cache with that envelope is a complete, correct read — the next save quotes a live
+   * precondition without a round trip.
+   */
+  readonly takeTheirs: () => void
+  /**
+   * Dismiss the conflict without resolving it.
+   *
+   * There is otherwise NO way to clear `conflict`: it is derived from `mutation.error`, which
+   * survives until the next save or a reset. So an author who wants to look at the grid before
+   * choosing would be arguing with an undismissable dialog, and the two resolutions above would have
+   * no way to put it away once they had done their work.
+   */
+  readonly reset: () => void
+}
+
+/** What a save sends: the document, and the revision it claims to be replacing (ADR-0035). */
+interface SaveAttempt {
+  readonly dashboard: DashboardSnapshot
+  readonly baseRevision: number | null
 }
 
 export const useDashboard = (): UseDashboard => {
@@ -57,11 +96,12 @@ export const useDashboard = (): UseDashboard => {
   const query = useQuery(currentDashboardQuery(ports, subject))
 
   const mutation = useMutation({
-    // The base revision comes from the query cache, never from the editor: the document is
-    // undoable and the precondition must not be (ADR-0035). `null` is a first save — there is
-    // nothing on the server to collide with.
-    mutationFn: (dashboard: DashboardSnapshot) =>
-      ports.dashboard.save(dashboard, query.data?.revision ?? null),
+    // The precondition travels WITH the document as a mutation variable rather than being read from
+    // the cache inside `mutationFn`. Two reasons: a resolving save needs a base the cache does not
+    // hold (the server's, from the conflict), and the variables of the refused attempt are then the
+    // record of what to re-send.
+    mutationFn: ({ dashboard, baseRevision }: SaveAttempt) =>
+      ports.dashboard.save(dashboard, baseRevision),
     // Set, not invalidate: the response IS the new state — including the revision the NEXT save
     // must send — and refetching would leave a window where the grid and the cache disagree about
     // where a widget is.
@@ -70,6 +110,18 @@ export const useDashboard = (): UseDashboard => {
     },
   })
 
+  const conflict =
+    mutation.error instanceof DashboardConflictError ? mutation.error.current : null
+
+  const attempt = async (next: SaveAttempt): Promise<boolean> => {
+    try {
+      await mutation.mutateAsync(next)
+      return true
+    } catch {
+      return false
+    }
+  }
+
   return {
     dashboard: query.data?.artefact ?? null,
     isLoading: query.isPending,
@@ -77,20 +129,34 @@ export const useDashboard = (): UseDashboard => {
     retry: () => {
       void query.refetch()
     },
-    save: async (dashboard) => {
-      try {
-        await mutation.mutateAsync(dashboard)
-        return true
-      } catch {
-        return false
-      }
-    },
+    // The base comes from the query cache, never from the editor: the document is undoable and the
+    // precondition must not be (ADR-0035). `null` is a first save — nothing to collide with.
+    save: (dashboard) => attempt({ dashboard, baseRevision: query.data?.revision ?? null }),
     isSaving: mutation.isPending,
     // A conflict is reported through `conflict`, so it must not also arrive as an error — a
     // workspace rendering both would show "we could not store your change" beside the two
     // arrangements it is asking the author to choose between.
     error: mutation.error instanceof DashboardConflictError ? null : mutation.error,
-    conflict:
-      mutation.error instanceof DashboardConflictError ? mutation.error.current : null,
+    conflict,
+    keepMine: async () => {
+      const refused = mutation.variables?.dashboard
+      // Guarded rather than assumed: a press that arrives after the conflict has already been
+      // resolved elsewhere must not re-send a document nobody is looking at any more.
+      if (conflict === null || refused === undefined) return false
+      /*
+       * `conflict.revision` may be `null` — a server older than BACKEND-CONTRACT §2.1a, which is the
+       * only way a 409 arrives without one. Passing it through is right even so: the alternative is
+       * inventing a base, and a server that quotes no revision has no precondition to satisfy.
+       */
+      return attempt({ dashboard: refused, baseRevision: conflict.revision })
+    },
+    takeTheirs: () => {
+      if (conflict === null) return
+      queryClient.setQueryData(dashboardKeys.current(subject), conflict)
+      // After the cache, not before: `reset` clears the conflict and re-renders the workspace, which
+      // must find the adopted arrangement already in place rather than the one it just discarded.
+      mutation.reset()
+    },
+    reset: mutation.reset,
   }
 }

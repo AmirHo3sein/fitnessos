@@ -46,6 +46,51 @@ export interface UseNutritionPlan {
    * only base revision in reach the stale one that caused the collision.
    */
   readonly conflict: Loaded<NutritionSnapshot> | null
+  /**
+   * KEEP MINE — send the author's plan again, onto the revision the collision revealed.
+   *
+   * The plan is passed in rather than read from anywhere here, because the hook never holds the
+   * document being edited: it lives in the editor store, and only the caller that handed it to
+   * `save` still has it.
+   *
+   * Why this cannot be "press Save again": `save` quotes the revision the CACHE holds, which is
+   * still the stale one that collided — every retry would answer 409 for the same reason, and the
+   * author would be stuck with work they cannot store. Quoting `conflict.revision` is the whole
+   * difference between resolving the collision and repeating it.
+   *
+   * Deliberately an overwrite. The other author's version is not lost — it is a revision on the
+   * server — and the author choosing this has been told what they are doing (ADR-0033).
+   */
+  readonly keepMine: (plan: NutritionSnapshot) => Promise<boolean>
+  /**
+   * TAKE THEIRS — adopt the server's plan, discarding the local one.
+   *
+   * Nothing is sent: the server already holds this document at this revision, so a save would be a
+   * round trip that changes nothing except the revision every other reader is quoting.
+   */
+  readonly takeTheirs: () => void
+  /**
+   * Clear `error` and `conflict`.
+   *
+   * Needed because a conflict is mutation state, and mutation state only changes when another
+   * mutation runs. Without this the dialog could be left only by saving — so an author who wanted
+   * to keep editing and decide later would have to choose between two resolutions to get rid of
+   * the question, which is the one thing a conflict dialog must never force.
+   */
+  readonly reset: () => void
+}
+
+/**
+ * A save and the precondition it asserts, travelling together.
+ *
+ * The revision is a mutation VARIABLE rather than read inside `mutationFn`, because the two saves
+ * that exist quote different ones: an ordinary save quotes what was read, and a resolution quotes
+ * what the collision revealed. Reading it from the cache inside the mutation would make the second
+ * one unexpressible.
+ */
+interface SaveAttempt {
+  readonly plan: NutritionSnapshot
+  readonly baseRevision: number | null
 }
 
 export const useNutritionPlan = (): UseNutritionPlan => {
@@ -55,20 +100,27 @@ export const useNutritionPlan = (): UseNutritionPlan => {
   const query = useQuery(currentNutritionPlanQuery(ports, subject))
 
   const mutation = useMutation({
-    /*
-      The base revision comes from the envelope this render was drawn from — the plan the author
-      actually edited — and never from the editor, which is not told a revision exists (ADR-0035).
-      `null` only where nothing was read, which is the first save and the one case with nothing to
-      collide with; sent against a plan that exists it answers 409 rather than overwriting it.
-    */
-    mutationFn: (plan: NutritionSnapshot) =>
-      ports.nutrition.save(plan, query.data?.revision ?? null),
+    mutationFn: ({ plan, baseRevision }: SaveAttempt) => ports.nutrition.save(plan, baseRevision),
     // Set, not invalidate: the response IS the new state — the ENVELOPE, so the next save carries
     // the revision this one produced instead of the stale one it replaced.
     onSuccess: (saved) => {
       queryClient.setQueryData(nutritionKeys.current(subject), saved)
     },
   })
+
+  // A conflict is reported through `conflict`, so it must not also arrive as an error — a component
+  // rendering both would show "something went wrong" beside what the author collided with, and only
+  // one of those two is true.
+  const conflict = mutation.error instanceof NutritionConflictError ? mutation.error.current : null
+
+  const attempt = async (vars: SaveAttempt): Promise<boolean> => {
+    try {
+      await mutation.mutateAsync(vars)
+      return true
+    } catch {
+      return false
+    }
+  }
 
   return {
     plan: query.data?.artefact ?? null,
@@ -77,19 +129,30 @@ export const useNutritionPlan = (): UseNutritionPlan => {
     retry: () => {
       void query.refetch()
     },
-    save: async (plan) => {
-      try {
-        await mutation.mutateAsync(plan)
-        return true
-      } catch {
-        return false
-      }
-    },
+    /*
+      The base revision comes from the envelope this render was drawn from — the plan the author
+      actually edited — and never from the editor, which is not told a revision exists (ADR-0035).
+      `null` only where nothing was read, which is the first save and the one case with nothing to
+      collide with; sent against a plan that exists it answers 409 rather than overwriting it.
+    */
+    save: (plan) => attempt({ plan, baseRevision: query.data?.revision ?? null }),
     isSaving: mutation.isPending,
-    // A conflict is reported through `conflict`, so it must not also arrive as an error — a
-    // component rendering both would show "something went wrong" beside what the author collided
-    // with, and only one of those two is true.
     error: mutation.error instanceof NutritionConflictError ? null : mutation.error,
-    conflict: mutation.error instanceof NutritionConflictError ? mutation.error.current : null,
+    conflict,
+    // Nothing to keep mine OVER without a collision to answer, and inventing a precondition here
+    // would turn a stray press into the blind overwrite the revision exists to prevent.
+    keepMine: (plan) =>
+      conflict === null
+        ? Promise.resolve(false)
+        : attempt({ plan, baseRevision: conflict.revision }),
+    takeTheirs: () => {
+      if (conflict === null) return
+      // The envelope, so the next save quotes the revision this document actually has. Seeding the
+      // cache with the bare artefact would leave the author editing the other version against the
+      // precondition of the one they discarded — a second collision manufactured by the resolution.
+      queryClient.setQueryData(nutritionKeys.current(subject), conflict)
+      mutation.reset()
+    },
+    reset: mutation.reset,
   }
 }

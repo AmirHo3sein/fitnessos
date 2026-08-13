@@ -1,0 +1,67 @@
+# The local stand-in for the production reverse proxy (ADR-0025).
+#
+# ## Why this exists at all
+#
+# Everything the client does assumes ONE origin: the session cookie travels without
+# `withCredentials`, `/api/v1` is relative, and there is no CORS anywhere in the codebase. Testing
+# against `localhost:3000` talking to `localhost:8791` verifies none of that — two ports are two
+# origins, and Next's dev rewrite hides the difference.
+#
+# More importantly, BACKEND-CONTRACT §5.2 was written from measured browser behaviour THROUGH A PROXY:
+# response headers are not flushed to the browser until the first byte of body arrives, so a stream
+# that writes nothing until its first event leaves `EventSource` in CONNECTING for ever — while curl
+# against the origin works perfectly. That asymmetry cannot be reproduced without a proxy in the path.
+#
+# Deliberately NOT deployment. No TLS, no domain, no DNS, no cloud. One container, on this machine, so
+# the topology can be exercised before any of that exists.
+#
+# ## Ports 18080/18081, and why not 8080
+#
+# 8080 is the first port anyone reaches for, which is exactly why it is the wrong one: it was already
+# serving somebody else's project on this machine, and binding 0.0.0.0:8080 in a container SHADOWED
+# their process on [::1]:8080 without failing to start. Their app began answering 502 — this proxy's
+# Bad Gateway, because its own upstream was not running — and nothing said why.
+#
+# Check before binding. `lsof -nP -iTCP:<port> -sTCP:LISTEN` costs nothing and a silently stolen port
+# costs somebody an afternoon.
+
+{
+	admin off
+	auto_https off
+}
+
+:18080 {
+	# The API. `flush_interval -1` disables response buffering, which is what makes SSE work through
+	# a proxy at all — the Caddy equivalent of nginx's `proxy_buffering off`.
+	#
+	# It is set here AND the backend sends `X-Accel-Buffering: no`, because the two protect against
+	# different mistakes: this file is the deployment's business, and the header is what a deployment
+	# that forgot gets anyway. §5.2 asks for both.
+	handle /api/v1/* {
+		reverse_proxy host.docker.internal:8791 {
+			flush_interval -1
+		}
+	}
+
+	# Health and readiness, on the same origin so a probe exercises the same path traffic takes.
+	handle /health/* {
+		reverse_proxy host.docker.internal:8791
+	}
+
+	# Everything else is the app.
+	handle {
+		reverse_proxy host.docker.internal:3000
+	}
+}
+
+# The same topology WITHOUT `flush_interval`, so the buffering failure can be demonstrated rather than
+# asserted. §5.2 exists because this configuration silently breaks the stream and nothing reports it.
+:18081 {
+	handle /api/v1/* {
+		reverse_proxy host.docker.internal:8791
+	}
+
+	handle {
+		reverse_proxy host.docker.internal:3000
+	}
+}

@@ -51,6 +51,11 @@ export default async function PlanPage({
           loadFailed: t('loadFailed'),
           retry: t('retry'),
           saveFailed: t('saveFailed'),
+          conflictTitle: t('conflictTitle'),
+          conflictBody: t('conflictBody'),
+          conflictKeep: t('conflictKeep'),
+          conflictDiscard: t('conflictDiscard'),
+          conflictDismiss: t('conflictDismiss'),
           newTitle: t('newTitle'),
           firstPhase: t('firstPhase'),
           builder: {

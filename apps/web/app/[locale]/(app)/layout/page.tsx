@@ -46,6 +46,13 @@ export default async function LayoutPage({
           loadFailed: t('loadFailed'),
           retry: t('retry'),
           saveFailed: t('saveFailed'),
+          // The programme's four words for the same situation, plus the dismissal this dialog needs
+          // because its "keep" writes to the server rather than merely staying put.
+          conflictTitle: t('conflictTitle'),
+          conflictBody: t('conflictBody'),
+          conflictKeep: t('conflictKeep'),
+          conflictDiscard: t('conflictDiscard'),
+          conflictDismiss: t('conflictDismiss'),
           newTitle: t('newTitle'),
           builder: {
             heading: t('builder.heading'),

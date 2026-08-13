@@ -2,6 +2,7 @@
 
 import { Button, Card, CardDescription, CardTitle, Skeleton } from '@fitnessos/ui'
 import { newEntityId, type Locale } from '@fitnessos/kernel'
+import { useRef, useState } from 'react'
 import type { ReportSnapshot } from '../../editor/schema'
 import { useReport } from '../hooks/useReport'
 import { ReportBuilder, type ReportBuilderLabels } from './ReportBuilder'
@@ -22,6 +23,22 @@ export interface ReportWorkspaceLabels {
   readonly loadFailed: string
   readonly retry: string
   readonly saveFailed: string
+  /**
+   * The collision, and the choice it forces. The same four names the Program Builder uses, because
+   * a coach meets this situation in two places and it should read as one situation.
+   */
+  readonly conflictTitle: string
+  readonly conflictBody: string
+  readonly conflictKeep: string
+  readonly conflictDiscard: string
+  /**
+   * Close the panel and decide later — a fifth string the programme does not need.
+   *
+   * There, "keep" IS the dismissal: it leaves the draft open and stores nothing. Here "keep" stores
+   * the draft, so without this there would be no way out of the panel that does not write to the
+   * server or throw the local work away.
+   */
+  readonly conflictDismiss: string
   readonly newReportTitle: string
   readonly builder: ReportBuilderLabels
 }
@@ -39,7 +56,37 @@ export interface ReportWorkspaceProps {
  * click before every use with nobody on the other side of it.
  */
 export const ReportWorkspace = ({ locale, labels }: ReportWorkspaceProps) => {
-  const { report, isLoading, save, isSaving, error, loadFailed, retry, conflict } = useReport()
+  const { report, isLoading, save, isSaving, error, loadFailed, retry, conflict, keepMine, takeTheirs, reset } =
+    useReport()
+
+  /*
+    The document the last save attempt carried — what "keep mine" sends again.
+
+    The workspace holds no draft of its own: it lives in the builder's editor store and surfaces
+    here only as the argument to `onSave`. A ref rather than state, because nothing renders
+    differently for it and re-rendering the canvas on every save would be work for no picture.
+  */
+  const attempted = useRef<ReportSnapshot | null>(null)
+
+  /*
+    Bumped when a resolution lands, and used as the builder's key.
+
+    The builder hydrates its store ONCE, keyed on `report.id`, so that a refetch returning an
+    equal-but-new object cannot discard edits in progress. Both sides of a conflict are the same
+    report, so adopting the other author's document changes that id not at all — the coach would
+    press "discard mine" and go on looking at their own canvas, with the choice they just made
+    invisible. Remounting is what shows it to them.
+
+    Only on a resolution that LANDED. A "keep mine" that collided again must leave the builder
+    alone: the cache now holds the other author's document, and remounting would hydrate from it,
+    destroying the very work the button exists to save.
+  */
+  const [resolutions, setResolutions] = useState(0)
+
+  const attempt = (next: ReportSnapshot) => {
+    attempted.current = next
+    return save(next)
+  }
 
   if (isLoading) {
     return (
@@ -78,7 +125,7 @@ export const ReportWorkspace = ({ locale, labels }: ReportWorkspaceProps) => {
           type="button"
           className="mt-4"
           onPress={() => {
-            void save(startingReport(labels))
+            void attempt(startingReport(labels))
           }}
         >
           {labels.create}
@@ -90,24 +137,64 @@ export const ReportWorkspace = ({ locale, labels }: ReportWorkspaceProps) => {
   return (
     <div className="space-y-4">
       {/*
-        A conflict is a failure the author must SEE. It stopped populating `error` when it became its
-        own field, and for a window that meant a collided save showed nothing at all — worse than the
-        generic banner it replaced, because the work silently did not happen.
+        The collision, and the choice it forces — not the generic banner, which said "could not be
+        saved" and left the coach with no move except pressing Save into the same refusal.
 
-        This is the banner, not the resolution. A proper dialog — "keep mine" against "take theirs",
-        as the Program Builder already has — needs `conflict.artefact` and `conflict.revision`, both of
-        which are now on the hook.
+        Nothing here is destructive by default (ADR-0033): the local document stays in the editor
+        until the coach says otherwise, and the other author's version is never overwritten without
+        the revision that proves we saw it.
       */}
-      {(error !== null || conflict !== null) && (
+      {conflict !== null && (
+        <Card>
+          <CardTitle>{labels.conflictTitle}</CardTitle>
+          <CardDescription>{labels.conflictBody}</CardDescription>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Button
+              type="button"
+              size="sm"
+              isDisabled={isSaving}
+              onPress={() => {
+                const mine = attempted.current
+                if (mine === null) return
+                void keepMine(mine).then((stored) => {
+                  // Only a stored document is worth re-hydrating from; see `resolutions`.
+                  if (stored) setResolutions((count) => count + 1)
+                })
+              }}
+            >
+              {labels.conflictKeep}
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onPress={() => {
+                takeTheirs()
+                setResolutions((count) => count + 1)
+              }}
+            >
+              {labels.conflictDiscard}
+            </Button>
+            <Button type="button" variant="ghost" size="sm" onPress={reset}>
+              {labels.conflictDismiss}
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      {/* Narrowed back to `error`: a conflict has its own panel above, and a coach reading both at
+          once would be told their work was lost beside the two versions of it. */}
+      {error !== null && (
         <Card>
           <CardDescription>{labels.saveFailed}</CardDescription>
         </Card>
       )}
       <ReportBuilder
+        key={resolutions}
         report={report}
         locale={locale}
         labels={labels.builder}
-        onSave={save}
+        onSave={attempt}
         isSaving={isSaving}
       />
     </div>

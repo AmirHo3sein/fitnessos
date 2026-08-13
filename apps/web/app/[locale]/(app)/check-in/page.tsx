@@ -47,6 +47,11 @@ export default async function CheckInPage({
           loadFailed: t('loadFailed'),
           retry: t('retry'),
           saveFailed: t('saveFailed'),
+          conflictTitle: t('conflictTitle'),
+          conflictBody: t('conflictBody'),
+          conflictKeep: t('conflictKeep'),
+          conflictDiscard: t('conflictDiscard'),
+          conflictDismiss: t('conflictDismiss'),
           newFormTitle: t('newFormTitle'),
           builder: {
             heading: t('builder.heading'),

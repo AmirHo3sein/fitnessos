@@ -2,6 +2,7 @@
 
 import { Button, Card, CardDescription, CardTitle, Skeleton } from '@fitnessos/ui'
 import { newEntityId, type Locale, type PlainDate } from '@fitnessos/kernel'
+import { useState } from 'react'
 import { DAYS_PER_WEEK } from '../../topology/temporal'
 import type { PlanSnapshot } from '../../editor/schema'
 import { usePlan } from '../hooks/usePlan'
@@ -23,6 +24,19 @@ export interface PlanWorkspaceLabels {
   readonly loadFailed: string
   readonly retry: string
   readonly saveFailed: string
+  /*
+    The collision's four words, named as the Program Builder names them.
+
+    Same keys, same order, same two choices — one vocabulary for one situation, so a coach who has
+    met this on a programme recognises it on a plan. What differs is only what "keep" DOES here:
+    the programme leaves the editor open, this one writes.
+  */
+  readonly conflictTitle: string
+  readonly conflictBody: string
+  readonly conflictKeep: string
+  readonly conflictDiscard: string
+  /** Dismiss without choosing. A fifth string, because neither choice here is a "not now". */
+  readonly conflictDismiss: string
   readonly newTitle: string
   readonly firstPhase: string
   readonly builder: TimelineBuilderLabels
@@ -43,7 +57,19 @@ export interface PlanWorkspaceProps {
 
 /** Authoring the plan. Always in the editor once one exists — only its author opens this. */
 export const PlanWorkspace = ({ locale, labels, today }: PlanWorkspaceProps) => {
-  const { plan, isLoading, save, isSaving, error, loadFailed, retry, conflict } = usePlan()
+  const { plan, isLoading, save, isSaving, error, loadFailed, retry, conflict, keepMine, takeTheirs, reset } =
+    usePlan()
+
+  /*
+    How many times the author has taken the other version, used only as the builder's `key`.
+
+    The builder hydrates its editor store once per plan IDENTITY — the id does not change when a
+    collision is resolved, so adopting the server's plan would leave the canvas showing the local
+    draft while the cache held something else. Remounting is the honest way to say "this is a
+    different document now"; a counter rather than the revision, because the revision also moves on
+    every ordinary save and remounting there would throw away undo history nobody asked to lose.
+  */
+  const [adoptions, setAdoptions] = useState(0)
 
   if (isLoading) {
     return (
@@ -94,20 +120,59 @@ export const PlanWorkspace = ({ locale, labels, today }: PlanWorkspaceProps) => 
   return (
     <div className="space-y-4">
       {/*
-        A conflict is a failure the author must SEE. It stopped populating `error` when it became its
-        own field, and for a window that meant a collided save showed nothing at all — worse than the
-        generic banner it replaced, because the work silently did not happen.
+        A collision, and the two versions it left behind.
 
-        This is the banner, not the resolution. A proper dialog — "keep mine" against "take theirs",
-        as the Program Builder already has — needs `conflict.artefact` and `conflict.revision`, both of
-        which are now on the hook.
+        It takes the place of the generic banner rather than sitting beside it — which is why the
+        condition below is `error` alone again. "We could not store your change" is true of a
+        collision and useless: nothing broke, someone else got there first, and the author's next
+        move is a decision rather than another press of Save.
       */}
-      {(error !== null || conflict !== null) && (
+      {conflict !== null && (
+        <Card>
+          <CardTitle>{labels.conflictTitle}</CardTitle>
+          <CardDescription>{labels.conflictBody}</CardDescription>
+          {/*
+            Neither choice destroys silently (ADR-0033). "Keep mine" writes the author's document
+            onto the revision the server named, so their work survives; "take theirs" is the
+            explicit decision to let it go. Dismiss decides nothing and keeps the editor as it is.
+          */}
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Button
+              type="button"
+              size="sm"
+              isDisabled={isSaving}
+              onPress={() => {
+                void keepMine()
+              }}
+            >
+              {labels.conflictKeep}
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              isDisabled={isSaving}
+              onPress={() => {
+                takeTheirs()
+                setAdoptions((taken) => taken + 1)
+              }}
+            >
+              {labels.conflictDiscard}
+            </Button>
+            <Button type="button" variant="ghost" size="sm" onPress={reset}>
+              {labels.conflictDismiss}
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      {error !== null && (
         <Card>
           <CardDescription>{labels.saveFailed}</CardDescription>
         </Card>
       )}
       <TimelineBuilder
+        key={adoptions}
         plan={plan}
         locale={locale}
         labels={labels.builder}
