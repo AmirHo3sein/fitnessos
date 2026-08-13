@@ -6,7 +6,8 @@ import { AppProviders } from '../../../composition/app-providers'
 import { createFlags } from '../../../composition/flags'
 import { createQueryClient } from '../../../composition/query-client'
 import { createServerAthletePorts } from '../../../composition/server'
-import { Link } from '../../../src/i18n/navigation'
+import { ApiError } from '@fitnessos/infra'
+import { Link, redirect } from '../../../src/i18n/navigation'
 import { enableStaticRendering } from '../../../src/i18n/static'
 
 /**
@@ -77,6 +78,29 @@ export default async function AppLayout({
    */
   await queryClient.prefetchQuery(myAthleteQuery(athletePorts))
   const me = queryClient.getQueryData<{ id: string }>(myAthleteQuery(athletePorts).queryKey)
+
+  /*
+   * A missing athlete has TWO causes, and collapsing them was a regression.
+   *
+   *   404  onboarding has not run. Legitimate — it needs no subject, and the onboarding route reads
+   *        nothing that requires one.
+   *   401  the session is gone. NOT a state this shell can render: every query below would 401, and
+   *        `useSubject()` throws by design when there is no subject — so the throw landed during
+   *        render and pre-empted the client-side redirect that used to send the user to sign-in.
+   *
+   * The nightly e2e caught it as "a 401 the client cannot refresh past returns the user to sign-in".
+   * The local gate did not, because `pnpm check` does not run the browser suite — two definitions of
+   * green, and the narrower one was being quoted.
+   *
+   * Redirecting here is better than restoring what it did before, which was to render a shell that
+   * 401s every query and then replaces itself: the user reaches the same place with nothing rendered
+   * in between. §2.2 is what makes this safe to treat as final — the server never refreshes, so a 401
+   * arriving here has already outlived the client's single-flight refresh.
+   */
+  const failure = queryClient.getQueryState(myAthleteQuery(athletePorts).queryKey)?.error
+  if (me === undefined && failure instanceof ApiError && failure.isUnauthorized) {
+    redirect({ href: '/sign-in', locale })
+  }
 
   // Only routes that exist. A shell that links to unbuilt pages hands the user a 404 for a
   // link the product itself rendered — and it makes tests pass for the wrong reason, since a

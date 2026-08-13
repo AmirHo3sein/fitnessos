@@ -1,6 +1,6 @@
 'use client'
 
-import { AthletePortsProvider } from '@fitnessos/core/athlete/presentation'
+import { AthletePortsProvider, useMyAthlete } from '@fitnessos/core/athlete/presentation'
 import { GoalPortsProvider } from '@fitnessos/core/goal/presentation'
 import { PrescriptionPortsProvider } from '@fitnessos/ctx-prescription/presentation'
 import { ExecutionPortsProvider } from '@fitnessos/core/execution/presentation'
@@ -12,8 +12,10 @@ import { TimelinePortsProvider } from '@fitnessos/ctx-timeline/presentation'
 import { NutritionPortsProvider } from '@fitnessos/ctx-nutrition/presentation'
 import { WorkflowPortsProvider } from '@fitnessos/ctx-workflow/presentation'
 import { keysFor, openEventStream, RESUME_IMPOSSIBLE } from '@fitnessos/infra'
+import { ApiError } from '@fitnessos/infra'
 import { subjectScope, type SubjectId } from '@fitnessos/kernel'
 import { SubjectProvider } from '@fitnessos/ui'
+
 import { useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useRef, type ReactNode } from 'react'
@@ -288,7 +290,7 @@ export const AppProviders = ({ children, liveInvalidation, subject }: AppProvide
                     <NutritionPortsProvider value={ports.nutrition}>
                       <WorkflowPortsProvider value={ports.workflow}>
                         <ExecutionPortsProvider value={ports.execution}>
-                          {children}
+                          <SubjectGate seed={subject}>{children}</SubjectGate>
                         </ExecutionPortsProvider>
                       </WorkflowPortsProvider>
                     </NutritionPortsProvider>
@@ -302,7 +304,63 @@ export const AppProviders = ({ children, liveInvalidation, subject }: AppProvide
     </AthletePortsProvider>
   )
 
-  if (subject === null) return tree
+  return tree
+}
 
-  return <SubjectProvider value={subject as SubjectId}>{tree}</SubjectProvider>
+/**
+ * Supplies the subject, resolved on the CLIENT.
+ *
+ * ## Why not from the server-rendered prop alone
+ *
+ * That was the first attempt and it broke 43 e2e tests with
+ * `Subject ports were read outside their provider`. The layout's RSC prefetch of `myAthleteQuery` can
+ * fail — a cold stub, a slow dependency, anything — and before the subject existed that was harmless:
+ * `prefetchQuery` does not throw, the client fetched normally, and the only cost was a loading flash.
+ * Once the provider depended on it, the same failure meant no provider ever mounted and every page
+ * below threw during render.
+ *
+ * So the server value is a SEED, not the source. The client's own athlete query is authoritative,
+ * which is also the honest arrangement: the athlete surface's subject IS the signed-in athlete, and
+ * the client is what knows that.
+ *
+ * ## Why an unresolved subject renders nothing rather than its children
+ *
+ * `useSubject()` throws when read outside a provider, deliberately — a surface that forgets one must
+ * fail loudly rather than silently read somebody else's id. That guard only works if we never render
+ * subject-reading children while the answer is still unknown.
+ *
+ * `null` after the query settles means there is no athlete: onboarding has not run. That surface reads
+ * nothing subject-scoped, so it renders without a provider — and if anything below it ever does read
+ * one, it will say so.
+ */
+const SubjectGate = ({
+  seed,
+  children,
+}: {
+  readonly seed: string | null
+  readonly children: ReactNode
+}) => {
+  const me = useMyAthlete()
+  const subject = me.data?.id ?? seed
+
+  if (subject !== null) {
+    return <SubjectProvider value={subject as SubjectId}>{children}</SubjectProvider>
+  }
+
+  /*
+   * No subject. `getMine` THROWS rather than returning null, so both reasons arrive as errors and the
+   * status is the only thing that separates them — which is what the first fix got wrong.
+   *
+   *   404  no athlete: onboarding has not run. That surface reads nothing subject-scoped, so it
+   *        renders without a provider, and anything below it that does read one will say so.
+   *   401  the session is gone. The client's `onSessionLost` is already replacing the route with
+   *        sign-in; rendering children in the meantime would throw first and pre-empt it.
+   *   else pending, or a transient failure the client will retry.
+   *
+   * Rendering nothing costs a frame. Rendering children costs the throw that broke 43 e2e tests.
+   */
+  const missing = me.error instanceof ApiError && me.error.status === 404
+  if (missing) return <>{children}</>
+
+  return null
 }
