@@ -450,6 +450,21 @@ Ignoring the parameter does not degrade gracefully. Every deliberate reopen woul
 position and be replayed the entire backlog, each event of it invalidating queries — on every tab
 switch. Both spellings, same replay semantics; the header wins if both are present.
 
+**The id is OPAQUE.** Event ids are monotonic per ATHLETE — that is what closes the silent gap, since a
+global sequence hands out its number before commit and can make 42 visible before 41 — so a stream
+covering several athletes has several sequences and one `Last-Event-ID`. The wire id therefore encodes
+a position per subject. A single-subject stream still emits a bare integer, and the server accepts both.
+
+Nothing was ever entitled to read it as a number: the browser echoes back whatever the last frame's
+`id:` said, verbatim, and offers no way to construct one. The requirement is *no silent gap*, not *an
+integer*.
+
+**An unreadable position is `resume-impossible`, not a fresh start.** Starting over replays the whole
+window, every event of it invalidating queries; starting from now skips it silently. The same applies
+when a position names a subject the stream no longer carries — an engagement that ended between
+reconnects — and when only SOME positions are still honourable: a partial resume would lose the frames
+for the rest with nothing saying so.
+
 A capped replay window is fine. If a `Last-Event-ID` is older than the window, say so distinctly —
 close with a frame the client can recognise as "resume impossible" — so the client can refetch
 everything instead of assuming it is up to date. **Do not** silently resume from the newest event;
