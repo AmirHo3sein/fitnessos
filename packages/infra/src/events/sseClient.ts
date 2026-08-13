@@ -161,8 +161,18 @@ export const openEventStream = (options: SseOptions): SseHandle => {
       // A successful message clears the failure count. Without this, six drops over a working day
       // would eventually silence a stream that is fine.
       failures = 0
-      // Recorded BEFORE the callback, so a throw in a consumer cannot lose the position.
-      if (message.lastEventId !== '') lastEventId = message.lastEventId
+      /*
+       * Recorded BEFORE the callback, so a throw in a consumer cannot lose the position.
+       *
+       * An EMPTY id CLEARS the stored position rather than being ignored, which mirrors the platform:
+       * `EventSource` keeps a last-event-ID buffer that an empty `id:` sets to the empty string, and an
+       * empty buffer suppresses the `Last-Event-ID` header on the next reconnect. Ignoring it here made
+       * the two disagree — the browser would send no header while this still appended
+       * `?last-event-id=` to the URL, so the server saw the position the frame had just told the client
+       * to forget. The server sends an empty id exactly once: on `resume-impossible`, when no athlete
+       * on the stream has issued anything yet.
+       */
+      lastEventId = message.lastEventId === '' ? null : message.lastEventId
       options.onEvent({
         kind: readKind(message),
         subject: readSubject(message),

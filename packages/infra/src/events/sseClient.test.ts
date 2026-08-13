@@ -285,4 +285,22 @@ describe('carrying the resume position across a reopen', () => {
     handle.reopen()
     expect(sources[1]!.url).toContain('last-event-id=9')
   })
+
+  it('forgets the position when a frame carries an empty id', () => {
+    /*
+     * The platform's own rule, and the two have to agree. `EventSource` keeps a last-event-ID buffer
+     * that an empty `id:` sets to the empty string, and an empty buffer suppresses the
+     * `Last-Event-ID` header on the next reconnect.
+     *
+     * Ignoring an empty id made them disagree: the browser sent no header while this still appended
+     * `?last-event-id=` to the URL, so the server saw the very position the frame had told the client
+     * to forget. The server sends an empty id on `resume-impossible` — the one frame whose whole
+     * meaning is "the position you hold cannot be honoured".
+     */
+    const { handle, sources, latest } = harness()
+    latest().emit('session-logged', '9')
+    latest().emit('resume-impossible', '')
+    handle.reopen()
+    expect(sources[1]!.url).toBe('/api/v1/events')
+  })
 })

@@ -465,10 +465,35 @@ when a position names a subject the stream no longer carries — an engagement t
 reconnects — and when only SOME positions are still honourable: a partial resume would lose the frames
 for the rest with nothing saying so.
 
-A capped replay window is fine. If a `Last-Event-ID` is older than the window, say so distinctly —
-close with a frame the client can recognise as "resume impossible" — so the client can refetch
-everything instead of assuming it is up to date. **Do not** silently resume from the newest event;
-that is the same silent gap with extra steps.
+A capped replay window is fine. If a `Last-Event-ID` is older than the window, say so distinctly — a
+frame the client can recognise as "resume impossible" — so the client can refetch everything instead
+of assuming it is up to date. **Do not** silently resume from the newest event; that is the same
+silent gap with extra steps.
+
+**The `resume-impossible` frame must carry an `id:` of its own, and the stream must NOT close after
+it.** Both halves are load-bearing, and getting either wrong turns one refetch into a permanent loop.
+`EventSource` reconnects whenever a stream ENDS, reusing the URL it was constructed with — which
+carries `?last-event-id=` — and a frame with no `id:` leaves the browser's last-event-ID buffer
+untouched (WHATWG), so the header repeats too. The same unhonourable position then comes back every
+~3s from every open tab, each round-trip invalidating every query in the client's cache; and a
+delivered frame resets the client's failure count, so nothing ever gives up.
+
+So the frame names a position that IS honourable — the current head — and the stream carries on from
+it. Where no subject has issued anything yet, the `id:` is present and EMPTY, which sets the browser's
+buffer to the empty string and suppresses `Last-Event-ID` entirely on the next reconnect. A client
+must treat an empty id the same way: forget the position rather than ignore the field.
+
+**A stream re-resolves who it carries.** Access is resolved per request everywhere else, and a stream
+is one request that lasts hours — so a subject set resolved only at connect makes the stream the one
+place revocation does not reach: `GET /athletes/{id}` refuses immediately while the open stream goes
+on announcing that athlete's activity for as long as the tab stays open. Re-resolve at least once per
+poll interval, forget the positions of anyone dropped, and start anyone newly granted at THEIR current
+head rather than at the start of the window.
+
+**The wire id's shape is decided by the STREAM's subject count, not the cursor's.** A stream carrying
+two athletes, only one of whom has emitted anything, holds one position — and collapsing on that count
+emits a bare integer, which names no athlete and cannot be attributed on reconnect. The answer is then
+`resume-impossible` on every reconnect, silently, until the second athlete happens to act.
 
 ### 5.4 A 401 on the stream must be a 401 on the stream
 
