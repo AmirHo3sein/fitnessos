@@ -1,6 +1,18 @@
 import { expect, test } from '@playwright/test'
 
 /**
+ * Where the stub listens, and NOT a hard-coded 8791.
+ *
+ * `playwright.config.ts` has read `STUB_API_URL` since it was written; the spec files did not. So
+ * moving the stub off its default port left seven direct API calls in this file pointing at
+ * whatever else was on 8791, and the tests failed reading `.id` of undefined — a product bug's
+ * symptoms with no product bug behind them. The real backend defaults to 8791 too, which makes
+ * "run the E2E suite while the API is up" the ordinary case that triggers it.
+ */
+const STUB_API = process.env['STUB_API_URL'] ?? 'http://127.0.0.1:8791'
+
+
+/**
  * Critical-path checks on the app shell. Each one guards a failure that is either
  * invisible in review or catastrophic in production.
  */
@@ -818,13 +830,13 @@ test.describe('the program builder', () => {
     const cookies = await page.context().cookies()
     const cookieHeader = cookies.map((c) => `${c.name}=${c.value}`).join('; ')
     const current = await (
-      await request.get('http://127.0.0.1:8791/api/v1/programs/current', {
+      await request.get(`${STUB_API}/api/v1/programs/current`, {
         headers: { cookie: cookieHeader },
       })
     ).json()
 
     const elsewhere = await request.post(
-      `http://127.0.0.1:8791/api/v1/programs/${current.id as string}/versions`,
+      `${STUB_API}/api/v1/programs/${current.id as string}/versions`,
       {
         headers: { cookie: cookieHeader },
         data: {
@@ -908,7 +920,7 @@ test.describe('cross-document references', () => {
     const cookieHeader = (await page.context().cookies())
       .map((c) => `${c.name}=${c.value}`)
       .join('; ')
-    const declared = await page.request.post('http://127.0.0.1:8791/api/v1/goals', {
+    const declared = await page.request.post(`${STUB_API}/api/v1/goals`, {
       headers: { cookie: cookieHeader },
       data: { intent: 'می‌خواهم ۱۰ کیلومتر بدون توقف بدوم', cadenceDays: 28 },
     })
@@ -974,14 +986,14 @@ test.describe('a log that never arrived', () => {
     // Read the real prescribed session rather than reconstructing its deterministic id here — a
     // test that recomputes the stub's id scheme breaks when the scheme changes, for no reason.
     const upcoming = await (
-      await page.request.get('http://127.0.0.1:8791/api/v1/sessions/upcoming', { headers })
+      await page.request.get(`${STUB_API}/api/v1/sessions/upcoming`, { headers })
     ).json()
     const prescribed = upcoming[0] as { id: string; items: { id: string }[] }
 
     // The other device. A different log id, so this is a genuine second record rather than a
     // replay of the athlete's own.
     const elsewhere = await page.request.post(
-      'http://127.0.0.1:8791/api/v1/sessions/performed',
+      `${STUB_API}/api/v1/sessions/performed`,
       {
         headers,
         data: {
@@ -1023,11 +1035,11 @@ test.describe('a log that never arrived', () => {
       .join('; ')
     const headers = { cookie: cookieHeader }
     const upcoming = await (
-      await page.request.get('http://127.0.0.1:8791/api/v1/sessions/upcoming', { headers })
+      await page.request.get(`${STUB_API}/api/v1/sessions/upcoming`, { headers })
     ).json()
     const prescribed = upcoming[0] as { id: string; items: { id: string }[] }
 
-    await page.request.post('http://127.0.0.1:8791/api/v1/sessions/performed', {
+    await page.request.post(`${STUB_API}/api/v1/sessions/performed`, {
       headers,
       data: {
         id: '018f2c8a-0009-7000-8000-0000000000bb',

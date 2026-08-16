@@ -1,6 +1,17 @@
 import { expect, test, type Page } from '@playwright/test'
 
 /**
+ * Where the stub listens, and NOT a hard-coded 8791.
+ *
+ * `playwright.config.ts` has read `STUB_API_URL` since it was written; these two files did not, so
+ * moving the stub off its default port left the suite pointing `__fault` at whatever else was on
+ * 8791. Measured: 18 failures across both projects, every one of them the fault never being armed —
+ * a product bug's symptoms with no product bug behind them. The real backend also defaults to 8791,
+ * so "run the E2E suite while the API is up" was the ordinary case that triggered it.
+ */
+const STUB_API = process.env['STUB_API_URL'] ?? 'http://127.0.0.1:8791'
+
+/**
  * D-12 — the SSE spike, run against a real browser and a real `text/event-stream`.
  *
  * The handbook allots two days and a pass/fail matrix, and says to record an ADR either way. The
@@ -193,7 +204,7 @@ test.describe('D-12 · row 6 — a session that expires mid-stream', () => {
 
     // Arm the stream route to refuse, then sever the live connection.
     const cookie = (await page.context().cookies()).map((c) => `${c.name}=${c.value}`).join('; ')
-    const armed = await page.request.post('http://127.0.0.1:8791/__fault', {
+    const armed = await page.request.post(`${STUB_API}/__fault`, {
       headers: { cookie },
       data: { route: 'GET /api/v1/events', fault: 'unauthorized' },
     })

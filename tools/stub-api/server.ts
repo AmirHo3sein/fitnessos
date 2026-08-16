@@ -254,6 +254,17 @@ const outcomes = new Map<string, Map<string, unknown>>()
  * Seeded rather than generated so the unjudged-hypothesis view has something real to surface on
  * the first request. Dates are fixed, because a fixture computed from today's date makes a
  * failure unreproducible tomorrow.
+ *
+ * ## `proposedBy` is REQUIRED, and leaving it out cost six tests
+ *
+ * `ProposalSchema` made it required when Learning gained a proposer, and this fixture was not
+ * updated with it. The client validates at the boundary (ADR-0031), so every proposal was rejected
+ * as a contract violation and `/proposals` failed — which the view rendered as an empty list,
+ * because "nothing owed" and "we could not find out" were the same picture. Three e2e tests went
+ * red across two projects and stayed red, in the suite CI does not run.
+ *
+ * The lesson is not "remember the stub". It is that a fixture is a CLIENT of the contract, and
+ * this one had no check holding it to the schema it claims to speak.
  */
 const proposalsFor = (phone: string) => {
   const digits = phone.replace(/\D/g, '').slice(-12)
@@ -272,6 +283,9 @@ const proposalsFor = (phone: string) => {
       proposedOn: '2025-12-01',
       decidedOn: '2025-12-02',
       accepted: true,
+      // The assistant variant, which carries no `personId` — the shape that makes ADR-0003
+      // auditable, since this is the one a human then accepted.
+      proposedBy: { kind: 'assistant' },
     },
     {
       id: `018f2c8a-000c-7000-8000-${digits}`,
@@ -285,6 +299,7 @@ const proposalsFor = (phone: string) => {
         horizon: '2027-06-01',
       },
       proposedOn: '2026-08-01',
+      proposedBy: { kind: 'assistant' },
     },
   ]
 }

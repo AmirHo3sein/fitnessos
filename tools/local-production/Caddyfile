@@ -54,8 +54,25 @@
 	}
 }
 
-# The same topology WITHOUT `flush_interval`, so the buffering failure can be demonstrated rather than
-# asserted. §5.2 exists because this configuration silently breaks the stream and nothing reports it.
+# The same topology WITHOUT `flush_interval`.
+#
+# ## This does NOT demonstrate the buffering failure, and the comment claiming it did was worse than
+# ## no comment at all
+#
+# Caddy sets `FlushInterval = -1` by itself as soon as it sees `Content-Type: text/event-stream`, so
+# removing the directive changes nothing for a stream. Measured: 13ms to the first body byte on
+# :18080 against 33ms here — both flush the prelude immediately. This port was standing in as evidence
+# that the buffering failure had been reproduced, and it had reproduced nothing. A demonstration that
+# cannot fail is not evidence of anything.
+#
+# What it does show, honestly, is that Caddy's DEFAULT is safe: a deployment on Caddy that forgets
+# `flush_interval` still streams.
+#
+# The failure was then chased into `nginx-buffering.conf` on :18082 — a second proxy told to buffer,
+# with the backend's `X-Accel-Buffering: no` genuinely deleted one hop earlier — and it did not
+# reproduce there either. Read that file for the five measurements, and for what a negative result
+# does and does not license anyone to claim. The short version: both defences stay, and no local gate
+# claims to have verified the hazard they defend against.
 :18081 {
 	handle /api/v1/* {
 		reverse_proxy host.docker.internal:8791
@@ -65,3 +82,20 @@
 		reverse_proxy host.docker.internal:3000
 	}
 }
+
+# A backend that never sent `X-Accel-Buffering: no`, stood up by deleting it on the way out.
+#
+# Only reached by `nginx-buffering.conf`, and it exists because there is no other way to simulate the
+# omission. nginx's `proxy_hide_header X-Accel-Buffering` hides the header from the CLIENT while
+# still acting on it itself — measured: the header was absent from the response and the stream
+# flushed in 32ms anyway — so hiding it proves nothing. Deleting it one hop EARLIER means the
+# buffering proxy genuinely never sees it, which is the deployment §5.2 is warning about.
+:18083 {
+	handle {
+		reverse_proxy host.docker.internal:8791 {
+			flush_interval -1
+			header_down -X-Accel-Buffering
+		}
+	}
+}
+

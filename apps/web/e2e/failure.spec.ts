@@ -1,6 +1,17 @@
 import { expect, test, type Page } from '@playwright/test'
 
 /**
+ * Where the stub listens, and NOT a hard-coded 8791.
+ *
+ * `playwright.config.ts` has read `STUB_API_URL` since it was written; these two files did not, so
+ * moving the stub off its default port left the suite pointing `__fault` at whatever else was on
+ * 8791. Measured: 18 failures across both projects, every one of them the fault never being armed —
+ * a product bug's symptoms with no product bug behind them. The real backend also defaults to 8791,
+ * so "run the E2E suite while the API is up" was the ordinary case that triggered it.
+ */
+const STUB_API = process.env['STUB_API_URL'] ?? 'http://127.0.0.1:8791'
+
+/**
  * What the product does when things go wrong.
  *
  * Every screen here makes a promise about a bad moment — "your changes are still here", "this
@@ -55,7 +66,7 @@ const signIn = async (page: Page, phone: string) => {
 /** Arm a fault for the signed-in session. Uses the browser's own cookies. */
 const arm = async (page: Page, route: string, fault: string) => {
   const cookie = (await page.context().cookies()).map((c) => `${c.name}=${c.value}`).join('; ')
-  const response = await page.request.post('http://127.0.0.1:8791/__fault', {
+  const response = await page.request.post(`${STUB_API}/__fault`, {
     headers: { cookie },
     data: { route, fault },
   })

@@ -1,0 +1,49 @@
+# The local production topology, written down so it can be re-run rather than remembered.
+#
+#   Browser → this proxy → Next.js (:3000) → Rust API (:8791) → PostgreSQL / Redis
+#
+# It was previously stood up with an ad-hoc `docker run`, which meant the one thing the simulation
+# exists to prove — that the app works through a proxy on ONE origin — could not be reproduced by
+# anyone who did not have that command in their shell history.
+#
+# ## Ports
+#
+# 18080/18081/18082, and every one of them is bound to 127.0.0.1 explicitly. 8080 is the port anyone
+# reaches for first, and it was already serving somebody else's project on this machine: binding
+# 0.0.0.0:8080 in a container SHADOWED their process on [::1]:8080 without failing to start, and
+# their app simply began answering this proxy's 502. Check with
+# `lsof -nP -iTCP:<port> -sTCP:LISTEN` before adding a port here.
+#
+# Deliberately NOT deployment: no TLS, no domain, no DNS, no cloud.
+#
+#   docker compose -f tools/local-production/docker-compose.yml up -d
+
+services:
+  # The honest topology. This is the one to test against.
+  proxy:
+    image: caddy:2-alpine
+    container_name: fitnessos-proxy
+    ports:
+      - "127.0.0.1:18080:18080"
+      - "127.0.0.1:18081:18081"
+      # Only the buffering proxy talks to this one. See the Caddyfile: it is the API with
+      # `X-Accel-Buffering` deleted, which is the only way to simulate a backend that never sent it.
+      - "127.0.0.1:18083:18083"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # The failure, reproducible on demand. See `nginx-buffering.conf`: a proxy that buffers AND a
+  # backend whose `X-Accel-Buffering: no` has been stripped, which together are the configuration
+  # §5.2 warns about. Not part of the passing path — it exists so the warning can be shown to be
+  # about something real.
+  buffering-proxy:
+    image: nginx:1-alpine
+    container_name: fitnessos-buffering-proxy
+    ports:
+      - "127.0.0.1:18082:18082"
+    volumes:
+      - ./nginx-buffering.conf:/etc/nginx/nginx.conf:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
