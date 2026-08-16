@@ -8,6 +8,7 @@
   },
   "devDependencies": {
     "@fitnessos/config": "workspace:*",
+    "@fitnessos/contracts": "workspace:*",
     "typescript": "^5.6.3",
     "vitest": "^3.2.6"
   }

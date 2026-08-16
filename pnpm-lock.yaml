@@ -871,6 +871,9 @@ importers:
       '@fitnessos/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@fitnessos/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
       typescript:
         specifier: ^5.6.3
         version: 5.9.3

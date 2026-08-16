@@ -284,3 +284,82 @@ jobs:
           include-hidden-files: true
           if-no-files-found: error
           retention-days: 7
+
+  # ── the job that exists because nobody was told ────────────────────────────────────────────────
+  #
+  # This workflow ran red for four consecutive nights — 13, 14, 15 and 16 August — on a real defect,
+  # and the only place that said so was a tab nobody opens. The tests were right the whole time.
+  # `proposedBy` became required on `Proposal`, the stub's fixture was never updated, the client
+  # rejected every proposal as a contract violation, and three tests plus a screenshot went red and
+  # stayed there.
+  #
+  # A nightly suite with no route out of the runner is not a safety net; it is a log file. So this
+  # opens a GitHub issue on the first red night and COMMENTS on the same issue for each subsequent
+  # one, rather than opening a fourth issue nobody reads either. It closes the issue when a run goes
+  # green, so the issue's state is the suite's state.
+  #
+  # No external service, no webhook, no secret beyond the token every workflow already has: an issue
+  # notifies whoever watches the repository, and a mechanism that needs credentials to be provisioned
+  # is a mechanism that is off until somebody provisions them.
+  report:
+    runs-on: ubuntu-latest
+    needs: [e2e-full, conformance, kill-switch, lighthouse]
+    if: always()
+    permissions:
+      issues: write
+    steps:
+      - name: open, comment on, or close the nightly issue
+        uses: actions/github-script@v7
+        env:
+          # `needs.*.result` is 'success' | 'failure' | 'cancelled' | 'skipped'. A cancelled run is
+          # not a failure — usually somebody pressed the button — and treating it as one would teach
+          # people that the issue is noise.
+          RESULTS: ${{ toJSON(needs) }}
+        script: |
+          const TITLE = 'nightly suite is red'
+          const results = JSON.parse(process.env.RESULTS)
+          const failed = Object.entries(results)
+            .filter(([, v]) => v.result === 'failure')
+            .map(([name]) => name)
+
+          const { owner, repo } = context.repo
+          const open = await github.rest.issues.listForRepo({
+            owner, repo, state: 'open', labels: 'nightly',
+          })
+          const existing = open.data.find((i) => i.title === TITLE)
+
+          const run = `https://github.com/${owner}/${repo}/actions/runs/${context.runId}`
+
+          if (failed.length === 0) {
+            if (existing) {
+              await github.rest.issues.createComment({
+                owner, repo, issue_number: existing.number,
+                body: `Green again on ${context.sha.slice(0, 8)}.\n\n${run}`,
+              })
+              await github.rest.issues.update({
+                owner, repo, issue_number: existing.number, state: 'closed',
+              })
+            }
+            return
+          }
+
+          const body = [
+            `Failing jobs: **${failed.join(', ')}**`,
+            ``,
+            `Commit: ${context.sha.slice(0, 8)}`,
+            `Run: ${run}`,
+            ``,
+            `The Playwright report is an artifact on that run. A red nightly is usually one of two`,
+            `things: a real defect the critical tier does not cover, or a fixture that has drifted`,
+            `from the contract — the stub is a client of the schema like any other.`,
+          ].join('\n')
+
+          if (existing) {
+            await github.rest.issues.createComment({
+              owner, repo, issue_number: existing.number, body,
+            })
+          } else {
+            await github.rest.issues.create({
+              owner, repo, title: TITLE, body, labels: ['nightly'],
+            })
+          }
