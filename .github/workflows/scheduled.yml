@@ -315,51 +315,52 @@ jobs:
           # not a failure — usually somebody pressed the button — and treating it as one would teach
           # people that the issue is noise.
           RESULTS: ${{ toJSON(needs) }}
-        script: |
-          const TITLE = 'nightly suite is red'
-          const results = JSON.parse(process.env.RESULTS)
-          const failed = Object.entries(results)
-            .filter(([, v]) => v.result === 'failure')
-            .map(([name]) => name)
+        with:
+          script: |
+            const TITLE = 'nightly suite is red'
+            const results = JSON.parse(process.env.RESULTS)
+            const failed = Object.entries(results)
+              .filter(([, v]) => v.result === 'failure')
+              .map(([name]) => name)
 
-          const { owner, repo } = context.repo
-          const open = await github.rest.issues.listForRepo({
-            owner, repo, state: 'open', labels: 'nightly',
-          })
-          const existing = open.data.find((i) => i.title === TITLE)
+            const { owner, repo } = context.repo
+            const open = await github.rest.issues.listForRepo({
+              owner, repo, state: 'open', labels: 'nightly',
+            })
+            const existing = open.data.find((i) => i.title === TITLE)
 
-          const run = `https://github.com/${owner}/${repo}/actions/runs/${context.runId}`
+            const run = `https://github.com/${owner}/${repo}/actions/runs/${context.runId}`
 
-          if (failed.length === 0) {
+            if (failed.length === 0) {
+              if (existing) {
+                await github.rest.issues.createComment({
+                  owner, repo, issue_number: existing.number,
+                  body: `Green again on ${context.sha.slice(0, 8)}.\n\n${run}`,
+                })
+                await github.rest.issues.update({
+                  owner, repo, issue_number: existing.number, state: 'closed',
+                })
+              }
+              return
+            }
+
+            const body = [
+              `Failing jobs: **${failed.join(', ')}**`,
+              ``,
+              `Commit: ${context.sha.slice(0, 8)}`,
+              `Run: ${run}`,
+              ``,
+              `The Playwright report is an artifact on that run. A red nightly is usually one of two`,
+              `things: a real defect the critical tier does not cover, or a fixture that has drifted`,
+              `from the contract — the stub is a client of the schema like any other.`,
+            ].join('\n')
+
             if (existing) {
               await github.rest.issues.createComment({
-                owner, repo, issue_number: existing.number,
-                body: `Green again on ${context.sha.slice(0, 8)}.\n\n${run}`,
+                owner, repo, issue_number: existing.number, body,
               })
-              await github.rest.issues.update({
-                owner, repo, issue_number: existing.number, state: 'closed',
+            } else {
+              await github.rest.issues.create({
+                owner, repo, title: TITLE, body, labels: ['nightly'],
               })
             }
-            return
-          }
-
-          const body = [
-            `Failing jobs: **${failed.join(', ')}**`,
-            ``,
-            `Commit: ${context.sha.slice(0, 8)}`,
-            `Run: ${run}`,
-            ``,
-            `The Playwright report is an artifact on that run. A red nightly is usually one of two`,
-            `things: a real defect the critical tier does not cover, or a fixture that has drifted`,
-            `from the contract — the stub is a client of the schema like any other.`,
-          ].join('\n')
-
-          if (existing) {
-            await github.rest.issues.createComment({
-              owner, repo, issue_number: existing.number, body,
-            })
-          } else {
-            await github.rest.issues.create({
-              owner, repo, title: TITLE, body, labels: ['nightly'],
-            })
-          }
