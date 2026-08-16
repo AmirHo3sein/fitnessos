@@ -12,7 +12,7 @@ import { defineConfig, devices } from '@playwright/test'
  */
 export default defineConfig({
   testDir: '.',
-  testMatch: 'smoke.spec.ts',
+  testMatch: /(smoke|journey)\.spec\.ts/,
   fullyParallel: false,
   reporter: 'list',
   timeout: 60_000,

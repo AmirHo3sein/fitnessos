@@ -147,7 +147,7 @@ describe('every response matches the shape this server publishes', () => {
         const result = schema.safeParse(item)
         if (!result.success) {
           throw new Error(
-            `${path}[${index}] does not match its published schema:\n${explain(result as never)}\n\n` +
+            `${path}[${String(index)}] does not match its published schema:\n${explain(result as never)}\n\n` +
               `received: ${JSON.stringify(item)}`,
           )
         }
@@ -157,7 +157,7 @@ describe('every response matches the shape this server publishes', () => {
 
   for (const { path, schema, note } of SINGLES) {
     it(`${path} — ${note}`, async () => {
-      const response = await request<unknown>(path)
+      const response = await request(path)
 
       // 204 is a legitimate answer (§3.2), and 404 is the honest one for an athlete who does not
       // exist yet. Neither is a shape failure; both mean there was nothing to check.

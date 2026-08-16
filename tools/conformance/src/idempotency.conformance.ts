@@ -48,8 +48,12 @@ describe('§1.1 · POST /sessions/performed — 409 on a duplicate id', () => {
      * client would stop being able to detect double-submission at all.
      */
     // A bare array, not an envelope. `/sessions/upcoming` returns the sessions themselves.
+    //
+    // Indexed directly rather than through `Array.isArray`: that guard is typed `arg is any[]`, so
+    // it discards the element type and every read below becomes an unchecked `any` — which is how a
+    // suite whose whole job is checking shapes ends up not checking its own.
     const upcoming = await request<readonly UpcomingSession[]>('/sessions/upcoming')
-    const session = Array.isArray(upcoming.body) ? upcoming.body[0] : undefined
+    const session = upcoming.body?.[0]
     const prescribedSessionId = session?.id
     const prescribedItemId = session?.items[0]?.id
     if (prescribedSessionId === undefined || prescribedItemId === undefined) {
@@ -136,12 +140,7 @@ describe('§1.4 and §2.1 · programme versions', () => {
     }
 
     const programme = current.body
-    const baseVersionId = programme.currentVersion?.id
-    if (baseVersionId === undefined) {
-      expect.fail(
-        'the current programme carries no currentVersion.id, so a revision cannot be constructed',
-      )
-    }
+    const baseVersionId = programme.currentVersion.id
 
     const body = {
       id: newId(),

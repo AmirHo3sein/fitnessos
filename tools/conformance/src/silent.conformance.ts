@@ -102,7 +102,8 @@ describe('§5.3 · the resume position, from the header AND the query string', (
     const all = idsIn(await readStream(1_200))
     expect(all.length, 'expected at least two events to exist by now').toBeGreaterThan(1)
 
-    const from = all[0]!
+    const from = all[0]
+    if (from === undefined) expect.fail('no event id to resume from')
     const resumed = idsIn(await readStream(1_200, { lastEventId: from, header: true }))
     expect(resumed, `resuming from ${from} must not replay ${from} itself`).not.toContain(from)
   })
@@ -134,7 +135,8 @@ describe('§5.3 · the resume position, from the header AND the query string', (
       'no events on the stream, so resume-by-parameter could not be exercised — check §5.1 and §5.2',
     ).toBeGreaterThan(0)
 
-    const from = all[0]!
+    const from = all[0]
+    if (from === undefined) expect.fail('no event id to resume from')
     const resumed = idsIn(await readStream(1_200, { lastEventId: from, header: false }))
     expect(
       resumed,
@@ -257,8 +259,11 @@ const readStream = async (
     if (reader === undefined) return ''
     const decoder = new TextDecoder()
     for (;;) {
-      const { done, value } = await reader.read()
-      if (done) break
+      const { done, value } = (await reader.read()) as {
+        done: boolean
+        value: Uint8Array | undefined
+      }
+      if (done || value === undefined) break
       text += decoder.decode(value, { stream: true })
     }
   } catch {

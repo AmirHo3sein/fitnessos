@@ -1,0 +1,4 @@
+{
+  "extends": "@fitnessos/config/tsconfig.package.json",
+  "include": ["*.ts"]
+}

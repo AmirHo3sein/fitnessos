@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { freshPhone, toPersianDigits } from './seed'
 
 /**
  * The production topology, driven by a real browser, against the REAL Rust backend.
@@ -35,11 +36,6 @@ import { expect, test } from '@playwright/test'
 const ORIGIN = process.env['SMOKE_ORIGIN'] ?? 'http://127.0.0.1:18080'
 const OTP = process.env['SMOKE_OTP'] ?? '123456'
 
-/** A number nobody else in this database has used. */
-const freshPhone = () => `0912${String(Date.now()).slice(-7)}`
-
-const toPersianDigits = (ascii: string) =>
-  [...ascii].map((d) => '۰۱۲۳۴۵۶۷۸۹'[Number(d)] ?? d).join('')
 
 test('the whole path works on one origin, with nothing stubbed', async ({ page }) => {
   const apiCalls: string[] = []
@@ -67,7 +63,7 @@ test('the whole path works on one origin, with nothing stubbed', async ({ page }
   expect(access, 'the session cookie must exist').toBeDefined()
   expect(access?.httpOnly, 'HttpOnly, or an XSS exfiltrates the session').toBe(true)
   expect(access?.sameSite).toBe('Lax')
-  expect(new URL(ORIGIN).hostname).toBe(access?.domain?.replace(/^\./, ''))
+  expect(new URL(ORIGIN).hostname).toBe(access?.domain.replace(/^\./, ''))
 
   /*
    * Every API call the browser made must be RELATIVE to this origin. One absolute URL to :8791

@@ -4,12 +4,15 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test:conformance": "vitest run --config vitest.config.ts"
+    "lint": "eslint .",
+    "test:conformance": "vitest run --config vitest.config.ts",
+    "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@fitnessos/config": "workspace:*",
     "@fitnessos/contracts": "workspace:*",
     "typescript": "^5.6.3",
-    "vitest": "^3.2.6"
+    "vitest": "^3.2.6",
+    "zod": "^3.23.8"
   }
 }

@@ -1,4 +1,5 @@
 {
   "extends": "@fitnessos/config/tsconfig.package.json",
-  "include": ["src/**/*.ts"]
+  "//": "vitest.config.ts is included so `projectService: true` can type-aware-lint it too; leaving it out made it the one unparseable file in the package.",
+  "include": ["src/**/*.ts", "vitest.config.ts"]
 }
