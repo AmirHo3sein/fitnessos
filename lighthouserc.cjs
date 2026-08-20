@@ -29,10 +29,20 @@
  * Playwright already manages. That is a large, permanent cost for a lab number, so the answer is no
  * until something else needs puppeteer anyway.
  *
- * What covers that ground instead, imperfectly and knowingly: `tools/bundle-budget.mjs` for bytes
- * per route including deferred chunks, the axe suite for accessibility on every builder, and the
- * e2e assertions that canvases have real height. None of them is LCP, CLS or TBT on a throttled
- * mobile CPU, and that remains a gap rather than something quietly covered.
+ * ## The gap is now CLOSED, by a third route neither attempt considered
+ *
+ * `tools/local-production/lighthouse-authenticated.mjs`. Lighthouse can attach to an ALREADY-RUNNING
+ * Chrome over CDP (`--port`), and Playwright can launch one — the Chromium it has downloaded anyway
+ * — with a persistent profile. Signing in through the UI puts the session in a real cookie JAR, so
+ * the client's own `/api/v1/*` calls are authenticated and the page under measurement is the page.
+ * Neither objection above applies: no header, no second browser.
+ *
+ * It asserts `finalDisplayedUrl` per route, because the first attempt's failure mode — a healthy
+ * score for a redirect nobody asked about — is silent unless something checks.
+ *
+ * That script deliberately lives outside this config and outside CI: it needs a database, a
+ * production build and a proxy. This file stays exactly as it is, measuring public routes on every
+ * schedule.
  *
  * ## What this adds that the rest of the suite does not
  *
